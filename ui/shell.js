@@ -9,6 +9,7 @@ import { avatar, teamLogo, esc } from "./avatar.js";
 import { Spring, createSheet, scrollEdge, reduceMotion, project, tracker, rubberband } from "./motion.js";
 import { mountLiveWire } from "./ticker.js";
 import { pickInventory, toCode } from "../service/draft.js";
+import { logoMark, wordmark, HooptraxWatermark } from "./brand.js";
 
 const ICON = {
   live: '<path d="M2 12h3.5l2.5-6 4 12 3-9 2 3H22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
@@ -19,7 +20,6 @@ const ICON = {
   teams: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="2"/>',
 };
 const svg = (k, cls = "ic") => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICON[k]}</svg>`;
-const LOGO = `<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="#f26b1d"/><path d="M2.5 16h27M16 2v28M6.5 6.2c4.6 4 4.6 15.6 0 19.6M25.5 6.2c-4.6 4-4.6 15.6 0 19.6" fill="none" stroke="#1c1c1e" stroke-width="1.6"/></svg>`;
 export const TABS = [
   ["live", "Live", "live.html"], ["trade", "Trade", "index.html"], ["draft", "Draft", "draft.html"],
   ["awards", "Awards", "awards.html"], ["mcconnell", "McConnell", "mcconnell.html"],
@@ -36,7 +36,7 @@ export function mountShell({ active = "live" } = {}) {
   const bar = document.getElementById("bar") || document.body.insertBefore(document.createElement("header"), document.body.firstChild);
   bar.id = "bar"; bar.className = "bar app-bar";
   bar.innerHTML = `<div class="bar-inner">
-      <a class="brand-link" href="live.html" aria-label="Courtside home">${LOGO}<span class="brand-name">Courtside</span></a>
+      <a class="brand-link" href="./" aria-label="Hooptrax home">${logoMark("brand-mark")}${wordmark()}</a>
       <nav class="topnav" aria-label="Tools">${TABS.map(([k, label, href]) => `<a href="${href}"${k === active ? ' aria-current="page"' : ""}>${svg(k)}<span>${label}</span></a>`).join("")}</nav>
       <div class="bar-right">
         <button class="status-pill" type="button" id="statusPill" aria-label="Live data status. Open LiveWire."><span class="pulse" id="pulse"></span><span id="sync">Live Sync</span></button>
@@ -49,6 +49,11 @@ export function mountShell({ active = "live" } = {}) {
   tabbar.className = "tabbar"; tabbar.setAttribute("aria-label", "Tools");
   tabbar.innerHTML = TABS.map(([k, label, href]) => `<a href="${href}"${k === active ? ' aria-current="page"' : ""}>${svg(k)}<span>${label}</span></a>`).join("");
   document.body.append(tabbar);
+  // App footer: brand watermark so screenshots carry it
+  const footer = document.createElement("footer");
+  footer.className = "app-footer";
+  footer.innerHTML = `${HooptraxWatermark()}<span class="app-footer-note">Live NBA data from ESPN's public feeds. Not affiliated with the NBA or ESPN.</span>`;
+  (document.querySelector("main") || document.body).after(footer);
   document.body.classList.add("has-shell");
 
   /* ---------- LiveWire: right rail on wide screens, slide-up drawer otherwise ---------- */

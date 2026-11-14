@@ -1,57 +1,34 @@
-/* Shared tokens + components for the trade builder and the live hub. */
+/* Hooptrax design tokens: one deliberate dark "front office" theme across every tool.
+   Obsidian canvas, charcoal cards, amber highlights, emerald for live, crimson for injuries/drops. */
 :root {
-  --bg: #f2f2f7;
-  --surface: #ffffff;
-  --surface-2: #f7f7fa;
-  --fill: rgba(120, 120, 128, 0.12);
-  --fill-strong: rgba(120, 120, 128, 0.2);
-  --label: #1c1c1e;
-  --label-2: rgba(60, 60, 67, 0.72);
-  --label-3: rgba(60, 60, 67, 0.45);
-  --sep: rgba(60, 60, 67, 0.14);
-  --accent: #0a66ff;
-  --good: #1f9d55;
-  --bad: #e5484d;
-  --warn: #c27c0e;
-  --live: #ff3b30;
-  /* Precomputed tints: older iOS Safari can't mix colors in CSS */
-  --accent-soft: rgba(10,102,255,.10); --accent-soft-2: rgba(10,102,255,.16); --accent-press: #095ae0;
-  --focus: rgba(10,102,255,.55); --ring: rgba(10,102,255,.35);
-  --good-soft: rgba(31,157,85,.12); --bad-soft: rgba(229,72,77,.13); --warn-soft: rgba(194,124,14,.15); --live-soft: rgba(255,59,48,.14);
-  --chrome: rgba(249, 249, 251, 0.72);
-  --chrome-edge: rgba(255, 255, 255, 0.6);
-  --scrim: rgba(0, 0, 0, 0.32);
-  --thumb: #ffffff;
-  --shadow-sm: 0 1px 2px rgba(0,0,0,.04), 0 2px 8px rgba(0,0,0,.04);
-  --shadow-lg: 0 10px 40px rgba(0,0,0,.14), 0 2px 8px rgba(0,0,0,.06);
-  --r-lg: 1.25rem;
-  --r-md: 0.875rem;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #000000; --surface: #1c1c1e; --surface-2: #232326;
-    --fill: rgba(120,120,128,.24); --fill-strong: rgba(120,120,128,.36);
-    --label: #f5f5f7; --label-2: rgba(235,235,245,.68); --label-3: rgba(235,235,245,.38);
-    --sep: rgba(84,84,88,.5); --accent: #3b8bff; --good: #34c66b; --bad: #ff6369; --warn: #f0a63a; --live: #ff453a;
-    --accent-soft: rgba(59,139,255,.14); --accent-soft-2: rgba(59,139,255,.22); --accent-press: #347ae0;
-    --focus: rgba(59,139,255,.6); --ring: rgba(59,139,255,.4);
-    --good-soft: rgba(52,198,107,.14); --bad-soft: rgba(255,99,105,.15); --warn-soft: rgba(240,166,58,.16); --live-soft: rgba(255,69,58,.16);
-    --chrome: rgba(22,22,24,.7); --chrome-edge: rgba(255,255,255,.08); --scrim: rgba(0,0,0,.55); --thumb: #636366;
-    --shadow-sm: 0 1px 0 rgba(255,255,255,.03) inset; --shadow-lg: 0 10px 40px rgba(0,0,0,.6);
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #000000; --surface: #1c1c1e; --surface-2: #232326;
-  --fill: rgba(120,120,128,.24); --fill-strong: rgba(120,120,128,.36);
-  --label: #f5f5f7; --label-2: rgba(235,235,245,.68); --label-3: rgba(235,235,245,.38);
-  --sep: rgba(84,84,88,.5); --accent: #3b8bff; --good: #34c66b; --bad: #ff6369; --warn: #f0a63a; --live: #ff453a;
-    --accent-soft: rgba(59,139,255,.14); --accent-soft-2: rgba(59,139,255,.22); --accent-press: #347ae0;
-    --focus: rgba(59,139,255,.6); --ring: rgba(59,139,255,.4);
-    --good-soft: rgba(52,198,107,.14); --bad-soft: rgba(255,99,105,.15); --warn-soft: rgba(240,166,58,.16); --live-soft: rgba(255,69,58,.16);
-  --chrome: rgba(22,22,24,.7); --chrome-edge: rgba(255,255,255,.08); --scrim: rgba(0,0,0,.55); --thumb: #636366;
-  --shadow-sm: 0 1px 0 rgba(255,255,255,.03) inset; --shadow-lg: 0 10px 40px rgba(0,0,0,.6);
+  --bg: #0B0E14;
+  --surface: #151B26;
+  --surface-2: #1A2130;
+  --fill: rgba(148, 163, 184, 0.10);
+  --fill-strong: rgba(148, 163, 184, 0.18);
+  --label: #E8ECF3;
+  --label-2: rgba(203, 213, 225, 0.74);
+  --label-3: rgba(148, 163, 184, 0.62);
+  --sep: #232C3D;
+  --accent: #F59E0B;          /* Electric Amber */
+  --on-accent: #0B0E14;       /* text on amber */
+  --good: #10B981;            /* Ticker Emerald */
+  --bad: #EF4444;             /* Crimson */
+  --warn: #FBBF24;
+  --live: #10B981;
+  --accent-soft: rgba(245,158,11,.12); --accent-soft-2: rgba(245,158,11,.2); --accent-press: #D97706;
+  --focus: rgba(245,158,11,.6); --ring: rgba(245,158,11,.38);
+  --good-soft: rgba(16,185,129,.14); --bad-soft: rgba(239,68,68,.15); --warn-soft: rgba(251,191,36,.14); --live-soft: rgba(16,185,129,.16);
+  --chrome: rgba(11, 14, 20, 0.82);
+  --chrome-edge: rgba(255, 255, 255, 0.06);
+  --scrim: rgba(3, 5, 9, 0.66);
+  --thumb: #2A3448;
+  --shadow-sm: 0 1px 0 rgba(255,255,255,.03) inset, 0 6px 20px rgba(0,0,0,.25);
+  --shadow-lg: 0 16px 48px rgba(0,0,0,.55), 0 0 0 1px #232C3D;
+  --r-lg: 0.75rem;            /* rounded-xl */
+  --r-md: 0.625rem;
+  --font-sans: "Plus Jakarta Sans", Inter, -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
   color-scheme: dark;
 }
 
@@ -59,14 +36,16 @@
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; background: var(--bg); color: var(--label);
-  font: 100%/1.47 -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;
-  letter-spacing: -0.006em; -webkit-font-smoothing: antialiased; font-optical-sizing: auto;
+  font: 100%/1.5 var(--font-sans);
+  letter-spacing: -0.008em; -webkit-font-smoothing: antialiased; font-optical-sizing: auto;
 }
 button, input, select { font: inherit; color: inherit; letter-spacing: inherit; }
 button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 a { color: var(--accent); }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
-.num { font-variant-numeric: tabular-nums; }
+/* Numbers everywhere: JetBrains Mono, tabular */
+.num, td, .val, .stat .v, .sal, .money, .rec, .seed, .pct, .odds-t td, .kpis .v, .qv-stats .v, .stats .v,
+.g-team .sc, .box-team .sc, .grade, .wire .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 
 /* Press feedback: instant on pointer-down */
 .press { transition: transform 100ms ease-out, background-color 150ms ease; }
@@ -96,7 +75,7 @@ a { color: var(--accent); }
   background: var(--fill); font-weight: 590; font-size: 0.9375rem; white-space: nowrap;
 }
 .btn:hover { background: var(--fill-strong); }
-.btn.primary { background: var(--accent); color: #fff; }
+.btn.primary { background: var(--accent); color: var(--on-accent); font-weight: 700; }
 .btn.primary:hover { background: var(--accent-press); }
 .btn:disabled { opacity: .4; cursor: default; }
 .icon-btn {
@@ -222,7 +201,7 @@ button.row:hover { background: var(--fill); }
 .topnav { flex: 1; display: flex; justify-content: center; gap: 0.2rem; min-width: 0; }
 .topnav a { display: flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.8rem; border-radius: 999px; color: var(--label-2); font-weight: 600; font-size: 0.875rem; text-decoration: none; white-space: nowrap; }
 .topnav a:hover { background: var(--fill); color: var(--label); }
-.topnav a[aria-current="page"] { background: var(--label); color: var(--bg); }
+.topnav a[aria-current="page"] { background: var(--accent-soft-2); color: var(--accent); }
 .ic { width: 1.05rem; height: 1.05rem; flex: none; }
 .bar-right { display: flex; gap: 0.5rem; align-items: center; flex: none; margin-left: auto; }
 .status-pill, .teams-btn { border: 0; background: var(--fill); border-radius: 999px; padding: 0.45rem 0.8rem; display: flex; gap: 0.45rem; align-items: center; font-size: 0.8125rem; font-weight: 600; cursor: pointer; min-height: 2.25rem; }
@@ -287,3 +266,31 @@ button.row:hover { background: var(--fill); }
 .skel-line { height: 2.75rem; border-radius: 0.7rem; background: var(--fill); margin: 0.4rem 0; }
 [data-team-hub] { cursor: pointer; }
 @media (max-width: 34rem) { .qv-stats { grid-template-columns: repeat(3, 1fr); } }
+
+/* =====================================================================
+   Hooptrax brand
+   ===================================================================== */
+.brand-link { gap: 0.55rem; }
+.brand-mark { width: 2rem; height: 2rem; }
+.htx-word { font-family: var(--font-sans); font-weight: 800; font-size: 1.3125rem; letter-spacing: -0.045em; line-height: 1; }
+.htx-word .hoop { color: #FFFFFF; } .htx-word .trax { color: #F59E0B; }
+.htx-wm { display: inline-flex; align-items: center; gap: 0.4rem; font-family: var(--font-sans); font-weight: 750; font-size: 0.75rem; letter-spacing: -0.01em;
+  color: var(--label-2); text-decoration: none; padding: 0.25rem 0.55rem 0.25rem 0.35rem; border-radius: 999px; border: 1px solid var(--sep); background: rgba(11,14,20,.6); }
+.htx-wm:hover { color: var(--label); border-color: #34405A; }
+.htx-wm-mark { width: 1.1rem; height: 1.1rem; }
+.app-footer { display: flex; align-items: center; justify-content: center; gap: 0.75rem; flex-wrap: wrap; padding: 1.25rem 1rem 2rem; color: var(--label-3); font-size: 0.75rem; text-align: center; }
+.sheet-foot { flex: none; display: flex; justify-content: center; padding: 0.4rem 1rem calc(0.5rem + env(safe-area-inset-bottom)); border-top: 1px solid var(--sep); background: var(--surface); }
+.sheet-body { padding-bottom: 0.75rem !important; }
+.sheet, .card, .sum-card, .panel, .group, .game, .board, .odds-wrap, .hub-team, .inv-y { border-color: var(--sep); }
+body { background-image: radial-gradient(1200px 500px at 70% -10%, rgba(245,158,11,.06), transparent 60%); background-attachment: fixed; }
+@media (max-width: 767px) {
+  .htx-word { font-size: 1.1875rem; }
+  .brand-mark { width: 1.8rem; height: 1.8rem; }
+  .app-footer { padding-bottom: calc(var(--tabbar-h) + 1rem); }
+  body.has-shell { padding-bottom: 0; }
+}
+@media (prefers-contrast: more) { .htx-wm { color: var(--label); } }
+
+/* Names stay in the sans face even inside numeric tables */
+td .who, td .tm, td .nm, td .who .nm, .who .sub, td b, th { font-family: var(--font-sans); letter-spacing: -0.008em; }
+th { letter-spacing: 0.06em; }

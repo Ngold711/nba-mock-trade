@@ -3,8 +3,29 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>McConnell</title>
-<meta name="description" content="Guess the mystery NBA player in eight tries. Daily puzzle and unlimited mode, built on live ESPN rosters." />
+<title>McConnell — Daily NBA Player Guessing Game · Hooptrax</title>
+<meta name="description" content="Guess the mystery NBA player in eight tries. A new player every day, plus unlimited mode." />
+<meta name="theme-color" content="#0B0E14" />
+<meta name="color-scheme" content="dark" />
+<link rel="icon" href="public/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="public/favicon-32.png" type="image/png" sizes="32x32" />
+<link rel="apple-touch-icon" href="public/apple-touch-icon.png" />
+<meta property="og:site_name" content="Hooptrax" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="McConnell — Daily NBA Player Guessing Game · Hooptrax" />
+<meta property="og:description" content="Guess the mystery NBA player in eight tries. A new player every day, plus unlimited mode." />
+<meta property="og:url" content="https://hooptrax.com/mcconnell.html" />
+<meta property="og:image" content="https://hooptrax.com/public/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Hooptrax: live NBA trade machine, 3-2-1 lottery simulator and draft hub" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="McConnell — Daily NBA Player Guessing Game · Hooptrax" />
+<meta name="twitter:description" content="Guess the mystery NBA player in eight tries. A new player every day, plus unlimited mode." />
+<meta name="twitter:image" content="https://hooptrax.com/public/og-image.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
 <link rel="stylesheet" href="ui/base.css" />
 <style>
 main { max-width: 60rem; margin: 0 auto; padding: 0 max(1rem, env(safe-area-inset-right)) 3rem max(1rem, env(safe-area-inset-left)); }
@@ -42,7 +63,7 @@ main { max-width: 60rem; margin: 0 auto; padding: 0 max(1rem, env(safe-area-inse
 .grid .hdr span:first-child { text-align: left; padding-left: 0.3rem; }
 .cell { min-height: 3.1rem; border-radius: 0.6rem; display: grid; place-items: center; text-align: center; font-weight: 750; font-size: 0.875rem; letter-spacing: -0.01em;
   background: var(--fill); color: var(--label); font-variant-numeric: tabular-nums; padding: 0.2rem; line-height: 1.1; backface-visibility: hidden; }
-.cell.green { background: #1f9d55; color: #fff; } .cell.yellow { background: #e0a816; color: #1c1300; } .cell.gray { background: var(--fill-strong); }
+.cell.green { background: #10B981; color: #04130D; } .cell.yellow { background: #EAB308; color: #1A1300; } .cell.gray { background: var(--fill-strong); }
 .cell .ar { display: block; font-size: 0.75rem; line-height: 1; margin-top: 0.1rem; }
 .cell.who { justify-items: start; grid-template-columns: auto minmax(0, 1fr); gap: 0.45rem; background: transparent; padding: 0; font-weight: 650; text-align: left; }
 .cell.who .n { font-size: 0.8125rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -70,7 +91,7 @@ details.help p { margin: 0.4rem 0; line-height: 1.5; }
 .dist { display: grid; gap: 0.25rem; margin-top: 0.25rem; }
 .dist div { display: grid; grid-template-columns: 1rem 1fr; gap: 0.4rem; align-items: center; font-size: 0.75rem; font-variant-numeric: tabular-nums; }
 .dist span.b { background: var(--fill-strong); color: var(--label); border-radius: 0.3rem; padding: 0.15rem 0.4rem; text-align: right; min-width: 1.6rem; font-weight: 700; justify-self: start; }
-.dist span.b.me { background: #1f9d55; color: #fff; }
+.dist span.b.me { background: #10B981; color: #04130D; }
 .share-row { display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; }
 .share-row .btn { min-height: 44px; flex: 1; justify-content: center; display: inline-flex; align-items: center; }
 .share-fallback { width: 100%; min-height: 8rem; margin-top: 0.5rem; font: 0.875rem/1.3 ui-monospace, Menlo, monospace; border-radius: 0.6rem; border: var(--card-border); padding: 0.5rem; }
@@ -110,7 +131,7 @@ details.help p { margin: 0.4rem 0; line-height: 1.5; }
     <div class="status"><span id="statusL">Guess 1 of 8</span><span id="statusR"></span></div>
     <div class="grid" id="grid" role="table" aria-label="Your guesses"></div>
     <div class="after" id="after"></div>
-    <div class="legend"><span><i style="background:#1f9d55"></i>Match</span><span><i style="background:#e0a816"></i>Close (within 2) or shares a position</span><span><i style="background:var(--fill-strong)"></i>No match</span><span>↑ ↓ the mystery value is higher / lower</span></div>
+    <div class="legend"><span><i style="background:#10B981"></i>Match</span><span><i style="background:#EAB308"></i>Close (within 2) or shares a position</span><span><i style="background:var(--fill-strong)"></i>No match</span><span>↑ ↓ the mystery value is higher / lower</span></div>
     <details class="help"><summary>How to play</summary>
       <p>Search any active NBA player to make a guess. Each guess shows how it compares with the mystery player: team, conference, division, position, height, age and jersey number.</p>
       <p>Height, age and number turn yellow when they’re within 2 of the answer, with an arrow pointing toward it. Positions come from ESPN (G, F, C); hybrids like G-F and F-C are derived from our roster data and height, and share a yellow match with either side.</p>
@@ -277,7 +298,7 @@ function showResults() {
   const look = teamLook(m.team);
   const st = stats[m.id];
   const results = state.guesses.map((id) => compare(byId[id], m));
-  const text = shareText({ results, won: state.won, game: mode === "daily" ? game : null, url: location.origin + location.pathname });
+  const text = shareText({ results, won: state.won, game: mode === "daily" ? game : null, url: "Hooptrax.com/mcconnell" });   // brand watermark on the shared grid
   const s = mode === "daily" ? store.get("mc:stats", emptyStats()) : null;
   const u = mode === "unlimited" ? store.get("mc:unlStats", { played: 0, wins: 0 }) : null;
   sheet.open({

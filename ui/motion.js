@@ -1,6 +1,8 @@
 // Fluid motion primitives: interruptible springs, momentum projection, rubber-banding,
 // and a draggable bottom sheet. Shared by the trade builder and the live hub.
 
+import { HooptraxWatermark } from "./brand.js";
+
 export const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
 /** Spring using Apple's damping ratio + response. Retargeting keeps current value and velocity. */
@@ -84,7 +86,8 @@ function buildSheet() {
   sheet.innerHTML = `<div class="sheet-head"><div class="grabber" aria-hidden="true"></div>
       <div class="sheet-title"><h4 id="sheetTitle"></h4><button class="btn press" type="button" data-done>Done</button></div>
       <input class="search" id="sheetSearch" type="search" placeholder="Search" autocomplete="off" hidden></div>
-    <div class="sheet-body"></div>`;
+    <div class="sheet-body"></div>
+    <div class="sheet-foot">${HooptraxWatermark()}</div>`;
   document.body.append(scrim, sheet);
   const head = sheet.querySelector(".sheet-head"), body = sheet.querySelector(".sheet-body");
   const title = sheet.querySelector("h4"), search = sheet.querySelector(".search"), done = sheet.querySelector("[data-done]");

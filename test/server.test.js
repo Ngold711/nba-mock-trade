@@ -78,5 +78,8 @@ test("validation and static safety", async () => {
   assert.equal((await fetch(base + "/test/store.test.js")).status, 404);
   const page = await fetch(base + "/");
   assert.equal(page.status, 200);
-  assert.match(await page.text(), /Mock Trade/);
+  const html = await page.text();
+  assert.match(html, /<title>Hooptrax — Live NBA Trade Machine/);
+  assert.match(html, /og:image" content="https:\/\/hooptrax.com\/public\/og-image.png"/);
+  assert.equal((await fetch(base + "/public/logo.svg")).status, 200);
 });

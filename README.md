@@ -182,3 +182,14 @@ Gray means no match.
   Stats, streaks and the 1–8 distribution are stored locally.
 - **Unlimited:** random mystery players, one after another.
 - **Share:** copies the emoji grid.
+
+## Brand: Hooptrax
+
+- **Assets:** `public/logo.svg` (the mark), `public/favicon.svg` + `favicon-32.png`, `apple-touch-icon.png` (180),
+  `icon-512.png`, and `og-image.png` (1200×630, used for OpenGraph and Twitter cards).
+- **Theme:** one deliberate dark theme, with tokens at the top of `ui/base.css`: canvas `#0B0E14`, cards `#151B26`,
+  borders `#232C3D`, amber `#F59E0B`, emerald `#10B981` and crimson `#EF4444`. Text is Plus Jakarta Sans; numbers
+  use JetBrains Mono with tabular figures.
+- **`HooptraxWatermark()`** (`ui/brand.js`) appears in the app footer, at the foot of every sheet and modal, on the
+  exported ballot card, and as the last line of the McConnell share text.
+- **Domain:** OpenGraph tags point at `https://hooptrax.com`. Link previews need that domain to serve this site.
