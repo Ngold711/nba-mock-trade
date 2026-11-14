@@ -186,7 +186,8 @@ export function validateTeam(t, cba) {
   if (t.rosterCount != null) {
     const nOut = sends.filter((a) => a.kind === "player").length, nIn = receives.filter((a) => a.kind === "player").length;
     const after = t.rosterCount - nOut + nIn;
-    if (after > 15 && nIn > nOut) warnings.push(`Roster goes to ${after} players (max 15 standard contracts); a waiver would be needed.`);
+    const std = Math.min(t.rosterCount, 15) - nOut + nIn;      // ESPN lists two-way players too; assume a full 15 standard deals at most
+    if (std > 15 && nIn > nOut) warnings.push(`Roster goes to ${std} standard contracts (max 15); a waiver would be needed.`);
     if (after < 12 && nOut > nIn) warnings.push(`Roster drops to ${after} players (minimum 12); a signing would be needed.`);
   }
 

@@ -62,3 +62,34 @@ export function fitText(x, text, X, Y, maxW) {
 }
 export const canvasToBlob = (c) => new Promise((res) => c.toBlob((b) => res(b), "image/png"));
 export const fontsReady = () => (document.fonts?.ready || Promise.resolve()).catch(() => {});
+
+/**
+ * Preview sheet for an exported card: image, Download PNG, Copy Image, and the native share sheet
+ * (iOS Safari → Messages, X, Photos) when the browser can share files.
+ */
+export async function openImageSheet(sheet, canvas, { title = "Share", filename = "hooptrax.png", text = "", toast = () => {} } = {}) {
+  const blob = await canvasToBlob(canvas);
+  const url = URL.createObjectURL(blob);
+  const file = typeof File !== "undefined" ? new File([blob], filename, { type: "image/png" }) : null;
+  const canShareFile = !!(file && navigator.canShare && navigator.canShare({ files: [file] }));
+  const canCopy = !!(navigator.clipboard && window.ClipboardItem);
+  sheet.open({
+    title,
+    render(body) {
+      body.innerHTML = `<img class="card-img" src="${url}" alt="${title}" style="width:100%;height:auto;border-radius:0.9rem;display:block;margin:0.25rem 0 0.9rem" />
+        <div class="img-actions" style="display:flex;gap:0.5rem;flex-wrap:wrap">
+          <a class="btn primary press" href="${url}" download="${filename}" style="text-decoration:none;flex:1;text-align:center;min-height:44px;display:inline-flex;align-items:center;justify-content:center">Download PNG</a>
+          ${canCopy ? `<button class="btn ghost press" type="button" data-copy-img style="flex:1;min-height:44px">Copy Image</button>` : ""}
+          ${canShareFile ? `<button class="btn ghost press" type="button" data-share-img style="flex:1;min-height:44px">Share…</button>` : ""}
+        </div>
+        <p style="font-size:0.75rem;color:var(--label-3);margin:0.6rem 0 0">On iPhone you can also long-press the image to save it.</p>`;
+      body.querySelector("[data-copy-img]")?.addEventListener("click", async () => {
+        try { await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]); toast("✓ Image copied"); }
+        catch { toast("Couldn't copy. Use Download instead."); }
+      });
+      body.querySelector("[data-share-img]")?.addEventListener("click", async () => {
+        try { await navigator.share({ files: [file], title, text }); } catch (e) { if (e?.name !== "AbortError") toast("Sharing isn't available here"); }
+      });
+    },
+  });
+}

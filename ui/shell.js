@@ -32,6 +32,8 @@ const f1 = (x) => (x == null || !Number.isFinite(+x) ? "—" : Number(x).toFixed
 let instance = null;
 export function mountShell({ active = "live" } = {}) {
   if (instance) return instance;
+  // A shared trade link always opens on the Trade tab, whichever page it was pasted onto.
+  if (active !== "trade" && new URLSearchParams(location.search).has("trade")) { location.replace(`index.html${location.search}`); }
   const sheet = createSheet();
   // The LiveWire ticker lives on the Live tab only; elsewhere a quiet dot on that tab says updates are streaming.
   const hasWire = active === "live";
