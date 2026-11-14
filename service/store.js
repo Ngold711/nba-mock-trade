@@ -10,7 +10,7 @@ import { load as defaultLoad } from "./espn.js";
 const SEC = 1000, MIN = 60 * SEC;
 
 export const TTL = {
-  live: 20 * SEC,          // games in progress (spec: 15–30s)
+  live: 15 * SEC,          // games in progress (spec: 15–30s)
   pregame: 30 * SEC,       // a game tips within 15 min, or should have started
   summaryPre: 2 * MIN,
   final: 60 * MIN,

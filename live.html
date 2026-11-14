@@ -133,6 +133,27 @@ tr.cut td { border-top: 1.5px dashed var(--fill-strong); }
 }
 .wire-detail p { margin: .25rem 0 .75rem; font-size: .9375rem; line-height: 1.5; }
 .wire-detail .meta { color: var(--label-2); font-size: .8125rem; }
+
+/* Game Center */
+.ls-wrap { overflow-x: auto; margin: 0.25rem 0 0.75rem; }
+.ls { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+.ls th { font-size: 0.625rem; font-weight: 700; color: var(--label-3); letter-spacing: 0.06em; padding: 0.3rem 0.4rem; text-align: center; }
+.ls td { padding: 0.35rem 0.4rem; text-align: center; border-top: 1px solid var(--hair); }
+.ls .ls-t { text-align: left; display: flex; align-items: center; gap: 0.35rem; font-family: var(--font-sans); font-weight: 650; }
+.ls .ls-tot { font-weight: 800; }
+.gc-tabs { margin: 0.25rem 0 0.75rem; } .gc-tabs button { font-size: 0.8125rem; padding: 0.45rem 0.2rem; min-height: 40px; }
+.ts-head { display: flex; justify-content: space-between; font-weight: 700; font-size: 0.875rem; margin-bottom: 0.4rem; }
+.ts-head span { display: inline-flex; align-items: center; gap: 0.4rem; }
+.ts { display: grid; gap: 0.3rem; }
+.ts-row { display: grid; grid-template-columns: 1fr 1.4fr 1fr; align-items: center; gap: 0.5rem; padding: 0.4rem 0.5rem; border-radius: 0.6rem; background: var(--surface-2); }
+.ts-v { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 650; text-align: center; border-radius: 0.45rem; padding: 0.1rem 0; }
+.ts-v small { display: block; font-size: 0.625rem; color: var(--label-3); font-weight: 500; }
+.ts-v.win { color: var(--good); background: var(--good-soft); }
+.ts-l { font-size: 0.75rem; color: var(--label-2); text-align: center; display: grid; gap: 0.25rem; justify-items: center; }
+.ts-bar { display: flex; width: 100%; max-width: 8rem; height: 0.3rem; border-radius: 99px; overflow: hidden; gap: 2px; }
+.ts-bar i { display: block; height: 100%; }
+.plays .pb-logo { width: 1.3rem; flex: none; }
+.box-seg { --n: 2; }
 </style>
 </head>
 <body>
@@ -311,37 +332,51 @@ $("#prevDay").addEventListener("click", () => shiftDay(-1));
 $("#nextDay").addEventListener("click", () => shiftDay(1));
 $("#todayBtn").addEventListener("click", () => { day = null; current = null; show("games"); });
 
-/* Box score sheet — polls the game summary while open (20s when live) */
+/* Game Center sheet: linescore header + Box Score / Team Stats / Play-by-Play; polls every 15s while live */
 let openGame = null;
 function openBox(id) {
-  let data = null, side = 1, stop = null, err = null;
+  let data = null, side = 0, tab = "box", stop = null, err = null, sideSet = false;
   openGame = id;
   sheet.open({
-    title: "Box score",
+    title: "Game Center",
     render(body) {
       if (err && !data) { body.innerHTML = `<div class="empty">Couldn’t load this game: ${esc(err)}</div>`; return; }
-      if (!data) { body.innerHTML = `<div class="skeleton" style="height:12rem;box-shadow:none;background:var(--fill)"></div>`; return; }
-      body.innerHTML = boxScore(data, side);
+      if (!data) { body.innerHTML = `<div class="skeleton" style="height:9rem"></div><div class="skeleton" style="height:14rem;margin-top:.75rem"></div>`; return; }
+      body.innerHTML = gameCenter(data, side, tab);
       body.querySelectorAll("[data-side]").forEach((b) => b.addEventListener("click", () => { side = +b.dataset.side; sheet.refresh(); }));
+      body.querySelectorAll("[data-gtab]").forEach((b) => b.addEventListener("click", () => { tab = b.dataset.gtab; sheet.refresh(); }));
     },
     onClose() { stop?.(); openGame = null; },
   });
   stop = client.watch("summary", { id }, (d, meta) => {
     data = d; err = meta?.error || null;
+    if (!sideSet) { const ai = d.teams.findIndex((t) => t.team.id === d.game.away?.id); side = ai >= 0 ? ai : 0; sideSet = true; }
     const g = d.game;
-    sheet.setTitle(g.away && g.home ? `${g.away.abbr} @ ${g.home.abbr}` : "Box score");
+    sheet.setTitle(g.away && g.home ? `${g.away.abbr} @ ${g.home.abbr}` : "Game Center");
     if (sheet.isOpen && openGame === id) sheet.refresh();
   }, (e) => { err = e.message; if (sheet.isOpen && openGame === id) sheet.refresh(); });
 }
-function boxScore(d, side) {
+function gameCenter(d, side, tab) {
   const g = d.game;
-  const T = (t, cls) => t ? `<div class="box-team ${cls}">${teamLogo(t, { size: "2.5rem" })}<div><div class="sc">${t.score ?? "–"}</div><div class="ab">${esc(t.abbr)}</div></div></div>` : "<div></div>";
+  const T = (t, cls) => t ? `<div class="box-team ${cls}">${teamLogo(t, { size: "2.75rem" })}<div><div class="sc">${t.score ?? "–"}</div><div class="ab">${esc(t.abbr)}</div></div></div>` : "<div></div>";
   let html = `<div class="box-head">${T(g.away, "away")}<div class="box-mid">${statusPill(g)}</div>${T(g.home, "home")}</div>`;
-  if (!d.teams.length) return html + `<div class="empty">Box score appears once the game tips off.</div>`;
-  html += `<div class="seg box-seg" role="group" aria-label="Team"><span class="thumb" style="transform:translateX(${side * 100}%)"></span>
-    ${d.teams.map((t, i) => `<button type="button" data-side="${i}" aria-pressed="${i === side}">${esc(t.team.displayName)}</button>`).join("")}</div>`;
+  const la = d.linescore?.away || [], lh = d.linescore?.home || [];
+  const n = Math.max(4, la.length, lh.length);
+  if (la.length || lh.length) {
+    const head = Array.from({ length: n }, (_, i) => (i < 4 ? `Q${i + 1}` : n - 4 > 1 ? `OT${i - 3}` : "OT"));
+    const line = (t, arr) => `<tr><td class="ls-t">${teamLogo(t, { size: "1.2rem" })}${esc(t.abbr)}</td>${head.map((_, i) => `<td>${arr[i] ?? "–"}</td>`).join("")}<td class="ls-tot">${t.score ?? "–"}</td></tr>`;
+    html += `<div class="ls-wrap"><table class="ls"><thead><tr><th></th>${head.map((h) => `<th>${h}</th>`).join("")}<th>T</th></tr></thead><tbody>${line(g.away, la)}${line(g.home, lh)}</tbody></table></div>`;
+  }
+  html += `<div class="seg gc-tabs" role="tablist" style="--n:3"><span class="thumb" style="transform:translateX(${["box", "team", "pbp"].indexOf(tab) * 100}%)"></span>
+    ${[["box", "Box Score"], ["team", "Team Stats"], ["pbp", "Play-by-Play"]].map(([k, l]) => `<button type="button" role="tab" data-gtab="${k}" aria-pressed="${tab === k}">${l}</button>`).join("")}</div>`;
+  if (!d.teams.length) return html + `<div class="empty">The box score appears once the game tips off.</div>`;
+  if (tab === "team") return html + teamStatsView(d);
+  if (tab === "pbp") return html + playsView(d);
+  const order = [d.teams.findIndex((t) => t.team.id === g.away?.id), d.teams.findIndex((t) => t.team.id === g.home?.id)].map((i, k) => (i >= 0 ? i : k));
+  html += `<div class="seg box-seg" role="group" aria-label="Team" style="--n:2"><span class="thumb" style="transform:translateX(${order.indexOf(side) * 100}%)"></span>
+    ${order.map((i) => `<button type="button" data-side="${i}" aria-pressed="${i === side}">${esc(d.teams[i].team.displayName)}</button>`).join("")}</div>`;
   const tm = d.teams[side] || d.teams[0];
-  const cols = ["MIN", "PTS", "REB", "AST", "FG", "3PT", "FT", "STL", "BLK", "TO", "+/-"].filter((c) => tm.labels.includes(c));
+  const cols = ["MIN", "PTS", "REB", "AST", "STL", "BLK", "FG", "3PT", "+/-"].filter((c) => tm.labels.includes(c));
   const played = tm.players.filter((p) => !p.didNotPlay);
   const dnp = tm.players.filter((p) => p.didNotPlay);
   const rowFor = (p, i) => `<tr${i === 5 ? ' class="cut"' : ""}><td><div class="who" data-player="${esc(p.id || "")}" role="button" tabindex="0">${avatar(p, { size: "2rem", color: tm.team.color })}
@@ -351,13 +386,34 @@ function boxScore(d, side) {
     ${played.map(rowFor).join("")}
     <tr><td><b>Team</b></td>${cols.map((c) => `<td><b>${esc(tm.totals[c] ?? "")}</b></td>`).join("")}</tr></tbody></table></div></div>`;
   if (dnp.length) html += `<div class="dnp">Did not play: ${dnp.map((p) => `${esc(p.shortName)}${p.reason ? ` (${esc(p.reason.toLowerCase())})` : ""}`).join(", ")}</div>`;
-  if (d.plays.length) {
-    const names = Object.fromEntries(d.teams.map((t) => [t.team.id, t.team.abbr]));
-    html += `<div class="sheet-sub">Latest plays</div><ul class="list plays">${d.plays.slice(0, 20).map((p) => `
-      <li class="row${p.scoring ? " scoring" : ""}"><span class="clk">${p.period ? `Q${p.period > 4 ? `OT${p.period - 4 > 1 ? p.period - 4 : ""}` : p.period}` : ""} ${esc(p.clock)}</span>
-      <span class="txt">${esc(p.text)}</span><span class="scr">${p.awayScore ?? ""}–${p.homeScore ?? ""}</span></li>`).join("")}</ul>`;
-  }
   return html;
+}
+function teamStatsView(d) {
+  const g = d.game;
+  const A = d.teamStats?.find((t) => t.homeAway === "away") || d.teamStats?.[0], H = d.teamStats?.find((t) => t.homeAway === "home") || d.teamStats?.[1];
+  if (!A || !H) return `<div class="empty">Team stats appear once the game tips off.</div>`;
+  const ROWS = [["Field Goal %", "fieldGoalPct", "fieldGoalsMade-fieldGoalsAttempted"], ["3-Point %", "threePointFieldGoalPct", "threePointFieldGoalsMade-threePointFieldGoalsAttempted"], ["Free Throw %", "freeThrowPct", "freeThrowsMade-freeThrowsAttempted"],
+    ["Rebounds", "totalRebounds"], ["Assists", "assists"], ["Turnovers", "totalTurnovers", null, true], ["Fast Break Points", "fastBreakPoints"], ["Points in Paint", "pointsInPaint"], ["Steals", "steals"], ["Blocks", "blocks"]];
+  const val = (T, key) => parseFloat(T.stats[key] ?? (key === "totalTurnovers" ? T.stats.turnovers : undefined));
+  return `<div class="ts-head"><span>${teamLogo(g.away, { size: "1.5rem" })}${esc(g.away.abbr)}</span><span>${esc(g.home.abbr)}${teamLogo(g.home, { size: "1.5rem" })}</span></div>
+    <div class="ts">${ROWS.map(([label, key, sub, lowerBetter]) => {
+      const a = val(A, key), h = val(H, key);
+      if (!Number.isFinite(a) && !Number.isFinite(h)) return "";
+      const share = a + h > 0 ? a / (a + h) : 0.5;
+      const aw = lowerBetter ? a < h : a > h, hw = lowerBetter ? h < a : h > a;
+      return `<div class="ts-row"><span class="ts-v ${aw ? "win" : ""}">${Number.isFinite(a) ? a : "–"}${sub && A.stats[sub] ? `<small>${esc(A.stats[sub])}</small>` : ""}</span>
+        <span class="ts-l">${label}<span class="ts-bar"><i style="width:${(share * 100).toFixed(1)}%;background:${g.away.color || "var(--accent)"}"></i><i style="width:${((1 - share) * 100).toFixed(1)}%;background:${g.home.color || "var(--label-3)"}"></i></span></span>
+        <span class="ts-v ${hw ? "win" : ""}">${Number.isFinite(h) ? h : "–"}${sub && H.stats[sub] ? `<small>${esc(H.stats[sub])}</small>` : ""}</span></div>`;
+    }).join("")}</div>`;
+}
+function playsView(d) {
+  if (!d.plays.length) return `<div class="empty">No plays yet.</div>`;
+  const logos = Object.fromEntries(d.teams.map((t) => [t.team.id, t.team]));
+  const per = (p) => (p.period ? (p.period > 4 ? (p.period - 4 > 1 ? `OT${p.period - 4}` : "OT") : `Q${p.period}`) : "");
+  return `<ul class="list plays">${d.plays.map((p) => `
+    <li class="row${p.scoring ? " scoring" : ""}"><span class="pb-logo">${logos[p.teamId] ? teamLogo(logos[p.teamId], { size: "1.3rem" }) : ""}</span><span class="clk">${per(p)} ${esc(p.clock)}</span>
+    <span class="txt">${esc(p.text)}</span><span class="scr">${p.awayScore ?? ""}–${p.homeScore ?? ""}</span></li>`).join("")}</ul>
+    <p class="fine" style="margin-top:.5rem">Latest ${d.plays.length} of ${d.playCount} plays · refreshes every 15 seconds while live.</p>`;
 }
 
 /* LiveWire item → box score or detail sheet */

@@ -4,7 +4,7 @@ import { createStore, scoreboardTtl, TTL } from "../service/store.js";
 
 const game = (state, date = "2026-11-14T00:00Z") => ({ id: "1", date, status: { state } });
 
-test("scoreboard cadence: 20s live, 30s near tip, sleeps until ~10 min before tip, idle otherwise", () => {
+test("scoreboard cadence: 15s live, 30s near tip, sleeps until ~10 min before tip, idle otherwise", () => {
   const now = Date.parse("2026-11-14T20:00:00Z");
   assert.equal(scoreboardTtl({ games: [game("in"), game("post")] }, now), TTL.live);
   assert.equal(scoreboardTtl({ games: [game("pre", "2026-11-14T20:10:00Z")] }, now), TTL.pregame);
@@ -74,7 +74,7 @@ test("throws only when there has never been data", async () => {
   await assert.rejects(h.store.get("injuries"), /offline/);
 });
 
-test("watch polls live scoreboards every ~20s and stops when unsubscribed", async () => {
+test("watch polls live scoreboards every ~15s and stops when unsubscribed", async () => {
   const h = harness(() => ({ games: [game("in")] }));
   const seen = [];
   const stop = h.store.watch("scoreboard", {}, (d, m) => seen.push(m.refreshInMs));

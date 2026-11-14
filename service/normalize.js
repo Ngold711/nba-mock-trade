@@ -159,7 +159,7 @@ export function normalizeScoreboard(json) {
 }
 
 /* ------------------------------------------------------- summary / box score */
-export function normalizeSummary(json, { maxPlays = 40 } = {}) {
+export function normalizeSummary(json, { maxPlays = 60 } = {}) {
   const comp = get(json, "header.competitions.0", {});
   const game = normalizeGame({ id: get(json, "header.id"), competitions: [comp], status: get(comp, "status") });
 
@@ -199,7 +199,17 @@ export function normalizeSummary(json, { maxPlays = 40 } = {}) {
     teamId: str(get(p, "team.id"), ""),
   }));
 
-  return { game, teams, plays, playCount: arr(get(json, "plays")).length };
+  // Quarter-by-quarter linescore (Q1–Q4, then each OT) for away and home.
+  const comps = arr(get(comp, "competitors"));
+  const ls = (side) => arr(get(comps.find((c) => get(c, "homeAway") === side) || {}, "linescores")).map((l) => num(get(l, "displayValue") ?? get(l, "value"), null));
+  const linescore = { away: ls("away"), home: ls("home") };
+  // Team stats, keyed by ESPN stat name (fieldGoalPct, totalRebounds, fastBreakPoints, pointsInPaint …).
+  const teamStats = arr(get(json, "boxscore.teams")).map((t) => ({
+    team: team(get(t, "team", {})),
+    homeAway: str(get(t, "homeAway"), ""),
+    stats: Object.fromEntries(arr(get(t, "statistics")).map((x) => [str(get(x, "name")), str(get(x, "displayValue"), "")])),
+  }));
+  return { game, teams, plays, linescore, teamStats, playCount: arr(get(json, "plays")).length };
 }
 
 /* ------------------------------------------------------------------ rosters */
