@@ -435,3 +435,26 @@ export function normalizePlayerStats(json) {
   }).filter((p) => p.id);
   return { season: num(get(json, "requestedSeason.year"), null), players };
 }
+
+/* ---------------------------------------------------------- team schedule */
+export function normalizeSchedule(json) {
+  const teamId = str(get(json, "team.id"), "");
+  const games = arr(get(json, "events")).map((e) => {
+    const c = get(e, "competitions.0", {});
+    const comps = arr(get(c, "competitors"));
+    const me = comps.find((x) => str(get(x, "team.id")) === teamId) || comps[0] || {};
+    const opp = comps.find((x) => x !== me) || {};
+    const done = Boolean(get(c, "status.type.completed"));
+    const sc = (x) => num(get(x, "score.value"), num(get(x, "score"), null));
+    return {
+      id: str(get(e, "id"), ""), date: str(get(e, "date"), ""),
+      home: get(me, "homeAway") === "home",
+      opponent: { abbr: str(get(opp, "team.abbreviation"), ""), name: str(get(opp, "team.shortDisplayName") || get(opp, "team.displayName"), ""), logo: get(opp, "team.logos.0.href") || get(opp, "team.logo") || null },
+      state: done ? "post" : str(get(c, "status.type.state"), "pre"),
+      result: done ? (get(me, "winner") ? "W" : "L") : null,
+      score: done ? `${sc(me)}-${sc(opp)}` : null,
+      broadcast: str(get(c, "broadcasts.0.media.shortName"), ""),
+    };
+  });
+  return { team: { id: teamId, abbr: str(get(json, "team.abbreviation"), "") }, games };
+}

@@ -1,0 +1,67 @@
+{
+ "name": "Hooptrax — Live NBA Trade Machine & Draft Hub",
+ "short_name": "Hooptrax",
+ "description": "Live NBA trade machine, 3-2-1 lottery simulator, mock drafts, awards and live scores.",
+ "id": "/",
+ "start_url": "/?source=homescreen",
+ "scope": "/",
+ "display": "standalone",
+ "orientation": "portrait",
+ "background_color": "#0B0E14",
+ "theme_color": "#0B0E14",
+ "icons": [
+  {
+   "src": "/public/icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png"
+  },
+  {
+   "src": "/public/icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png"
+  },
+  {
+   "src": "/public/icon-maskable-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  },
+  {
+   "src": "/public/apple-touch-icon.png",
+   "sizes": "180x180",
+   "type": "image/png"
+  }
+ ],
+ "shortcuts": [
+  {
+   "name": "Trade Machine",
+   "url": "/index.html",
+   "icons": [
+    {
+     "src": "/public/icon-192.png",
+     "sizes": "192x192"
+    }
+   ]
+  },
+  {
+   "name": "Live Scores",
+   "url": "/live.html",
+   "icons": [
+    {
+     "src": "/public/icon-192.png",
+     "sizes": "192x192"
+    }
+   ]
+  },
+  {
+   "name": "Mock Draft",
+   "url": "/draft.html",
+   "icons": [
+    {
+     "src": "/public/icon-192.png",
+     "sizes": "192x192"
+    }
+   ]
+  }
+ ]
+}

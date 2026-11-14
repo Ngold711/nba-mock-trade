@@ -5,11 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Hooptrax — Live NBA Trade Machine, 3-2-1 Lottery Simulator &amp; Draft Hub</title>
 <meta name="description" content="Build multi-team NBA trades on live ESPN rosters and 2026–27 salaries, simulate the 3-2-1 draft lottery, run mock drafts and track the awards race." />
-<meta name="theme-color" content="#0B0E14" />
-<meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#0B0E14" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#F8FAFC" media="(prefers-color-scheme: light)" />
+<meta name="color-scheme" content="dark light" />
+<script>/* theme before first paint: dark default, light optional (localStorage "htx:theme") */(function(){var t="dark";try{t=localStorage.getItem("htx:theme")==="light"?"light":"dark"}catch(e){}document.documentElement.setAttribute("data-theme",t);var c=t==="light"?"#F8FAFC":"#0B0E14";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c)})})();</script>
+<link rel="manifest" href="public/manifest.json" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Hooptrax" />
 <link rel="icon" href="public/favicon.svg" type="image/svg+xml" />
 <link rel="icon" href="public/favicon-32.png" type="image/png" sizes="32x32" />
 <link rel="apple-touch-icon" href="public/apple-touch-icon.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="public/apple-touch-icon.png" />
 <meta property="og:site_name" content="Hooptrax" />
 <meta property="og:type" content="website" />
 <meta property="og:title" content="Hooptrax — Live NBA Trade Machine, 3-2-1 Lottery Simulator &amp; Draft Hub" />

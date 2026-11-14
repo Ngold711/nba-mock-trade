@@ -6,6 +6,7 @@ import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize as normPath, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createStore } from "./service/store.js";
+import { setResolver } from "./service/espn.js";
 
 const ROOT = fileURLToPath(new URL(".", import.meta.url));
 const PORT = Number(process.env.PORT) || 8787;
@@ -14,6 +15,7 @@ const QUIET = process.env.QUIET === "1";
 const log = (...a) => { if (!QUIET) console.log(new Date().toISOString(), ...a); };
 
 export const store = createStore({ log: (m) => log("[store]", m) });
+setResolver((resource, params) => store.get(resource, params).then((r) => r.data));
 
 // Common abbreviations → ESPN's own (ESPN uses GS, NO, NY, SA, UTAH, WSH).
 const ALIASES = { GSW: "GS", NOP: "NO", NYK: "NY", SAS: "SA", UTA: "UTAH", WAS: "WSH", PHO: "PHX", BRK: "BKN", CHO: "CHA" };
@@ -64,7 +66,57 @@ async function proxyImage(req, res, m, q) {
   } catch { res.writeHead(502); res.end(); }
 }
 
+/* Hooptrax Live Polls: tap-to-vote community polls (MVP, ROY, DPOY, Player of the Week).
+   Counts live in memory and are flushed to data/polls.json; a redeploy on hosts with ephemeral disks resets them.
+   One vote per poll per browser (client id) and per IP. */
+import { writeFile, mkdir } from "node:fs/promises";
+import { createHash } from "node:crypto";
+const POLL_FILE = join(ROOT, "data", "polls.json");
+const polls = new Map();           // pollId -> { counts: {optionId: n}, voters: Set<hash> }
+try { const saved = JSON.parse(await readFile(POLL_FILE, "utf8")); for (const [id, v] of Object.entries(saved)) polls.set(id, { counts: v.counts || {}, voters: new Set(v.voters || []) }); } catch {}
+let pollFlush = null;
+const flushPolls = () => {
+  if (pollFlush) return;
+  pollFlush = setTimeout(async () => {
+    pollFlush = null;
+    const out = Object.fromEntries([...polls].map(([id, v]) => [id, { counts: v.counts, voters: [...v.voters] }]));
+    try { await mkdir(join(ROOT, "data"), { recursive: true }); await writeFile(POLL_FILE, JSON.stringify(out)); } catch {}
+  }, 2000);
+  pollFlush.unref?.();
+};
+const POLL_ID = /^[a-z0-9-]{3,48}$/, OPT_ID = /^[0-9]{1,12}$/;
+const pollView = (id) => { const p = polls.get(id); const counts = p ? p.counts : {}; return { id, counts, total: Object.values(counts).reduce((a, b) => a + b, 0) }; };
+function readBody(req, limit = 2048) {
+  return new Promise((resolve, reject) => {
+    let size = 0; const chunks = [];
+    req.on("data", (c) => { size += c.length; if (size > limit) { reject(new Error("too large")); req.destroy(); } else chunks.push(c); });
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8"))); req.on("error", reject);
+  });
+}
+async function pollsRoute(req, res, m, q) {
+  if (req.method === "GET") {
+    const ids = (q.get("ids") || "").split(",").filter((x) => POLL_ID.test(x)).slice(0, 20);
+    return json(res, 200, { data: Object.fromEntries(ids.map((id) => [id, pollView(id)])) });
+  }
+  if (req.method !== "POST") { res.writeHead(405); return res.end(); }
+  let body;
+  try { body = JSON.parse(await readBody(req)); } catch { return json(res, 400, { error: "Send JSON: { poll, option, voter }" }); }
+  const { poll, option, voter } = body || {};
+  if (!POLL_ID.test(String(poll)) || !OPT_ID.test(String(option)) || !/^[a-z0-9]{8,40}$/i.test(String(voter))) return json(res, 400, { error: "Invalid poll, option or voter id" });
+  if (!polls.has(poll) && polls.size >= 300) return json(res, 429, { error: "Too many polls" });
+  const p = polls.get(poll) || polls.set(poll, { counts: {}, voters: new Set() }).get(poll);
+  if (!(option in p.counts) && Object.keys(p.counts).length >= 30) return json(res, 400, { error: "Too many options" });
+  const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+  const keys = [createHash("sha256").update(`${poll}|v|${voter}`).digest("hex").slice(0, 20), createHash("sha256").update(`${poll}|ip|${ip}`).digest("hex").slice(0, 20)];
+  if (keys.some((k) => p.voters.has(k))) return json(res, 409, { error: "Already voted", data: pollView(poll) });
+  keys.forEach((k) => p.voters.add(k));
+  p.counts[option] = (p.counts[option] || 0) + 1;
+  flushPolls();
+  return json(res, 200, { data: pollView(poll) });
+}
+
 const routes = [
+  [/^\/api\/polls$/, pollsRoute],
   [/^\/api\/proxy-image$/, proxyImage],
   [/^\/api\/health$/, (req, res) => json(res, 200, { ok: true, uptime: process.uptime(), cache: store.status() })],
   [/^\/api\/scoreboard$/, (req, res, m, q) => {
@@ -103,6 +155,13 @@ const routes = [
   [/^\/api\/starts$/, (req, res) => serve(res, "starts", {})],
   [/^\/api\/coaches$/, (req, res) => serve(res, "coaches", {})],
   [/^\/api\/league$/, (req, res) => serve(res, "league", {})],
+  [/^\/api\/2k-ratings$/, (req, res) => serve(res, "ratings", {})],
+  [/^\/api\/schedule\/([A-Za-z0-9]{1,5})$/, async (req, res, m) => {
+    let id;
+    try { id = await resolveTeam(m[1]); } catch (err) { return json(res, 502, { error: `Couldn't load teams: ${err.message}` }); }
+    if (!id) return json(res, 404, { error: `Unknown team: ${m[1]}` });
+    return serve(res, "schedule", { team: id });
+  }],
   [/^\/api\/honors\/(\d{1,12})$/, (req, res, m) => serve(res, "honors", { id: m[1] })],
   [/^\/api\/college\/(\d{3,12})$/, (req, res, m, q) => {
     const team = q.get("team");
@@ -117,19 +176,19 @@ const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; ch
 async function serveStatic(req, res, pathname) {
   const rel = pathname === "/" ? "/index.html" : pathname;
   const file = normPath(join(ROOT, decodeURIComponent(rel)));
-  if (!file.startsWith(ROOT) || file.slice(ROOT.length).split(sep).some((p) => p.startsWith(".") || p === "node_modules" || p === "test") || !TYPES[extname(file)] || DENY.has(file.slice(ROOT.length).replace(/^[\\/]/, ""))) {
+  if (!file.startsWith(ROOT) || file.slice(ROOT.length).split(sep).some((p) => p.startsWith(".") || p === "node_modules" || p === "test" || p === "data") || !TYPES[extname(file)] || DENY.has(file.slice(ROOT.length).replace(/^[\\/]/, ""))) {
     res.writeHead(404); return res.end("Not found");
   }
   try {
     if (!(await stat(file)).isFile()) throw new Error("not a file");
-    res.writeHead(200, { "content-type": TYPES[extname(file)], "cache-control": "no-cache" });
+    res.writeHead(200, { "content-type": file.endsWith("manifest.json") ? "application/manifest+json" : TYPES[extname(file)], "cache-control": "no-cache" });
     res.end(await readFile(file));
   } catch { res.writeHead(404); res.end("Not found"); }
 }
 
 export const server = createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
-  if (req.method !== "GET" && req.method !== "HEAD") { res.writeHead(405); return res.end(); }
+  if (req.method !== "GET" && req.method !== "HEAD" && !(req.method === "POST" && url.pathname === "/api/polls")) { res.writeHead(405); return res.end(); }
   for (const [re, handler] of routes) {
     const m = re.exec(url.pathname);
     if (m) return handler(req, res, m, url.searchParams);
@@ -142,7 +201,7 @@ export const server = createServer(async (req, res) => {
 // (league rosters and standings every 30 min), so requests are answered from memory instead of
 // waiting on ESPN. This matters most right after a Render cold start.
 export function startPolling() {
-  const stops = ["scoreboard", "injuries", "standings", "transactions", "teams", "players"].map((r) => store.watch(r, {}, () => {}));
+  const stops = ["scoreboard", "injuries", "standings", "transactions", "teams", "players", "ratings"].map((r) => store.watch(r, {}, () => {}));
   stops.push(store.watch("league", {}, (data) => {
     if (!data?.rosters) return;
     for (const [teamId, roster] of Object.entries(data.rosters)) store.prime("roster", { team: teamId }, roster);

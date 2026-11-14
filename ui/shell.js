@@ -6,10 +6,11 @@
 //   shell.setWireHandler((item) => …)   // optional: a page can take over ticker clicks
 import { createClient } from "./client.js";
 import { avatar, teamLogo, esc } from "./avatar.js";
-import { Spring, createSheet, scrollEdge, reduceMotion, project, tracker, rubberband } from "./motion.js";
+import { Spring, createSheet, createToast, scrollEdge, reduceMotion, project, tracker, rubberband } from "./motion.js";
 import { mountLiveWire } from "./ticker.js";
 import { pickInventory, toCode } from "../service/draft.js";
 import { logoMark, wordmark, HooptraxWatermark } from "./brand.js";
+import { mountVault } from "./vault.js";
 
 const ICON = {
   live: '<path d="M2 12h3.5l2.5-6 4 12 3-9 2 3H22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
@@ -35,6 +36,7 @@ export function mountShell({ active = "live" } = {}) {
   // A shared trade link always opens on the Trade tab, whichever page it was pasted onto.
   if (active !== "trade" && new URLSearchParams(location.search).has("trade")) { location.replace(`index.html${location.search}`); }
   const sheet = createSheet();
+  let toaster = null; const toastFn = (m) => (toaster ||= createToast())(m);
   // The LiveWire ticker lives on the Live tab only; elsewhere a quiet dot on that tab says updates are streaming.
   const hasWire = active === "live";
   const tabLink = ([k, label, href]) => `<a href="${href}"${k === active ? ' aria-current="page"' : ""}${k === "live" && !hasWire ? ' class="tab-live" aria-label="Live (updates streaming)"' : ""}>${svg(k)}<span>${label}</span></a>`;
@@ -46,9 +48,22 @@ export function mountShell({ active = "live" } = {}) {
       <div class="bar-right">
         <button class="status-pill" type="button" id="statusPill" aria-label="${hasWire ? "Live data status. Open LiveWire." : "Live data status. Go to Live."}"><span class="pulse" id="pulse"></span><span id="sync">Live Sync</span></button>
         <button class="teams-btn" type="button" id="teamsBtn" aria-haspopup="dialog">${svg("teams")}<span>30 Teams</span></button>
+        <button class="theme-btn" type="button" id="themeBtn" aria-label="Switch to light mode"><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
       </div>
     </div>`;
   scrollEdge(bar);
+  /* ---------- Light / dark theme ---------- */
+  const themeBtn = document.getElementById("themeBtn");
+  const paintTheme = () => { const light = document.documentElement.dataset.theme === "light"; themeBtn.setAttribute("aria-label", light ? "Switch to dark mode" : "Switch to light mode"); themeBtn.title = light ? "Light mode" : "Dark mode"; };
+  themeBtn.addEventListener("click", () => {
+    const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem("htx:theme", next); } catch {}
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", next === "light" ? "#F8FAFC" : "#0B0E14"));
+    paintTheme();
+    window.dispatchEvent(new CustomEvent("htx:theme", { detail: next }));
+  });
+  paintTheme();
 
   const tabbar = document.createElement("nav");
   tabbar.className = "tabbar"; tabbar.setAttribute("aria-label", "Tools");
@@ -148,70 +163,8 @@ export function mountShell({ active = "live" } = {}) {
   }
   document.getElementById("teamsBtn").addEventListener("click", teamsSheet);
 
-  async function openTeam(input) {
-    await ensureData();
-    const code = toCode(input);
-    const look = teamLook(code);
-    let roster = null, standing = null, err = null, inv = null;
-    sheet.open({
-      title: `${look.city} ${look.name}`,
-      render(body) {
-        const st = standing;
-        body.innerHTML = `<div class="hub-head" style="--c:${look.color}">${teamLogo(look, { size: "3.25rem" })}
-            <div><div class="hub-name">${esc(look.city)} ${esc(look.name)}</div>
-            <div class="hub-meta num">${st ? `${st.wins}-${st.losses} · ${st.seed ? `#${st.seed} in the ${st.conf}` : st.conf}${st.streak ? ` · ${esc(st.streak)}` : ""}` : roster?.team?.record ? esc(roster.team.record) : "Loading record…"}</div>
-            ${roster?.coach ? `<div class="hub-meta">Coach ${esc(roster.coach)}</div>` : ""}</div></div>
-          <div class="sheet-sub">2027–2029 first-round picks</div>
-          ${inv ? `<div class="inv">${inv.map((y) => `<div class="inv-y"><b>${y.year}</b><ul>${y.items.map((i) => `<li class="inv-${i.kind}">${esc(i.text)}${i.verified ? "" : ' <span class="pill risk">unconfirmed</span>'}</li>`).join("")}</ul></div>`).join("")}</div>` : `<div class="skel-line"></div>`}
-          <div class="sheet-sub">Roster${roster ? ` · ${roster.athletes.length}` : ""}</div>
-          ${err ? `<div class="empty">Couldn’t load the roster: ${esc(err)}</div>` : !roster ? `<div class="skel-line"></div><div class="skel-line"></div>` :
-            `<ul class="list">${[...roster.athletes].sort((a, b) => (b.salary || 0) - (a.salary || 0)).map((a) => `<li><button class="row" type="button" data-player="${esc(a.id)}">
-              ${avatar(a, { size: "2.5rem", color: look.color })}
-              <span class="meta"><span class="nm">${esc(a.name)}${a.injury ? ` <span class="pill ${/out/i.test(a.injury.status) ? "out" : "dtd"}">${esc(a.injury.status)}</span>` : ""}</span>
-              <span class="sub num">${[a.position, a.jersey ? `#${a.jersey}` : "", a.height, a.age ? `${a.age} yrs` : ""].filter(Boolean).map(esc).join(" · ")}</span></span>
-              <span class="sal num">${a.salary ? `$${(a.salary / 1e6).toFixed(1)}M` : ""}</span></button></li>`).join("")}</ul>`}
-          <div class="hub-actions"><a class="btn press" href="index.html#t=${encodeURIComponent(code + ",_")}">Open in Trade Machine</a><a class="btn press" href="draft.html">Draft board</a></div>`;
-      },
-    });
-    const refresh = () => sheet.isOpen && sheet.refresh();
-    pickConfig().then((c) => { inv = pickInventory(code, c); refresh(); });
-    const c = client || await createClient();
-    c.get("roster", { team: look.espn || CODE_TO_ESPN[code] || code }).then(({ data }) => { roster = data; refresh(); }).catch((e) => { err = e.message; refresh(); });
-    c.get("standings", {}).then(({ data }) => {
-      for (const conf of data.conferences) for (const t of conf.teams) if (toCode(t.team.abbr) === code) standing = { wins: t.wins, losses: t.losses, seed: t.seed, conf: conf.abbr || conf.name, streak: t.streak };
-      refresh();
-    }).catch(() => {});
-  }
-
-  async function openPlayer(id, { fallback = null } = {}) {
-    await ensureData();
-    let p = null, inj = null, loading = true;
-    const draw = (body) => {
-      const base = p || fallback || {};
-      const teamAbbr = p?.teamAbbr || base.team?.abbr || base.teamAbbr || "";
-      const code = toCode(teamAbbr);
-      const look = teamLook(code);
-      const s = p?.stats;
-      const tradeHref = code && window.NBA_DATA.teams[code] ? `index.html#t=${encodeURIComponent(code + ",_")}&a=${encodeURIComponent(`${code}:${slug(base.name || "")}>_`)}` : "index.html";
-      body.innerHTML = `<div class="qv-head" style="--c:${look.color}">${avatar(base, { size: "5.5rem", color: look.color, full: true })}
-          <div><div class="qv-name">${esc(base.name || "Player")}</div>
-          <div class="qv-sub">${code ? `<button class="qv-team" type="button" data-team-hub="${code}">${teamLogo(look, { size: "1.25rem" })}${esc(look.city)} ${esc(look.name)}</button>` : ""}</div>
-          <div class="qv-sub num">${[base.position, base.jersey ? `#${base.jersey}` : "", base.height, base.age ? `${base.age} yrs` : (p?.age ? `${p.age} yrs` : "")].filter(Boolean).map(esc).join(" · ")}</div>
-          ${inj ? `<div class="qv-sub"><span class="pill ${inj.status === "Out" ? "out" : "dtd"}">${esc(inj.status)}</span> ${esc(inj.injury || "")}</div>` : ""}</div></div>
-        <div class="sheet-sub">2026–27 season</div>
-        ${s ? `<div class="qv-stats">${[["PPG", f1(s.pts)], ["RPG", f1(s.reb)], ["APG", f1(s.ast)], ["FG%", f1(s.fgPct)], ["3P%", f1(s.threePct)], ["MIN", f1(s.min)]].map(([k, v]) => `<div><div class="k">${k}</div><div class="v num">${v}</div></div>`).join("")}</div>
-          <p class="qv-note num">${s.gp} games · ${f1(s.stl)} STL · ${f1(s.blk)} BLK · FT ${f1(s.ftPct)}%</p>`
-          : loading ? `<div class="skel-line"></div>` : `<div class="empty">No 2026–27 games yet.</div>`}
-        <div class="hub-actions"><a class="btn primary press" href="${tradeHref}">Open in Trade Machine</a>${code ? `<button class="btn press" type="button" data-team-hub="${code}">Team Hub</button>` : ""}</div>`;
-    };
-    sheet.open({ title: "Player", render: draw });
-    const c = client || await createClient();
-    const [pl, ij] = await Promise.allSettled([c.get("players", {}), c.get("injuries", {})]);
-    if (pl.status === "fulfilled") p = pl.value.data.players.find((x) => x.id === String(id)) || null;
-    if (ij.status === "fulfilled") inj = ij.value.data.find((x) => x.athlete?.id === String(id)) || null;
-    loading = false;
-    if (sheet.isOpen) sheet.refresh();
-  }
+  const vault = mountVault({ sheet, getClient: () => (client ? Promise.resolve(client) : createClient()), teamLook, ensureData, pickConfig, toast: (m) => toastFn(m) });
+  const { openTeam, openPlayer, openCompare } = vault;
 
   // Global delegation: any [data-team-hub] badge or [data-player] row anywhere in the app.
   document.addEventListener("click", (e) => {
@@ -222,7 +175,7 @@ export function mountShell({ active = "live" } = {}) {
   }, true);
 
   instance = {
-    openTeam, openPlayer, openDrawer, closeDrawer,
+    openTeam, openPlayer, openCompare, openDrawer, closeDrawer,
     setWireHandler(fn) { wireHandler = fn; },
     get wire() { return wire; },
     setStatus(kind, text) {

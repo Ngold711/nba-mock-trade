@@ -3,7 +3,7 @@ import {
   normalizeScoreboard, normalizeSummary, normalizeRoster, normalizeInjuries,
   normalizeStandings, normalizeTransactions, normalizeTeams,
   normalizeCollegeOverview, collegeBioFromRoster, collegeHeadshot,
-  normalizeNews, normalizePlayerStats, normalizeHonors,
+  normalizeNews, normalizePlayerStats, normalizeHonors, normalizeSchedule,
 } from "./normalize.js";
 
 const SITE = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba";
@@ -16,6 +16,7 @@ export const ENDPOINTS = {
   scoreboard: ({ date } = {}) => `${SITE}/scoreboard${date ? `?dates=${encodeURIComponent(date)}` : ""}`,
   summary: ({ id }) => `${SITE}/summary?event=${encodeURIComponent(id)}`,
   roster: ({ team }) => `${SITE}/teams/${encodeURIComponent(team)}/roster`,
+  schedule: ({ team }) => `${SITE}/teams/${encodeURIComponent(team)}/schedule`,
   injuries: () => `${SITE}/injuries`,
   standings: ({ season } = {}) => `${STANDINGS}${season ? `?season=${encodeURIComponent(season)}` : ""}`,
   news: () => `${SITE}/news?limit=50`,
@@ -38,6 +39,7 @@ export const NORMALIZERS = {
   news: normalizeNews,
   honors: normalizeHonors,
   players: normalizePlayerStats,
+  schedule: normalizeSchedule,
 };
 
 export class FetchError extends Error {
@@ -164,7 +166,17 @@ async function loadLeague(_params, opts) {
   Object.defineProperty(out, "rosters", { value: rosters, enumerable: false });
   return out;
 }
-const CUSTOM = { college: loadCollege, starts: loadStarts, coaches: loadCoaches, league: loadLeague };
+/* 2K27-style ratings (service/ratings.js). Inside the service the inputs come from its warm cache
+   (setResolver); in the browser fallback they're loaded directly. */
+let resolver = null;
+export function setResolver(fn) { resolver = fn; }
+const dep = (r, p = {}) => (resolver ? resolver(r, p) : load(r, p));
+async function loadRatings() {
+  const { buildRatings } = await import("./ratings.js");
+  const [players, league, prevPlayers] = await Promise.all([dep("players"), dep("league").catch(() => null), dep("players", { season: "2026" }).catch(() => null)]);
+  return buildRatings({ players, league, prevPlayers });
+}
+const CUSTOM = { college: loadCollege, starts: loadStarts, coaches: loadCoaches, league: loadLeague, ratings: loadRatings };
 
 /** Fetch + normalize one resource. */
 export async function load(resource, params = {}, opts = {}) {

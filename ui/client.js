@@ -17,6 +17,8 @@ const ROUTES = {
   transactions: () => "/api/transactions",
   teams: () => "/api/teams",
   league: () => "/api/league",
+  ratings: () => "/api/2k-ratings",
+  schedule: (p) => `/api/schedule/${encodeURIComponent(p.team)}`,
   college: (p) => `/api/college/${encodeURIComponent(p.id)}${p.team ? `?team=${encodeURIComponent(p.team)}` : ""}`,
 };
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));

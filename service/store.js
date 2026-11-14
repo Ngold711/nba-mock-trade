@@ -29,6 +29,8 @@ export const TTL = {
   coaches: 12 * 60 * MIN,
   honors: 24 * 60 * MIN,
   league: 30 * MIN,        // all 30 rosters, warmed at startup
+  ratings: 6 * 60 * MIN,   // 2K27-style ratings
+  schedule: 30 * MIN,
 };
 const MAX_BACKOFF = 5 * MIN;
 
@@ -73,6 +75,8 @@ export const POLICIES = {
   coaches: () => TTL.coaches,
   honors: () => TTL.honors,
   league: () => TTL.league,
+  ratings: () => TTL.ratings,
+  schedule: () => TTL.schedule,
 };
 
 const keyOf = (resource, params = {}) =>

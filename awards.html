@@ -5,11 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>All-Star Predictor &amp; Awards Race · Hooptrax</title>
 <meta name="description" content="Live All-Star rosters, MVP and award ladders, All-NBA teams and the 65-game rule, built on ESPN stats." />
-<meta name="theme-color" content="#0B0E14" />
-<meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#0B0E14" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#F8FAFC" media="(prefers-color-scheme: light)" />
+<meta name="color-scheme" content="dark light" />
+<script>/* theme before first paint: dark default, light optional (localStorage "htx:theme") */(function(){var t="dark";try{t=localStorage.getItem("htx:theme")==="light"?"light":"dark"}catch(e){}document.documentElement.setAttribute("data-theme",t);var c=t==="light"?"#F8FAFC":"#0B0E14";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c)})})();</script>
+<link rel="manifest" href="public/manifest.json" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Hooptrax" />
 <link rel="icon" href="public/favicon.svg" type="image/svg+xml" />
 <link rel="icon" href="public/favicon-32.png" type="image/png" sizes="32x32" />
 <link rel="apple-touch-icon" href="public/apple-touch-icon.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="public/apple-touch-icon.png" />
 <meta property="og:site_name" content="Hooptrax" />
 <meta property="og:type" content="website" />
 <meta property="og:title" content="All-Star Predictor &amp; Awards Race · Hooptrax" />
@@ -99,8 +107,8 @@ h3.sec .grow { flex: 1; }
 }
 
 /* ---------- All-Star Voting ---------- */
-.views { --n: 2; width: min(100%, 34rem); margin: 0.25rem 0 1rem; }
-.views button { font-size: 0.875rem; padding: 0.55rem 0.4rem; min-height: 44px; font-weight: 700; }
+.views { margin: 0.25rem 0 1rem; }
+.views button { font-size: 0.875rem; padding: 0.5rem 0.95rem; min-height: 40px; font-weight: 700; }
 .views .vsub { font-weight: 500; color: var(--label-3); font-size: 0.75rem; }
 .as-bar { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
 .as-bar .mode { --n: 2; width: min(100%, 22rem); }
@@ -206,17 +214,90 @@ body.has-votebar main { padding-bottom: 6rem; }
   .vote-bar .hm { display: none; }
   .pool-list { max-height: none; }
 }
+
+/* Weekly & Polls */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.wk-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); margin-bottom: 1rem; }
+#view-weekly .card, #view-ratings .card { background: var(--surface); border: 1px solid var(--hair); border-radius: var(--r-lg); padding: 1rem; }
+#view-weekly h4, #view-ratings h4 { margin: 0 0 0.75rem; font-size: 1rem; letter-spacing: -0.01em; }
+.sub-h { font-size: 1.125rem; margin: 1.5rem 0 0.75rem; letter-spacing: -0.015em; }
+.pow-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+.pow-head h4 { margin: 0 !important; }
+.wk-sel { border: 1px solid var(--hair); background: var(--surface); color: var(--label); border-radius: 99px; padding: 0.35rem 0.7rem; font-size: 0.8125rem; font-weight: 600; }
+.pow-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.pow-c { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--label-3); margin-bottom: 0.4rem; }
+.pow-p { display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem; border-radius: var(--r-md); background: var(--surface-2); cursor: pointer; min-width: 0; }
+.pow-t { min-width: 0; } .pow-t b { display: block; font-size: 0.9375rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pow-t span { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; color: var(--label-2); }
+.sched { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.sched li { display: grid; grid-template-columns: 9.5rem 1fr; gap: 0.75rem; font-size: 0.8125rem; }
+.sched .when { font-family: var(--font-mono); color: var(--accent); font-size: 0.75rem; padding-top: 0.1rem; }
+.sched .what small { display: block; color: var(--label-3); }
+.news { margin: 0; padding-left: 1.1rem; font-size: 0.875rem; line-height: 1.6; }
+.lad { list-style: none; margin: 0; padding: 0; }
+.lad li { display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0; border-top: 1px solid var(--hair); cursor: pointer; }
+.lad li:first-child { border-top: 0; }
+.lad-n { font-family: var(--font-mono); color: var(--label-3); width: 1.1rem; text-align: right; font-size: 0.8125rem; }
+.lad-t { flex: 1; min-width: 0; } .lad-t b { display: block; font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .lad-t span { font-size: 0.75rem; color: var(--label-2); }
+.lad-s { font-size: 0.8125rem; white-space: nowrap; } .lad-s small { color: var(--label-3); font-size: 0.625rem; margin: 0 0.3rem 0 0.1rem; }
+.poll-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); }
+.poll-opts { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.poll-opt { position: relative; overflow: hidden; width: 100%; display: flex; align-items: center; gap: 0.55rem; border: 1px solid var(--hair); background: transparent; border-radius: var(--r-md); padding: 0.4rem 0.6rem; cursor: pointer; text-align: left; min-height: 44px; color: var(--label); }
+.poll-opt:hover:not(:disabled) { border-color: var(--accent); }
+.poll-opt:disabled { cursor: default; }
+.poll-opt > * { position: relative; }
+.poll-bar { position: absolute !important; left: 0; top: 0; bottom: 0; background: var(--good-soft); transition: width 600ms cubic-bezier(.2,.8,.2,1); }
+.poll-opt.mine .poll-bar { background: rgba(16,185,129,.24); }
+.poll-opt.mine { border-color: var(--good); }
+.poll-n { flex: 1; font-weight: 600; font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.poll-pc { font-weight: 700; font-size: 0.8125rem; }
+.poll-foot { font-size: 0.75rem; color: var(--label-3); margin: 0.6rem 0 0; }
+/* 2K27 ratings */
+.rt-top { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+.rt-tabs { width: 14rem; } .rt-tabs button { font-size: 0.8125rem; padding: 0.4rem; }
+.rt-note { font-size: 0.75rem; color: var(--label-3); flex: 1; min-width: 14rem; }
+.rt-card { display: grid; gap: 0.6rem; }
+.rt-filters { display: flex; gap: 0.5rem; } .rt-filters .search { margin: 0; flex: 1; font-size: 16px; }
+.rt-count { font-size: 0.75rem; color: var(--label-3); }
+.rt-list { list-style: none; margin: 0; padding: 0; }
+.rt-list li + li { border-top: 1px solid var(--hair); }
+.rt-row { width: 100%; display: flex; align-items: center; gap: 0.65rem; padding: 0.55rem 0.25rem; background: none; border: 0; cursor: pointer; text-align: left; color: var(--label); border-radius: var(--r-md); }
+.rt-row:hover { background: var(--fill); }
+.rt-rank { width: 1.6rem; text-align: right; color: var(--label-3); font-size: 0.75rem; }
+.rt-who { flex: 1; min-width: 0; } .rt-who b { display: block; font-size: 0.9375rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rt-who span { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; color: var(--label-2); }
+.rt-attr { font-weight: 700; min-width: 2rem; text-align: right; }
+.rt-teams { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.rt-teams th { text-align: left; font-size: 0.625rem; color: var(--label-3); letter-spacing: 0.07em; text-transform: uppercase; padding: 0.4rem; }
+.rt-teams td { padding: 0.45rem 0.4rem; border-top: 1px solid var(--hair); }
+.rt-teams tr { cursor: pointer; } .rt-teams tr:hover td { background: var(--fill); }
+.rt-team { display: flex; align-items: center; gap: 0.55rem; } .rt-team small { display: block; color: var(--label-3); font-size: 0.6875rem; }
+.rt-dh { display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; }
+.ovr.big { min-width: 2.8rem; height: 2.1rem; font-size: 1.1rem; }
+.attr-bars { display: grid; gap: 0.5rem; }
+.ab { display: grid; grid-template-columns: 6.5rem 1fr 2.2rem; align-items: center; gap: 0.6rem; font-size: 0.8125rem; }
+.ab-l { color: var(--label-2); } .ab-v { text-align: right; font-weight: 700; }
+.ab-t { height: 0.5rem; border-radius: 99px; background: var(--fill); overflow: hidden; }
+.ab-f { display: block; height: 100%; border-radius: 99px; background: var(--label-3); }
+.ab-f.t-dia { background: linear-gradient(90deg, #38BDF8, #67E8F9); } .ab-f.t-rub { background: linear-gradient(90deg, #F59E0B, #FCD34D); } .ab-f.t-ok { background: var(--good); } .ab-f.t-lo { background: var(--label-3); }
+.link { background: none; border: 0; color: var(--accent); font-weight: 650; cursor: pointer; padding: 0; }
+@media (max-width: 34rem) { .sched li { grid-template-columns: 1fr; gap: 0.1rem; } .pow-pair { grid-template-columns: 1fr; } .rt-dh .avatar { --s: 3.5rem !important; } }
+/* light court */
+:root[data-theme="light"] .court { background: radial-gradient(120% 90% at 50% 0%, rgba(245,158,11,.08), transparent 60%), linear-gradient(180deg, #F8FAFC, #EEF2F7) !important; }
+:root[data-theme="light"] .slot.empty { background: rgba(255,255,255,.7); border-color: #CBD5E1; }
+:root[data-theme="light"] .slot.filled:hover { border-color: #CBD5E1; }
+:root[data-theme="light"] .court::before { border-color: rgba(15,23,42,.08); }
 </style>
 </head>
 <body>
 <header class="bar" id="bar"></header>
 
 <main>
-  <div class="toolbar"><h2>All-Star &amp; Awards</h2></div>
-  <p class="lede" id="lede">Live model built on ESPN season stats and standings. Switch any section to your own ballot; it’s saved in this browser.</p>
+  <div class="toolbar"><h2>Awards</h2></div>
+  <p class="lede" id="lede" hidden>Live model built on ESPN season stats and standings. Switch any section to your own ballot; it’s saved in this browser.</p>
   <div id="banner"></div>
-  <div class="seg views" id="views" role="group" aria-label="Awards view"><span class="thumb"></span>
-    <button type="button" data-view="allstar" aria-pressed="true">All-Star Voting</button><button type="button" data-view="awards" aria-pressed="false">Season Awards <span class="vsub">MVP, ROY, DPOY, All-NBA</span></button></div>
+  <div class="pills views" id="views" role="group" aria-label="Awards view">
+    <button type="button" data-view="allstar" aria-pressed="true">All-Star</button><button type="button" data-view="awards" aria-pressed="false">Season Races</button><button type="button" data-view="weekly" aria-pressed="false">Weekly &amp; Polls</button><button type="button" data-view="ratings" aria-pressed="false">2K27 Ratings</button></div>
 
   <section id="view-allstar" aria-label="All-Star Voting">
     <div class="as-bar">
@@ -243,7 +324,9 @@ body.has-votebar main { padding-bottom: 6rem; }
   <section id="view-awards" aria-label="Season awards" hidden>
     <nav class="mtabs" id="mtabs" aria-label="Awards"><button type="button" data-mtab="mvp" aria-pressed="true">MVP</button><button type="button" data-mtab="roy" aria-pressed="false">ROY</button><button type="button" data-mtab="dpoy" aria-pressed="false">DPOY</button><button type="button" data-mtab="smoy" aria-pressed="false">6MOY</button><button type="button" data-mtab="mip" aria-pressed="false">MIP</button><button type="button" data-mtab="coy" aria-pressed="false">COY</button><button type="button" data-mtab="allNba" aria-pressed="false">All-NBA</button></nav>
     <div class="awards-grid" id="awards"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
-  </section><div class="skel"></div><div class="skel"></div></div>
+  </section>
+  <section id="view-weekly" aria-label="Weekly honors and polls" hidden></section>
+  <section id="view-ratings" aria-label="2K27 ratings" hidden></section>
 
   <p class="fine">AwardScore = a Game Score–style production blend (points, shooting efficiency, rebounds, assists, steals, blocks, turnovers) × team win % × availability. Projected games = games played ÷ team games × 82; players under 65 carry a “65-game risk” badge and are left off MVP, DPOY, Sixth Man, Most Improved and All-NBA ladders (All-Star and Rookie of the Year are exempt here). Games started come from ESPN box scores; rookies are inferred (no 2025–26 stats, age 24 or under). ESPN doesn’t publish All-Star selection counts, so career honors from ESPN are shown instead. A statistical model, not a prediction of votes. Not affiliated with the NBA or ESPN.</p>
 </main>
@@ -257,7 +340,13 @@ import { Spring, createSheet, createToast, scrollEdge, springIn } from "./ui/mot
 import { computeAwards, RULE_GAMES } from "./service/awards.js";
 import { buildPool, migrateBallot, addToBallot, removeFromBallot, slotOf, filled, allIds, modelConf, STARTER_SLOTS } from "./service/allstar.js";
 import { mountShell } from "./ui/shell.js";
+import { renderWeekly, renderRatings } from "./ui/awards-extra.js";
 const shell = mountShell({ active: "awards" });
+let extra = { league: null, news: null, ratings: null };
+function renderExtra() {
+  if (view === "weekly") renderWeekly($("#view-weekly"), { model, league: extra.league, news: extra.news, client, toast });
+  if (view === "ratings") renderRatings($("#view-ratings"), { ratings: extra.ratings, sheet, openCompare: (id) => shell.openCompare?.(id), openPlayer: (id) => shell.openPlayer(id) });
+}
 
 /* Phone: Season Awards shows one ladder at a time via swipeable pill tabs. Desktop shows all. */
 let mtab = "mvp";
@@ -413,17 +502,19 @@ function renderAllStar() { renderLineup(); renderPool(); renderBar(); }
 /* segments: view, mode, conference */
 function segSpring(el, idx) { const sp = new Spring(idx, (x) => { el.querySelector(".thumb").style.transform = `translateX(${x * 100}%)`; }, 0.001); sp.onUpdate(sp.x); return sp; }
 const viewsSeg = $("#views"), modeSeg = $("#asMode"), confSeg = $("#confTabs");
-const viewSp = segSpring(viewsSeg, view === "allstar" ? 0 : 1), modeSp = segSpring(modeSeg, asMode === "ballot" ? 0 : 1), confSp = segSpring(confSeg, conf === "East" ? 0 : 1);
+const modeSp = segSpring(modeSeg, asMode === "ballot" ? 0 : 1), confSp = segSpring(confSeg, conf === "East" ? 0 : 1);
 const press = (seg, attr, val) => seg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset[attr] === val)));
+const VIEWS = ["allstar", "awards", "weekly", "ratings"];
+function showView() { for (const v of VIEWS) $(`#view-${v}`).hidden = v !== view; }
 function setView(v) {
-  view = v; store.set("awards:view", v); press(viewsSeg, "view", v); viewSp.to(v === "allstar" ? 0 : 1, { damping: 1, response: 0.3 });
-  $("#view-allstar").hidden = v !== "allstar"; $("#view-awards").hidden = v !== "awards";
-  renderBar(); applyTab();
+  view = VIEWS.includes(v) ? v : "allstar"; store.set("awards:view", view); press(viewsSeg, "view", view);
+  showView(); renderBar(); applyTab(); renderExtra();
 }
 function setMode(m) { asMode = m; store.set("awards:asMode2", m); press(modeSeg, "mode", m); modeSp.to(m === "ballot" ? 0 : 1, { damping: 1, response: 0.3 }); target = null; renderAllStar(); }
 function setConf(c) { conf = c; store.set("awards:conf", c); press(confSeg, "conf", c); confSp.to(c === "East" ? 0 : 1, { damping: 1, response: 0.3 }); target = null; poolLimit = 60; renderAllStar(); }
 press(viewsSeg, "view", view); press(modeSeg, "mode", asMode); press(confSeg, "conf", conf);
-$("#view-allstar").hidden = view !== "allstar"; $("#view-awards").hidden = view !== "awards";
+if (!VIEWS.includes(view)) view = "allstar";
+showView();
 viewsSeg.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setView(b.dataset.view); });
 modeSeg.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setMode(b.dataset.mode); });
 confSeg.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setConf(b.dataset.conf); });
@@ -677,9 +768,10 @@ async function loadHonors() {
 }
 let retry = 0;
 async function load() {
-  const names = [["players", {}], ["league", {}], ["standings", {}], ["players", { season: 2026 }], ["standings", { season: 2026 }], ["starts", {}], ["coaches", {}]];
+  const names = [["players", {}], ["league", {}], ["standings", {}], ["players", { season: 2026 }], ["standings", { season: 2026 }], ["starts", {}], ["coaches", {}], ["news", {}], ["ratings", {}]];
   const res = await Promise.allSettled(names.map(([n, p]) => client.get(n, p)));
-  const [players, league, standings, prevPlayers, prevStandings, starts, coaches] = res.map((r) => (r.status === "fulfilled" ? r.value.data : null));
+  const [players, league, standings, prevPlayers, prevStandings, starts, coaches, news, ratings] = res.map((r) => (r.status === "fulfilled" ? r.value.data : null));
+  extra = { league, news, ratings };
   model = null;
   try { if (players && standings) model = computeAwards({ players, prevPlayers, standings, prevStandings, starts, coaches }); } catch (e) { console.warn("awards model", e); }
   byId = model ? Object.fromEntries(model.players.map((p) => [p.id, p])) : {};
@@ -695,14 +787,14 @@ async function load() {
     ? `Vote your All-Star ballot or compare it with the live model, built on ESPN season stats, ${model.teamGamesMax} team games in. Your picks are saved in this browser.`
     : "Vote your All-Star ballot from live ESPN rosters. Your picks are saved in this browser.";
   shell.setStatus(players ? "on" : "err", players ? "Live Sync" : "Partial data");
-  renderAllStar(); renderAwards(); applyTab();
+  renderAllStar(); renderAwards(); applyTab(); renderExtra();
   loadHonors();
   if (!players || !standings || !league) setTimeout(() => load().catch(() => {}), Math.min(60_000 * ++retry, 300_000));
 }
 
 (async () => {
   client = await createClient();
-  renderAllStar();                       // empty ballot + "loading" pool right away
+  renderAllStar(); renderExtra();        // empty ballot + "loading" pool right away
   await load().catch((e) => { console.warn(e); });
   // stats are cached ~30 min server-side; re-run the model every 30 min while open
   setInterval(() => { if (!document.hidden) load().catch(() => {}); }, 30 * 60_000);
