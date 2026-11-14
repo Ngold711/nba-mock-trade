@@ -261,3 +261,27 @@ Tap any game: linescore (Q1–Q4, OT), Box Score (away/home), Team Stats, and Pl
 ### Home Screen app
 `public/manifest.json` (standalone, icons 192/512/maskable), `apple-mobile-web-app-capable`, `black-translucent` status bar, and
 light/dark `theme-color` tags. On iPhone: Share → Add to Home Screen.
+
+## Trading floor + Tankathon + Basketball Reference (Nov 2026, round 3)
+
+- **LED ticker board** (`ui/ledboard.js`, top of Live): three horizontal tapes in a black bezel: scores (`BOS 118 ▲ +4  LAL 114`),
+  player market (tonight's leaders vs. season average, then 2K27 movers), and an injury/move wire. Each row runs one Web Animations
+  transform (55 / 65 / 50 px/s) and keeps its position across data updates. A single ⏸ / ▶ button pauses all rows; nothing pauses on
+  hover. Reduced motion shows static, swipeable rows. Game quotes open the Game Center, and player and injury quotes open Quick-View.
+  The vertical LiveWire rail is retired.
+- **Advanced stats** (`service/advanced.js`): TS%, eFG%, AST/TO, Hollinger Game Score (total rebounds weighted 0.4 because ESPN's
+  league feed has no OREB/DREB split), and per-36, per-40 and totals scaling. **Per Game | Per 36 | Totals** toggles appear in Quick-View,
+  Compare and the Team Vault roster; the choice is saved as `htx:statMode`.
+- **Stat Leaders** (Live, below the games): top 25 in PPG, RPG, APG, SPG, BPG, 3PM, TS% and Game Score, filtered by All / East / West
+  and by mode. To qualify, a player needs half the league-high games played, plus 15 MIN for Per 36 and 6 FGA for TS%.
+- **Bio and draft pedigree** (`/api/bio/:id`): draft year, round, pick and overall number, college or country, age, height and
+  weight, and experience at the top of Quick-View.
+- **Team efficiency** (`/api/team-stats`, 60 min): possessions = FGA − OREB + TOV + 0.44·FTA; ORtg, DRtg, Net and Pace with league
+  ranks, shown in the Team Vault header and in Game Center.
+- **Draft:** Rem SOS (`/api/sos`: remaining opponents' win %, color-coded easiest to hardest), L10 and streak in the lottery table.
+  Also a sim count badge, ↑/↓ rank-change pills, Reset, Mock Draft This Order, and **Sim 1,000x**: a Monte Carlo matrix with
+  #1 %, Top 4 %, Top 10 %, Most Likely and average pick for all 16 lottery teams.
+- **Pick Grid:** the 30-team 2027–2029 first-round matrix with Own / Traded (Unprotected) / Protected / Swap Pool pills, plus picks
+  held from other teams.
+- **Prospect stats:** Per Game | Per 40 | Efficiency (TS%, eFG%, AST/TO) in the picker (Nov 14 snapshot) and the scouting drawer
+  (live ESPN college stats, now including FGA/FTA/3PA from the athlete stats endpoint).

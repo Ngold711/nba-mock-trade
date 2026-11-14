@@ -154,12 +154,33 @@ tr.cut td { border-top: 1.5px dashed var(--fill-strong); }
 .ts-bar i { display: block; height: 100%; }
 .plays .pb-logo { width: 1.3rem; flex: none; }
 .box-seg { --n: 2; }
+
+/* Stat Leaders */
+.leaders { margin-top: 1.75rem; }
+.ld-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+.ld-head h3 { margin: 0; font-size: 1.25rem; letter-spacing: -0.02em; }
+.ld-modes { width: 17rem; } .ld-modes button { font-size: 0.8125rem; padding: 0.4rem 0.2rem; }
+.ld-panel { margin-top: 0.75rem; }
+.ld-list { list-style: none; margin: 0; padding: 0.25rem 0.5rem; }
+.ld-list li + li { border-top: 1px solid var(--hair); }
+.ld-row { width: 100%; display: flex; align-items: center; gap: 0.65rem; padding: 0.55rem 0.4rem; background: none; border: 0; cursor: pointer; text-align: left; color: var(--label); border-radius: var(--r-md); }
+.ld-row:hover { background: var(--fill); }
+.ld-rank { width: 1.5rem; text-align: right; color: var(--label-3); font-size: 0.8125rem; }
+.ld-who { flex: 1; min-width: 0; } .ld-who b { display: block; font-size: 0.9375rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ld-who span { font-size: 0.75rem; color: var(--label-2); }
+.ld-v { font-weight: 750; font-size: 1.0625rem; text-align: right; } .ld-v small { display: block; font-size: 0.625rem; color: var(--label-3); font-weight: 600; }
+/* Team efficiency in Game Center */
+.eff-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin: -0.25rem 0 0.75rem; }
+.eff-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; font-size: 0.6875rem; color: var(--label-2); }
+.eff-row .eff-chips:last-child { justify-content: flex-end; }
+.eff-chips span { background: var(--surface-2); border: 1px solid var(--hair); border-radius: 99px; padding: 0.15rem 0.45rem; white-space: nowrap; font-family: var(--font-mono); }
+.eff-chips b { color: var(--label); } .eff-chips .pos b { color: var(--good); } .eff-chips .neg b { color: var(--bad); }
 </style>
 </head>
 <body>
 <header class="bar" id="bar"></header>
 
 <main>
+  <div id="ledBoard"></div>
   <div class="toolbar">
     <h2 id="viewTitle">Games</h2>
     <div class="seg tabs" role="tablist" aria-label="View" id="tabs">
@@ -180,6 +201,7 @@ tr.cut td { border-top: 1.5px dashed var(--fill-strong); }
       <button class="btn press today" type="button" id="todayBtn" hidden>Today</button>
     </div>
     <div class="games" id="games"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+    <section class="leaders" id="leaders" aria-label="Stat leaders"></section>
   </section>
   <section class="view" id="view-standings" hidden><div class="standings" id="standings"></div></section>
   <section class="view" id="view-injuries" hidden>
@@ -205,6 +227,9 @@ import { createClient } from "./ui/client.js";
 import { avatar, teamLogo, esc } from "./ui/avatar.js";
 import { Spring, createSheet, scrollEdge, springIn } from "./ui/motion.js";
 import { mountShell } from "./ui/shell.js";
+import { mountLedBoard } from "./ui/ledboard.js";
+import { advanced, inMode } from "./service/advanced.js";
+import { CONF_OF } from "./service/allstar.js";
 const shell = mountShell({ active: "live" });
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -332,6 +357,56 @@ $("#prevDay").addEventListener("click", () => shiftDay(-1));
 $("#nextDay").addEventListener("click", () => shiftDay(1));
 $("#todayBtn").addEventListener("click", () => { day = null; current = null; show("games"); });
 
+/* Stat Leaders explorer (Basketball Reference-style) + team efficiency for Game Center */
+let eff = null;                                   // /api/team-stats efficiency, keyed by ESPN abbr
+let leadersData = null;
+const LD = { cat: "pts", conf: "All", mode: "pergame" };
+try { Object.assign(LD, JSON.parse(localStorage.getItem("live:leaders") || "{}")); } catch {}
+const LD_CATS = [["pts", "PPG", "PTS"], ["reb", "RPG", "REB"], ["ast", "APG", "AST"], ["stl", "SPG", "STL"], ["blk", "BPG", "BLK"], ["tpm", "3PM", "3PM"], ["ts", "TS%", "TS%"], ["gmsc", "Game Score", "GmSc"]];
+const LD_MODES = [["pergame", "Per Game"], ["per36", "Per 36"], ["totals", "Totals"]];
+function leaderValue(p, cat, mode) {
+  const s = p.stats; if (!s) return null;
+  if (cat === "ts") { const a = advanced(s); return a?.ts != null ? a.ts * 100 : null; }
+  if (cat === "gmsc") { const g = advanced(s)?.gmsc; if (g == null) return null; return mode === "totals" ? g * s.gp : mode === "per36" ? (s.min ? g * 36 / s.min : null) : g; }
+  const m = inMode(s, mode); return m?.[cat] ?? null;
+}
+function renderLeaders() {
+  const el = $("#leaders"); if (!el) return;
+  const head = `<div class="ld-head"><h3>Stat Leaders</h3>
+      <div class="seg ld-modes" style="--n:3"><span class="thumb" style="transform:translateX(${LD_MODES.findIndex(([k]) => k === LD.mode) * 100}%)"></span>${LD_MODES.map(([k, l]) => `<button type="button" data-ldmode="${k}" aria-pressed="${LD.mode === k}">${l}</button>`).join("")}</div></div>
+    <div class="pills" data-ldk="cat">${LD_CATS.map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${LD.cat === k}">${l}</button>`).join("")}</div>
+    <div class="pills" data-ldk="conf" style="margin-top:.4rem">${["All", "East", "West"].map((c) => `<button type="button" data-v="${c}" aria-pressed="${LD.conf === c}">${c}</button>`).join("")}</div>`;
+  if (!leadersData) { el.innerHTML = head + `<div class="panel" style="margin-top:.6rem">${Array.from({ length: 6 }, () => `<div class="sk-row" style="padding:.6rem 1rem"><div class="sk c"></div><div class="sk-l"><div class="sk t"></div><div class="sk t s"></div></div><div class="sk n"></div></div>`).join("")}</div>`; }
+  else {
+    const maxGp = Math.max(1, ...leadersData.players.map((p) => p.stats.gp || 0));
+    const cat = LD_CATS.find(([k]) => k === LD.cat);
+    const qualified = leadersData.players.filter((p) => {
+      const s = p.stats; if (!s?.gp) return false;
+      if (LD.conf !== "All" && CONF_OF[p.teamAbbr] !== LD.conf) return false;
+      if (LD.mode === "totals") return true;
+      if (s.gp < Math.max(2, Math.ceil(maxGp * 0.5))) return false;                      // half the games, like a qualifier
+      if (LD.mode === "per36" && s.min < 15) return false;
+      if (LD.cat === "ts" && (s.fga || 0) < 6) return false;
+      return true;
+    });
+    const rows = qualified.map((p) => ({ p, v: leaderValue(p, LD.cat, LD.mode) })).filter((r) => r.v != null).sort((a, b) => b.v - a.v).slice(0, 25);
+    const fmtv = (v) => (LD.mode === "totals" && !["ts"].includes(LD.cat) ? Math.round(v).toLocaleString() : v.toFixed(1));
+    el.innerHTML = head + `<div class="panel ld-panel"><ol class="ld-list">${rows.map(({ p, v }, i) => `<li><button class="ld-row" type="button" data-player="${esc(p.id)}">
+        <span class="ld-rank num">${i + 1}</span>${avatar(p, { size: "2.25rem", color: "#64748B" })}
+        <span class="ld-who"><b>${esc(p.name)}</b><span>${esc(p.teamAbbr)} · ${p.stats.gp} GP · ${p.stats.min.toFixed(1)} MIN</span></span>
+        <span class="ld-v num">${fmtv(v)}<small>${LD.mode === "per36" ? `${cat[2]}/36` : LD.mode === "totals" ? cat[2] : cat[1]}</small></span></button></li>`).join("") || `<li class="empty">No qualified players yet.</li>`}</ol>
+      <p class="fine" style="padding:0 1rem .75rem;margin:0">Qualified: half of the max games played${LD.mode === "per36" ? ", 15+ MIN" : ""}${LD.cat === "ts" ? ", 6+ FGA" : ""}. TS% = PTS ÷ (2 × (FGA + 0.44 × FTA)). Game Score is Hollinger's, with total rebounds weighted 0.4 (ESPN's feed has no OREB/DREB split per player).</p></div>`;
+  }
+  el.querySelectorAll("[data-ldmode]").forEach((b) => b.addEventListener("click", () => { LD.mode = b.dataset.ldmode; saveLd(); renderLeaders(); }));
+  el.querySelectorAll("[data-ldk] [data-v]").forEach((b) => b.addEventListener("click", () => { LD[b.parentElement.dataset.ldk] = b.dataset.v; saveLd(); renderLeaders(); }));
+}
+const saveLd = () => { try { localStorage.setItem("live:leaders", JSON.stringify(LD)); } catch {} };
+function effChips(t) {
+  const e = eff?.[t?.abbr]; if (!e) return "";
+  const rk = (k) => (e.ranks?.[k] ? `#${e.ranks[k]}` : "");
+  return `<div class="eff-chips"><span title="Offensive rating (points per 100 possessions)">${rk("ortg")} ORtg <b>${e.ortg}</b></span><span title="Defensive rating (lower is better)">${rk("drtg")} DRtg <b>${e.drtg}</b></span><span class="${e.net >= 0 ? "pos" : "neg"}">Net <b>${e.net > 0 ? "+" : ""}${e.net}</b></span><span>Pace <b>${e.pace}</b></span></div>`;
+}
+
 /* Game Center sheet: linescore header + Box Score / Team Stats / Play-by-Play; polls every 15s while live */
 let openGame = null;
 function openBox(id) {
@@ -360,6 +435,7 @@ function gameCenter(d, side, tab) {
   const g = d.game;
   const T = (t, cls) => t ? `<div class="box-team ${cls}">${teamLogo(t, { size: "2.75rem" })}<div><div class="sc">${t.score ?? "–"}</div><div class="ab">${esc(t.abbr)}</div></div></div>` : "<div></div>";
   let html = `<div class="box-head">${T(g.away, "away")}<div class="box-mid">${statusPill(g)}</div>${T(g.home, "home")}</div>`;
+  if (eff) html += `<div class="eff-row">${effChips(g.away)}${effChips(g.home)}</div>`;
   const la = d.linescore?.away || [], lh = d.linescore?.home || [];
   const n = Math.max(4, la.length, lh.length);
   if (la.length || lh.length) {
@@ -499,6 +575,10 @@ function startMoves() {
 
 createClient().then((c) => {
   client = c;
+  mountLedBoard($("#ledBoard"), { client, onGame: (id) => openBox(id) });
+  renderLeaders();
+  client.watch("players", {}, (d) => { leadersData = d; renderLeaders(); });
+  client.watch("teamstats", {}, (d) => { eff = d.efficiency; });
   show(location.hash.slice(1) || "games", false);
   // LiveWire lives in the app shell; on this page, scores open the box score in place.
   shell.setWireHandler((it) => {

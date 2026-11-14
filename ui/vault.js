@@ -4,6 +4,7 @@ import { avatar, teamLogo, esc } from "./avatar.js";
 import { pickInventory, toCode, projectLottery, lotteryTable, DEFAULT_FORMAT } from "../service/draft.js";
 import { resolveSalary, teamTier, TIERS, money } from "../service/trade.js";
 import { ATTRS } from "../service/ratings.js";
+import { advanced, inMode, MODES } from "../service/advanced.js";
 import { loadImage, roundRect, drawAvatar, fitText, fontsReady, openImageSheet } from "./card.js";
 
 const CODE_TO_ESPN = { GSW: "GS", NOP: "NO", NYK: "NY", SAS: "SA", UTA: "UTAH", WAS: "WSH" };
@@ -12,6 +13,12 @@ const ovrTier = (o) => (o >= 95 ? "gal" : o >= 90 ? "dia" : o >= 85 ? "ame" : o 
 const ovrBadge = (r) => (r ? `<span class="ovr t-${r.tier || ovrTier(r.ovr)}" title="2K27 OVR${r.seeded ? "" : " (Hooptrax estimate)"}">${r.ovr}</span>` : "");
 const deltaPill = (d) => (d > 0 ? `<span class="delta up">+${d}</span>` : d < 0 ? `<span class="delta down">−${Math.abs(d)}</span>` : "");
 const inches = (h) => { const m = /(\d)\s*'\s*(\d{1,2})/.exec(String(h || "")); return m ? +m[1] * 12 + +m[2] : null; };
+
+let statMode = (() => { try { return localStorage.getItem("htx:statMode") || "pergame"; } catch { return "pergame"; } })();
+const setMode = (m) => { statMode = m; try { localStorage.setItem("htx:statMode", m); } catch {} };
+const modeSeg = () => `<div class="seg mode-seg" role="group" aria-label="Stat mode" style="--n:3"><span class="thumb" style="transform:translateX(${MODES.findIndex(([k]) => k === statMode) * 100}%)"></span>${MODES.map(([k, l]) => `<button type="button" data-smode="${k}" aria-pressed="${statMode === k}">${l}</button>`).join("")}</div>`;
+const bindMode = (body, redraw) => body.querySelectorAll("[data-smode]").forEach((b) => b.addEventListener("click", () => { setMode(b.dataset.smode); redraw(); }));
+const pct1 = (x) => (x == null ? "—" : (x * 100).toFixed(1));
 
 export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig, toast = () => {} }) {
   /* ---------- shared data (each loaded once per page, then cached by the service) ---------- */
@@ -23,6 +30,7 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
     league: () => get("league", async () => (await (await getClient()).get("league", {})).data),
     stats: () => get("stats", async () => (await (await getClient()).get("players", {})).data),
     standings: () => get("standings", async () => (await (await getClient()).get("standings", {})).data),
+    teamstats: () => get("teamstats", async () => (await (await getClient()).get("teamstats", {})).data),
   };
   const ratingOf = (ratings, id) => ratings?.players?.find((p) => p.id === String(id)) || null;
 
@@ -33,12 +41,13 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
     const code = toCode(input);
     const look = teamLook(code);
     const espnAbbr = CODE_TO_ESPN[code] || code;
-    const S = { roster: null, err: null, standing: null, lottery: null, inv: null, book: null, ratings: null, stats: null, schedule: null, schedErr: null };
+    const S = { roster: null, err: null, standing: null, lottery: null, inv: null, book: null, ratings: null, stats: null, schedule: null, schedErr: null, eff: null };
     const draw = (body) => {
       const st = S.standing;
       const head = `<div class="hub-head" style="--c:${look.color}">${teamLogo(look, { size: "3.25rem" })}
         <div style="min-width:0"><div class="hub-name">${esc(look.city)} ${esc(look.name)}</div>
         <div class="hub-meta num">${st ? `${st.wins}-${st.losses} · ${st.seed ? `#${st.seed} in the ${esc(st.conf)}` : esc(st.conf)}${st.streak ? ` · ${esc(st.streak)}` : ""}` : S.roster?.team?.record ? esc(S.roster.team.record) : '<span class="sk" style="display:inline-block;width:8rem;height:.8rem;border-radius:4px"></span>'}</div>
+        ${S.eff ? `<div class="hub-meta eff-badges">${[["ortg", "ORtg"], ["drtg", "DRtg"], ["net", "Net"], ["pace", "Pace"]].map(([k, l]) => `<span class="pill" title="${l} ${S.eff[k]}">#${S.eff.ranks?.[k] ?? "–"} ${l} <b class="num">${k === "net" && S.eff[k] > 0 ? "+" : ""}${S.eff[k]}</b></span>`).join("")}</div>` : ""}
         ${S.lottery ? `<div class="hub-meta"><span class="pill lot">3-2-1 lottery seed ${S.lottery.seed} · ${(S.lottery.p1 * 100).toFixed(1)}% for #1</span></div>` : ""}
         ${S.roster?.coach ? `<div class="hub-meta">Coach ${esc(S.roster.coach)}</div>` : ""}</div></div>
         <div class="seg vault-tabs" role="tablist" style="--n:3"><span class="thumb" style="transform:translateX(${["roster", "picks", "schedule"].indexOf(vaultTab) * 100}%)"></span>
@@ -50,12 +59,14 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
       body.innerHTML = head + `<div class="vault-body">${tab}</div>
         <div class="hub-actions"><a class="btn primary press" href="index.html#t=${encodeURIComponent(code + ",_")}">Load Team in Trade Machine</a><a class="btn ghost press" href="draft.html">Draft board</a></div>`;
       body.querySelectorAll("[data-vtab]").forEach((b) => b.addEventListener("click", () => { vaultTab = b.dataset.vtab; draw(body); if (vaultTab === "schedule") loadSchedule(); }));
+      bindMode(body, () => draw(body));
     };
     sheet.open({ title: "Team Vault", render: draw });
     const refresh = () => sheet.isOpen && sheet.refresh();
     const c = await getClient();
     pickConfig().then((cfg) => { S.inv = pickInventory(code, cfg); refresh(); });
     data.book().then((b) => { S.book = b; refresh(); }).catch(() => {});
+    data.teamstats().then((t) => { S.eff = t.efficiency?.[espnAbbr] || null; refresh(); }).catch(() => {});
     data.ratings().then((r) => { S.ratings = r; refresh(); }).catch(() => {});
     data.stats().then((s) => { S.stats = new Map(s.players.map((p) => [p.id, p.stats])); refresh(); }).catch(() => {});
     c.get("roster", { team: look.espn || espnAbbr }).then(({ data: d }) => { S.roster = d; refresh(); }).catch((e) => { S.err = e.message; refresh(); });
@@ -101,12 +112,13 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
         <div class="meter-legend">${marks.map(([l, v], i) => `<span><b>${["C", "T", "A1", "A2"][i]}</b> ${l} <span class="num">${money(v)}</span></span>`).join("")}</div>
         <p class="meter-note">${cba.projected ? "Thresholds are 2026–27 projections. " : ""}Payroll sums ESPN contracts${rows.some((r) => r.est) ? "; “est.” salaries are estimated from experience and production" : ""}. ESPN rosters include two-way players.</p>
       </div>
-      <div class="sheet-sub">Active roster · ${rows.length}</div>
-      <ul class="list">${rows.map(({ a, salary, est, rating }) => `<li><button class="row" type="button" data-player="${esc(a.id)}">
+      <div class="sheet-sub roster-sub"><span>Active roster · ${rows.length}</span>${modeSeg()}</div>
+      <ul class="list">${rows.map(({ a, salary, est, rating }) => { const st = S.stats?.get(a.id); const m = st ? inMode(st, statMode) : null; const f = (x) => (x == null ? "—" : statMode === "totals" ? Math.round(x) : Number(x).toFixed(1));
+        return `<li><button class="row" type="button" data-player="${esc(a.id)}">
         ${avatar(a, { size: "2.5rem", color: look.color })}
         <span class="meta"><span class="nm">${esc(a.name)}${a.injury ? ` <span class="pill ${/out/i.test(a.injury.status) ? "out" : "dtd"}">${esc(a.injury.status)}</span>` : ""}</span>
-        <span class="sub num">${[a.position, a.age ? `${a.age} yrs` : "", a.height].filter(Boolean).map(esc).join(" · ")}</span></span>
-        <span class="sal num">${money(salary)}${est ? '<span class="est">est.</span>' : ""}</span>${ovrBadge(rating)}</button></li>`).join("")}</ul>`;
+        <span class="sub num">${m && st.gp ? `${f(m.pts)} PTS · ${f(m.reb)} REB · ${f(m.ast)} AST` : [a.position, a.age ? `${a.age} yrs` : "", a.height].filter(Boolean).map(esc).join(" · ")}</span></span>
+        <span class="sal num">${money(salary)}${est ? '<span class="est">est.</span>' : ""}</span>${ovrBadge(rating)}</button></li>`; }).join("")}</ul>`;
   }
   function picksTab(S, code) {
     if (!S.inv) return skel(3);
@@ -131,7 +143,7 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
   /* =================================================================== Player Quick-View */
   async function openPlayer(id, { fallback = null } = {}) {
     await ensureData();
-    const S = { p: null, inj: null, rating: null, roster: null, salary: null, loading: true };
+    const S = { p: null, inj: null, rating: null, roster: null, salary: null, bio: null, loading: true };
     const draw = (body) => {
       const base = S.roster || S.p || fallback || {};
       const teamAbbr = S.p?.teamAbbr || S.roster?.teamAbbr || base.team?.abbr || base.teamAbbr || "";
@@ -141,21 +153,36 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
       const name = base.name || S.p?.name || "Player";
       const slug = String(name).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
       const tradeHref = code && window.NBA_DATA.teams[code] ? `index.html#t=${encodeURIComponent(code + ",_")}&a=${encodeURIComponent(`${code}:${slug}>_`)}` : "index.html";
+      const b = S.bio;
+      const draftTxt = b?.draft?.year ? `${b.draft.year} · Rd ${b.draft.round}, Pick ${b.draft.pick}${b.draft.overall ? ` (#${b.draft.overall} overall)` : ""}${b.draft.team ? ` · ${esc(b.draft.team)}` : ""}` : b ? "Undrafted" : null;
+      const bioGrid = b ? `<div class="bio-grid">
+          <div><span>Draft</span><b>${draftTxt}</b></div>
+          <div><span>${b.college ? "College" : "From"}</span><b>${esc(b.college || b.country || b.birthPlace || "—")}</b></div>
+          <div><span>Age</span><b class="num">${b.age ?? "—"}</b></div>
+          <div><span>Ht / Wt</span><b class="num">${esc([b.height, b.weight].filter(Boolean).join(" · ") || "—")}</b></div>
+          <div><span>Experience</span><b>${esc(b.experience || "—")}</b></div>
+        </div>` : `<div class="bio-grid">${Array.from({ length: 5 }, () => `<div><span class="sk" style="display:block;width:3rem;height:.6rem;border-radius:3px"></span><span class="sk" style="display:block;width:5rem;height:.8rem;border-radius:3px;margin-top:.25rem"></span></div>`).join("")}</div>`;
+      const m = s ? inMode(s, statMode) : null, adv = s ? advanced(s) : null;
+      const fx = (x) => (x == null ? "—" : statMode === "totals" ? Math.round(x) : Number(x).toFixed(1));
       body.innerHTML = `<div class="qv-head" style="--c:${look.color}">${avatar({ ...base, name }, { size: "5.5rem", color: look.color, full: true })}
           <div style="min-width:0"><div class="qv-name">${esc(name)}</div>
           <div class="qv-sub">${code ? `<button class="qv-team" type="button" data-team-hub="${code}">${teamLogo(look, { size: "1.25rem" })}${esc(look.city)} ${esc(look.name)}</button>` : ""}</div>
           <div class="qv-sub num">${[base.position, base.jersey ? `#${base.jersey}` : "", base.height, base.age || S.p?.age ? `${base.age || S.p.age} yrs` : ""].filter(Boolean).map(esc).join(" · ")}</div>
           ${S.rating ? `<div class="qv-sub">${ovrBadge(S.rating)} ${deltaPill(S.rating.delta)} <span class="muted small">2K27 OVR${S.rating.seeded ? "" : " · est."}</span>${S.salary != null ? ` <span class="muted small">· ${money(S.salary.salary)}${S.salary.source === "estimate" ? " est." : ""} in 2026–27</span>` : ""}</div>` : ""}
           ${S.inj ? `<div class="qv-sub"><span class="pill ${S.inj.status === "Out" ? "out" : "dtd"}">${esc(S.inj.status)}</span> ${esc(S.inj.injury || "")}</div>` : ""}</div></div>
-        <div class="sheet-sub">2026–27 season</div>
-        ${s ? `<div class="qv-stats">${[["PPG", f1(s.pts)], ["RPG", f1(s.reb)], ["APG", f1(s.ast)], ["FG%", f1(s.fgPct)], ["3P%", f1(s.threePct)], ["MIN", f1(s.min)]].map(([k, v]) => `<div><div class="k">${k}</div><div class="v num">${v}</div></div>`).join("")}</div>
-          <p class="qv-note num">${s.gp} games · ${f1(s.stl)} STL · ${f1(s.blk)} BLK · FT ${f1(s.ftPct)}%</p>`
+        ${bioGrid}
+        <div class="sheet-sub roster-sub"><span>2026–27 season</span>${modeSeg()}</div>
+        ${s ? `<div class="qv-stats">${[[statMode === "pergame" ? "PPG" : "PTS", fx(m.pts)], [statMode === "pergame" ? "RPG" : "REB", fx(m.reb)], [statMode === "pergame" ? "APG" : "AST", fx(m.ast)], ["STL", fx(m.stl)], ["BLK", fx(m.blk)], [statMode === "totals" ? "MIN" : "3PM", statMode === "totals" ? fx(m.min) : fx(m.tpm)]].map(([k, v]) => `<div><div class="k">${k}</div><div class="v num">${v}</div></div>`).join("")}</div>
+          <div class="qv-stats adv">${[["TS%", pct1(adv?.ts)], ["eFG%", pct1(adv?.efg)], ["AST/TO", adv?.astTo != null ? adv.astTo.toFixed(2) : "—"], ["GmSc", adv?.gmsc != null ? adv.gmsc.toFixed(1) : "—"], ["FG%", f1(s.fgPct)], ["3P%", f1(s.threePct)]].map(([k, v]) => `<div><div class="k">${k}</div><div class="v num">${v}</div></div>`).join("")}</div>
+          <p class="qv-note num">${s.gp} games · ${f1(s.min)} MIN · FT ${f1(s.ftPct)}%${statMode === "per36" ? " · scaled to 36 minutes" : statMode === "totals" ? " · season totals" : ""}</p>`
           : S.loading ? `<div class="skel-line"></div>` : `<div class="empty">No 2026–27 games yet.</div>`}
         <div class="hub-actions"><button class="btn primary press" type="button" data-compare>Compare</button><a class="btn ghost press" href="${tradeHref}">Open in Trade Machine</a>${code ? `<button class="btn ghost press" type="button" data-team-hub="${code}">Team Vault</button>` : ""}</div>`;
       body.querySelector("[data-compare]").addEventListener("click", () => openCompare(String(id)));
+      bindMode(body, () => draw(body));
     };
     sheet.open({ title: "Player", render: draw });
     const c = await getClient();
+    c.get("bio", { id: String(id) }).then(({ data: d }) => { S.bio = d; if (sheet.isOpen) sheet.refresh(); }).catch(() => { S.bio = { draft: { text: "" }, experience: "" }; if (sheet.isOpen) sheet.refresh(); });
     const [pl, ij, rt, lg, bk] = await Promise.allSettled([data.stats(), c.get("injuries", {}), data.ratings(), data.league(), data.book()]);
     if (pl.status === "fulfilled") S.p = pl.value.players.find((x) => x.id === String(id)) || null;
     if (ij.status === "fulfilled") S.inj = ij.value.data.find((x) => x.athlete?.id === String(id)) || null;
@@ -181,8 +208,10 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
       salary: r ? resolveSalary(r, { book, stats: s?.stats, cba: book?.cba }) : null,
     };
   }
-  const STAT_ROWS = [["PPG", (p) => p.stats?.pts], ["RPG", (p) => p.stats?.reb], ["APG", (p) => p.stats?.ast], ["STL", (p) => p.stats?.stl], ["BLK", (p) => p.stats?.blk],
-    ["FG%", (p) => p.stats?.fgPct], ["3P%", (p) => p.stats?.threePct], ["FT%", (p) => p.stats?.ftPct], ["MIN", (p) => p.stats?.min]];
+  const ms = (p) => (p.stats ? inMode(p.stats, statMode) : null);
+  const STAT_ROWS = [["PTS", (p) => ms(p)?.pts], ["REB", (p) => ms(p)?.reb], ["AST", (p) => ms(p)?.ast], ["STL", (p) => ms(p)?.stl], ["BLK", (p) => ms(p)?.blk], ["3PM", (p) => ms(p)?.tpm],
+    ["FG%", (p) => p.stats?.fgPct], ["3P%", (p) => p.stats?.threePct], ["FT%", (p) => p.stats?.ftPct], ["MIN", (p) => ms(p)?.min]];
+  const ADV_ROWS = [["TS%", (p) => (p.stats ? advanced(p.stats)?.ts * 100 : null)], ["eFG%", (p) => (p.stats ? advanced(p.stats)?.efg * 100 : null)], ["AST/TO", (p) => (p.stats ? advanced(p.stats)?.astTo : null)], ["Game Score", (p) => (p.stats ? advanced(p.stats)?.gmsc : null)]];
   const RATING_ROWS = [["OVR", (p) => p.rating?.ovr], ...ATTRS.map(([k, l]) => [l, (p) => p.rating?.attrs?.[k]])];
   const PROFILE_ROWS = [["2026–27 Salary", (p) => (p.salary ? money(p.salary.salary) + (p.salary.source === "estimate" ? " est." : "") : "—")], ["Age", (p) => p.age ?? "—"], ["Height", (p) => p.height || "—"],
     ["Experience", (p) => (p.experience == null ? "—" : p.experience === 0 ? "Rookie" : `${p.experience} yrs`)], ["Team", (p) => p.teamAbbr || "—"]];
@@ -206,7 +235,8 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
       body.innerHTML = `<div class="cmp-head">${head(A, "A")}<span class="cmp-vs">VS</span>${head(B, "B")}</div>
         ${!B ? `<input class="search" id="cmpSearch" type="search" placeholder="Search any NBA player" autocomplete="off" value="${esc(S.q)}" style="font-size:16px" aria-label="Search a player to compare" />
           <ul class="list cmp-results">${results.map((p) => `<li><button class="row" type="button" data-pick="${esc(p.id)}">${avatar(p, { size: "2.25rem", color: "#64748B" })}<span class="meta"><span class="nm">${esc(p.name)}</span><span class="sub">${esc(p.teamAbbr)} · ${esc(p.position || "")}</span></span></button></li>`).join("")}</ul>` : ""}
-        ${A ? `<div class="sheet-sub">2026–27 season stats</div><div class="cmp-tbl">${cmpRows(A, B, STAT_ROWS)}</div>
+        ${A ? `<div class="sheet-sub roster-sub"><span>2026–27 season · ${MODES.find(([k]) => k === statMode)[1]}</span>${modeSeg()}</div><div class="cmp-tbl">${cmpRows(A, B, STAT_ROWS, { digits: statMode === "totals" ? 0 : 1 })}</div>
+          <div class="sheet-sub">Advanced</div><div class="cmp-tbl">${cmpRows(A, B, ADV_ROWS, { digits: 1 })}</div>
           <div class="sheet-sub">NBA 2K27 ratings</div><div class="cmp-tbl">${cmpRows(A, B, RATING_ROWS, { digits: 0 })}</div>
           <div class="sheet-sub">Contract & profile</div><div class="cmp-tbl">${cmpRows(A, B, PROFILE_ROWS, { numeric: false })}</div>` : skel(4)}
         ${B ? `<div class="hub-actions"><button class="btn primary press" type="button" data-share>Share Comparison Card</button><button class="btn ghost press" type="button" data-swap>Swap sides</button></div>` : ""}
@@ -218,6 +248,7 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
       }
       body.querySelectorAll("[data-pick]").forEach((b) => b.addEventListener("click", async () => { S.B = await profileOf(b.dataset.pick); S.q = ""; draw(body); }));
       body.querySelector("[data-change]")?.addEventListener("click", () => { S.B = null; draw(body); });
+      bindMode(body, () => draw(body));
       body.querySelector("[data-swap]")?.addEventListener("click", () => { [S.A, S.B] = [S.B, S.A]; draw(body); });
       body.querySelector("[data-share]")?.addEventListener("click", async () => {
         try { const canvas = await renderCompareCard(S.A, S.B); await openImageSheet(sheet, canvas, { title: "Comparison Card", filename: "hooptrax-compare.png", toast }); }
@@ -233,7 +264,7 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
   /* ---------- comparison card PNG (1080 wide, 2x) ---------- */
   async function renderCompareCard(A, B) {
     await fontsReady();
-    const W = 1080, rowsAll = [["SEASON", STAT_ROWS], ["2K27", RATING_ROWS]];
+    const W = 1080, rowsAll = [[`SEASON · ${MODES.find(([k]) => k === statMode)[1].toUpperCase()}`, STAT_ROWS], ["ADVANCED", ADV_ROWS], ["2K27", RATING_ROWS]];
     const ROW = 50, H = 300 + rowsAll.reduce((s, [, r]) => s + 60 + r.length * ROW, 0) + 120;
     const c = document.createElement("canvas"); c.width = W * 2; c.height = H * 2;
     const x = c.getContext("2d"); x.scale(2, 2);

@@ -38,8 +38,9 @@ export function mountShell({ active = "live" } = {}) {
   const sheet = createSheet();
   let toaster = null; const toastFn = (m) => (toaster ||= createToast())(m);
   // The LiveWire ticker lives on the Live tab only; elsewhere a quiet dot on that tab says updates are streaming.
-  const hasWire = active === "live";
-  const tabLink = ([k, label, href]) => `<a href="${href}"${k === active ? ' aria-current="page"' : ""}${k === "live" && !hasWire ? ' class="tab-live" aria-label="Live (updates streaming)"' : ""}>${svg(k)}<span>${label}</span></a>`;
+  // The LED ticker board (ui/ledboard.js) lives on the Live tab itself; the old vertical rail is retired.
+  const hasWire = false;
+  const tabLink = ([k, label, href]) => `<a href="${href}"${k === active ? ' aria-current="page"' : ""}${k === "live" && active !== "live" ? ' class="tab-live" aria-label="Live (updates streaming)"' : ""}>${svg(k)}<span>${label}</span></a>`;
   const bar = document.getElementById("bar") || document.body.insertBefore(document.createElement("header"), document.body.firstChild);
   bar.id = "bar"; bar.className = "bar app-bar";
   bar.innerHTML = `<div class="bar-inner">
@@ -94,7 +95,7 @@ export function mountShell({ active = "live" } = {}) {
   }, 0.001);
   let drawerOpen = false;
   function openDrawer() {
-    if (!hasWire) { location.href = "live.html"; return; }
+    if (!hasWire) { if (active === "live") document.querySelector(".led")?.scrollIntoView({ behavior: reduceMotion.matches ? "auto" : "smooth", block: "center" }); else location.href = "live.html"; return; }
     if (wide.matches) { rail.querySelector(".wire-toggle")?.focus(); return; }
     drawerOpen = true; drawer.style.visibility = "visible"; drawerScrim.classList.add("on");
     if (reduceMotion.matches) dSpring.set(0); else dSpring.to(0, { damping: 1, response: 0.4 });
@@ -177,7 +178,7 @@ export function mountShell({ active = "live" } = {}) {
     const t = e.target.closest("[data-team-hub]");
     if (t && t.dataset.teamHub) { e.preventDefault(); e.stopPropagation(); openTeam(t.dataset.teamHub); return; }
     const p = e.target.closest("[data-player]");
-    if (p && p.dataset.player) { e.preventDefault(); e.stopPropagation(); openPlayer(p.dataset.player); }
+    if (p && p.dataset.player) { e.preventDefault(); e.stopPropagation(); openPlayer(p.dataset.player, p.dataset.name ? { fallback: { name: p.dataset.name, teamAbbr: p.dataset.team || "" } } : {}); }
   }, true);
 
   instance = {

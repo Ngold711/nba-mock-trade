@@ -455,3 +455,14 @@ body { background-image: none; }
 .cmp-bar { width: 100%; max-width: 7rem; height: 0.25rem; border-radius: 99px; background: rgba(148,163,184,.25); overflow: hidden; display: block; }
 .cmp-bar i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
 .link { background: none; border: 0; color: var(--accent); font-weight: 650; cursor: pointer; padding: 0; font-size: 0.75rem; }
+
+/* Stat mode toggle, bio grid, efficiency badges */
+.roster-sub { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+.mode-seg { width: 14.5rem; text-transform: none; letter-spacing: 0; } .mode-seg button { font-size: 0.75rem; padding: 0.3rem 0.1rem; font-weight: 650; }
+.bio-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr)); gap: 0.4rem; margin: 0.25rem 0 0.25rem; }
+.bio-grid > div { background: var(--surface-2); border: 1px solid var(--hair); border-radius: 0.6rem; padding: 0.4rem 0.55rem; min-width: 0; }
+.bio-grid span { display: block; font-size: 0.625rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--label-3); }
+.bio-grid b { display: block; font-size: 0.8125rem; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bio-grid > div:first-child { grid-column: 1 / -1; }
+.qv-stats.adv { margin-top: 0.4rem; } .qv-stats.adv .v { font-size: 1rem; }
+.eff-badges { gap: 0.3rem; } .eff-badges .pill b { color: var(--label); margin-left: 0.15rem; }
