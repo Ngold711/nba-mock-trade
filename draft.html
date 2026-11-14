@@ -173,6 +173,12 @@ th:first-child, td:first-child { text-align: left; }
 .pk-bar .link { background: none; border: 0; color: var(--accent); font-weight: 650; cursor: pointer; padding: 0; }
 .need { font-size: 0.625rem; font-weight: 750; letter-spacing: 0.04em; padding: 0.1rem 0.4rem; border-radius: 99px; background: var(--good-soft); color: var(--good); margin-left: 0.35rem; white-space: nowrap; vertical-align: 1px; }
 .pk-num { font-family: var(--font-mono); font-size: 0.75rem; color: var(--label-2); text-align: right; min-width: 3rem; }
+.pop-menu { display: grid; gap: 0.35rem; padding: 0.5rem; width: min(17rem, calc(100vw - 2rem)); }
+.pop-menu .btn { text-align: left; width: 100%; min-height: 40px; }
+.actions .pop { display: contents; }
+.actions .pop > summary { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+.actions { position: relative; }
+.actions .pop-body { top: calc(100% + 0.4rem); right: 0; }
 </style>
 </head>
 <body>
@@ -192,10 +198,13 @@ th:first-child, td:first-child { text-align: left; }
     <button type="button" data-rounds="1" aria-pressed="true">Round 1 · Picks 1–30</button><button type="button" data-rounds="2" aria-pressed="false">Full Draft · 1–60</button></div>
   <div class="actions">
     <button class="btn primary press" type="button" id="simBtn">Sim Lottery</button>
-    <button class="btn press" type="button" id="takeBtn">Take Order to Mock Draft</button>
-    <button class="btn press" type="button" id="projBtn">Projected order</button>
-    <button class="btn press" type="button" id="autoBtn">Auto-draft</button>
-    <button class="btn press" type="button" id="clearBtn">Clear picks</button>
+    <button class="btn ghost press" type="button" id="autoBtn">Auto-draft</button>
+    <details class="pop"><summary class="btn ghost press">Options</summary>
+      <div class="pop-body pop-menu">
+        <button class="btn ghost press" type="button" id="takeBtn">Jump to the pick on the clock</button>
+        <button class="btn ghost press" type="button" id="projBtn">Reset to projected order</button>
+        <button class="btn ghost press" type="button" id="clearBtn">Clear all picks</button>
+      </div></details>
   </div>
   <p class="source" id="source"></p>
   <div class="lot-head"><h3>Lottery odds</h3>

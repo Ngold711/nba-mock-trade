@@ -166,6 +166,12 @@ export function mountShell({ active = "live" } = {}) {
   const vault = mountVault({ sheet, getClient: () => (client ? Promise.resolve(client) : createClient()), teamLook, ensureData, pickConfig, toast: (m) => toastFn(m) });
   const { openTeam, openPlayer, openCompare } = vault;
 
+  // Popovers (<details class="pop">): close on outside tap, Escape, or after choosing an item.
+  document.addEventListener("click", (e) => {
+    document.querySelectorAll("details.pop[open]").forEach((d) => { if (!d.contains(e.target) || e.target.closest(".pop-menu button")) d.removeAttribute("open"); });
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") document.querySelectorAll("details.pop[open]").forEach((d) => d.removeAttribute("open")); });
+
   // Global delegation: any [data-team-hub] badge or [data-player] row anywhere in the app.
   document.addEventListener("click", (e) => {
     const t = e.target.closest("[data-team-hub]");

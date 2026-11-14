@@ -208,3 +208,56 @@ The Awards tab has two views: **All-Star Voting** and **Season Awards** (MVP, RO
   Conference comes from a fixed map, so a standings outage can't empty the list.
 - **View & Share Ballot** draws a 1080×1700 PNG with the Hooptrax watermark. The ballot is saved in
   `localStorage` (`awards:ballot:v2`), and v1 ballots are migrated automatically.
+
+## Platform upgrades (Nov 2026)
+
+### Fast start
+On startup the service fetches all 30 rosters at once (`Promise.allSettled`), plus standings, season stats and ratings,
+and refreshes them in the background (league rosters and standings every 30 min). Each team's roster is primed into the
+cache from the league-wide load, so `/api/rosters/:team` answers from memory. Pages show shimmer skeletons until data lands.
+
+### Trade Machine (`index.html`, `service/trade.js`, `salaries_2026_27.json`)
+- **Salaries:** live ESPN 2026–27 contract → the bundled ESPN contract snapshot (`salaries_2026_27.json`, by athlete id) →
+  an estimate from experience and production (veteran minimum, rookie scale, rotation, starter). Estimates show an `est.` tag;
+  no active player is ever $0.
+- **`validateTrade()`** runs on every change: cap room absorption, over-cap matching (200% + $250K / outgoing + flat / 125% + $250K),
+  a 100% limit at or over the 1st Apron after the trade, the 2nd-Apron aggregation ban, the Stepien Rule on 2027–2029 firsts
+  (protected picks owed away count as gone; picks a team doesn't control can't be traded), and roster-size warnings.
+  Cap thresholds are projections; edit `cba` in the JSON if official numbers differ.
+- **Strict CBA Rules / Sandbox Mode:** sandbox keeps the math but unlocks links and image cards, marked "⚡ Sandbox".
+- **Auto-save** to `localStorage` (`trade:workspace:v1`). **Copy Trade Link** encodes teams, ESPN player ids and picks as
+  `?trade=<base64url>`; opening it on any page loads the Trade tab.
+- **Share Image Card:** a 1080px-wide (2x) receipt drawn on a canvas. Images load with `crossOrigin="anonymous"`, falling back to
+  `GET /api/proxy-image?url=` (ESPN image CDN only). Download, Copy Image, or the native share sheet.
+
+### Mock Draft
+Boards hold 75 (2027) and 65 (2028, 2029) prospects. Ranks past each hand-built board are a statistical board of real
+Division I players from ESPN rosters, ordered by early-season production, class and size (`"board": "statistical"`).
+Round 1 or Full Draft (60 picks; round 2 in record order, owners unchanged). The picker filters by position (PG/SG/SF/PF/C,
+combos match both), origin (NCAA / International / High School), sorts by rank, height or PPG, and flags **Team Need** from the
+drafting team's live roster.
+
+### Awards tabs
+All-Star · Season Races · **Weekly & Polls** · **2K27 Ratings**.
+- Weekly: Players of the Week (seeded weeks 1–3, later winners detected from ESPN news headlines), honors schedule, MVP and
+  Rookie ladders, and Hooptrax Live Polls (`GET/POST /api/polls`; one vote per poll per browser and IP; stored in `data/polls.json`,
+  which resets on a fresh deploy).
+- 2K27 Ratings (`/api/2k-ratings`, `service/ratings.js`, cached 6 h): players named in the Nov 2026 update keep that OVR and delta;
+  everyone else is rated from live ESPN stats (percentile curve, capped at 93). Attributes, badges and 30 team ratings are computed.
+  These are Hooptrax estimates, not official 2K data.
+
+### Shell
+- **Light / dark** toggle (Sun/Moon) next to 30 Teams, saved as `htx:theme`, applied before first paint. The logo's lower seams and
+  the "Hoop" wordmark switch to deep slate in light mode.
+- **Team Vault** (30 Teams or any team badge): record, seed, 3-2-1 lottery badge, payroll meter against cap/tax/aprons, roster with
+  salaries and OVR, 2027–2029 picks, schedule and results (`/api/schedule/:team`).
+- **Player Quick-View** shows 2K27 OVR and salary; **Compare** lines up stats, ratings and contract/profile with winners in green and
+  exports a PNG card.
+- The LiveWire ticker appears on Live only; other pages show a live dot on the Live tab.
+
+### Live Game Center
+Tap any game: linescore (Q1–Q4, OT), Box Score (away/home), Team Stats, and Play-by-Play, polling every 15 s while live.
+
+### Home Screen app
+`public/manifest.json` (standalone, icons 192/512/maskable), `apple-mobile-web-app-capable`, `black-translucent` status bar, and
+light/dark `theme-color` tags. On iPhone: Share → Add to Home Screen.
