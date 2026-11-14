@@ -3,7 +3,7 @@ import {
   normalizeScoreboard, normalizeSummary, normalizeRoster, normalizeInjuries,
   normalizeStandings, normalizeTransactions, normalizeTeams,
   normalizeCollegeOverview, collegeBioFromRoster, collegeHeadshot,
-  normalizeNews, normalizePlayerStats, normalizeHonors, normalizeSchedule,
+  normalizeNews, normalizePlayerStats, normalizeHonors, normalizeSchedule, normalizeBio, collegeSplits,
 } from "./normalize.js";
 
 const SITE = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba";
@@ -25,6 +25,9 @@ export const ENDPOINTS = {
   transactions: () => `${SITE}/transactions`,
   teams: () => `${SITE}/teams`,
   collegeOverview: ({ id }) => `${NCAA_ATHLETE}/${encodeURIComponent(id)}/overview`,
+  collegeStats: ({ id }) => `${NCAA_ATHLETE}/${encodeURIComponent(id)}/stats`,
+  bio: ({ id }) => `https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/${encodeURIComponent(id)}`,
+  teamStats: ({ team }) => `${SITE}/teams/${encodeURIComponent(team)}/statistics`,
   collegeRoster: ({ team }) => `${NCAA_SITE}/teams/${encodeURIComponent(team)}/roster`,
 };
 
@@ -40,6 +43,7 @@ export const NORMALIZERS = {
   honors: normalizeHonors,
   players: normalizePlayerStats,
   schedule: normalizeSchedule,
+  bio: normalizeBio,
 };
 
 export class FetchError extends Error {
@@ -76,12 +80,16 @@ export async function fetchJson(url, { timeoutMs = 10000, retries = 1, fetchImpl
 
 /** College prospect: live season averages + game log (+ roster bio when a team id is given). */
 async function loadCollege({ id, team, season = "2026-27" }, opts) {
-  const [overview, roster] = await Promise.all([
+  const [overview, roster, stats] = await Promise.all([
     fetchJson(ENDPOINTS.collegeOverview({ id }), opts),
     team ? fetchJson(ENDPOINTS.collegeRoster({ team }), opts).catch(() => null) : null,   // bio is optional
+    fetchJson(ENDPOINTS.collegeStats({ id }), opts).catch(() => null),                     // shooting splits are optional
   ]);
   const hs = collegeHeadshot(id);
-  return { id: String(id), headshot: hs.url, headshotSmall: hs.small, ...normalizeCollegeOverview(overview, { season }), bio: roster ? collegeBioFromRoster(roster, id) : null };
+  const out = { id: String(id), headshot: hs.url, headshotSmall: hs.small, ...normalizeCollegeOverview(overview, { season }), bio: roster ? collegeBioFromRoster(roster, id) : null };
+  const sp = stats ? collegeSplits(stats, season) : null;
+  if (out.averages && sp && (!sp.season || sp.season === out.averages.season)) Object.assign(out.averages, sp, { season: out.averages.season });
+  return out;
 }
 /** Run fn over items with at most `limit` in flight. */
 async function mapLimit(items, limit, fn) {
@@ -176,7 +184,42 @@ async function loadRatings() {
   const [players, league, prevPlayers] = await Promise.all([dep("players"), dep("league").catch(() => null), dep("players", { season: "2026" }).catch(() => null)]);
   return buildRatings({ players, league, prevPlayers });
 }
-const CUSTOM = { college: loadCollege, starts: loadStarts, coaches: loadCoaches, league: loadLeague, ratings: loadRatings };
+/* Team efficiency: season averages for all 30 teams (in parallel) + opponent scoring from standings. */
+async function loadTeamStats(_p, opts) {
+  const { teamEfficiency } = await import("./advanced.js");
+  const teams = normalizeTeams(await fetchJson(ENDPOINTS.teams(), opts));
+  const settled = await Promise.allSettled(teams.map((t) => fetchJson(ENDPOINTS.teamStats({ team: t.id }), opts)));
+  const stats = {};
+  teams.forEach((t, i) => {
+    if (settled[i].status !== "fulfilled") return;
+    const v = {};
+    for (const c of arr(settled[i].value?.results?.stats?.categories)) for (const x of arr(c.stats)) v[x.name] = Number(x.value ?? x.displayValue);
+    stats[t.abbr] = { gp: v.gamesPlayed, pts: v.avgPoints, fga: v.avgFieldGoalsAttempted, fgm: v.avgFieldGoalsMade, fta: v.avgFreeThrowsAttempted, ftm: v.avgFreeThrowsMade,
+      tpm: v.avgThreePointFieldGoalsMade, tpa: v.avgThreePointFieldGoalsAttempted, oreb: v.avgOffensiveRebounds, dreb: v.avgDefensiveRebounds, reb: v.avgRebounds,
+      ast: v.avgAssists, tov: v.avgTurnovers, stl: v.avgSteals, blk: v.avgBlocks, fgPct: v.fieldGoalPct, threePct: v.threePointPct ?? v.threePointFieldGoalPct, ftPct: v.freeThrowPct };
+  });
+  if (!Object.keys(stats).length) throw new Error("No team stats could be loaded");
+  const st = await dep("standings").catch(() => null);
+  const opp = {};
+  for (const conf of st?.conferences || []) for (const t of conf.teams) opp[t.team.abbr] = { ppg: t.ppg, oppPpg: t.oppPpg };
+  return { asOf: new Date().toISOString(), stats, efficiency: teamEfficiency(stats, opp) };
+}
+/* Remaining strength of schedule, L10 and streak from all 30 schedules + standings. */
+async function loadSos(_p, opts) {
+  const { scheduleStrength } = await import("./advanced.js");
+  const teams = normalizeTeams(await fetchJson(ENDPOINTS.teams(), opts));
+  const [settled, st] = await Promise.all([
+    Promise.allSettled(teams.map((t) => fetchJson(ENDPOINTS.schedule({ team: t.id }), opts))),
+    dep("standings"),
+  ]);
+  const schedules = {};
+  teams.forEach((t, i) => { if (settled[i].status === "fulfilled") schedules[t.abbr] = normalizeSchedule(settled[i].value); });
+  if (!Object.keys(schedules).length) throw new Error("No schedules could be loaded");
+  const winPct = {};
+  for (const conf of st?.conferences || []) for (const t of conf.teams) winPct[t.team.abbr] = t.pct;
+  return { asOf: new Date().toISOString(), teams: scheduleStrength(schedules, winPct) };
+}
+const CUSTOM = { teamstats: loadTeamStats, sos: loadSos, college: loadCollege, starts: loadStarts, coaches: loadCoaches, league: loadLeague, ratings: loadRatings };
 
 /** Fetch + normalize one resource. */
 export async function load(resource, params = {}, opts = {}) {

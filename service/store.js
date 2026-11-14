@@ -31,6 +31,9 @@ export const TTL = {
   league: 30 * MIN,        // all 30 rosters, warmed at startup
   ratings: 6 * 60 * MIN,   // 2K27-style ratings
   schedule: 30 * MIN,
+  teamstats: 60 * MIN,
+  sos: 60 * MIN,
+  bio: 24 * 60 * MIN,
 };
 const MAX_BACKOFF = 5 * MIN;
 
@@ -77,6 +80,9 @@ export const POLICIES = {
   league: () => TTL.league,
   ratings: () => TTL.ratings,
   schedule: () => TTL.schedule,
+  teamstats: () => TTL.teamstats,
+  sos: () => TTL.sos,
+  bio: () => TTL.bio,
 };
 
 const keyOf = (resource, params = {}) =>

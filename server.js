@@ -156,6 +156,9 @@ const routes = [
   [/^\/api\/coaches$/, (req, res) => serve(res, "coaches", {})],
   [/^\/api\/league$/, (req, res) => serve(res, "league", {})],
   [/^\/api\/2k-ratings$/, (req, res) => serve(res, "ratings", {})],
+  [/^\/api\/team-stats$/, (req, res) => serve(res, "teamstats", {})],
+  [/^\/api\/sos$/, (req, res) => serve(res, "sos", {})],
+  [/^\/api\/bio\/(\d{1,12})$/, (req, res, m) => serve(res, "bio", { id: m[1] })],
   [/^\/api\/schedule\/([A-Za-z0-9]{1,5})$/, async (req, res, m) => {
     let id;
     try { id = await resolveTeam(m[1]); } catch (err) { return json(res, 502, { error: `Couldn't load teams: ${err.message}` }); }
@@ -201,7 +204,7 @@ export const server = createServer(async (req, res) => {
 // (league rosters and standings every 30 min), so requests are answered from memory instead of
 // waiting on ESPN. This matters most right after a Render cold start.
 export function startPolling() {
-  const stops = ["scoreboard", "injuries", "standings", "transactions", "teams", "players", "ratings"].map((r) => store.watch(r, {}, () => {}));
+  const stops = ["scoreboard", "injuries", "standings", "transactions", "teams", "players", "ratings", "teamstats", "sos"].map((r) => store.watch(r, {}, () => {}));
   stops.push(store.watch("league", {}, (data) => {
     if (!data?.rosters) return;
     for (const [teamId, roster] of Object.entries(data.rosters)) store.prime("roster", { team: teamId }, roster);

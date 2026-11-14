@@ -329,3 +329,55 @@ export function pickInventory(code, config, years = ["2027", "2028", "2029"]) {
     return { year, items };
   });
 }
+
+/* ----------------------------------------------------------- Monte Carlo */
+/**
+ * Run the lottery `runs` times and tabulate where each lottery team lands.
+ * @returns {{ runs, rows: {team, seed, p1, top4, top10, mostLikely, avgPick, dist: number[]}[] }}
+ */
+export function monteCarlo(order, runs = 1000, { format = DEFAULT_FORMAT, balls, restricted, rng = Math.random } = {}) {
+  const F = fmt(format);
+  const n = Math.min(F.teams, order.length);
+  const counts = Array.from({ length: n }, () => new Array(n).fill(0));
+  for (let r = 0; r < runs; r++) {
+    const { lottery } = simulateLottery(order, rng, { format, balls, restricted });
+    for (const l of lottery) counts[l.seed - 1][l.pick - 1]++;
+  }
+  const rows = counts.map((c, s) => {
+    const share = (k) => c.slice(0, k).reduce((a, b) => a + b, 0) / runs;
+    let best = 0; c.forEach((v, i) => { if (v > c[best]) best = i; });
+    return { team: order[s], seed: s + 1, p1: share(1), top4: share(4), top10: share(10), mostLikely: best + 1, avgPick: c.reduce((a, v, i) => a + v * (i + 1), 0) / runs, dist: c.map((v) => v / runs) };
+  });
+  return { runs, format: F.key, rows };
+}
+
+/* ------------------------------------------------------- pick ownership grid */
+/**
+ * Every team's own first in each year: "own" | "unprotected" (traded) | "protected" | "swap" | "split", plus who holds it
+ * and the other teams' firsts it holds. Drives the 30-team Pick Grid.
+ */
+export function pickGrid(config, teams, years = ["2027", "2028", "2029"]) {
+  const out = {};
+  for (const code of teams) {
+    out[code] = {};
+    for (const y of years) {
+      const rules = config?.years?.[y]?.rules || [];
+      const cell = { status: "own", to: null, note: "Owns its own 1st", verified: true, holds: [] };
+      for (const r of rules) {
+        const v = r.verified !== false;
+        if ((r.type === "unprotected" || r.type === "protected") && r.originalTeam === code) {
+          Object.assign(cell, { status: r.type, to: r.recipientTeam, verified: v,
+            note: r.type === "protected" ? `To ${r.recipientTeam} unless ${r.protectedRange[0] === 1 ? `top-${r.protectedRange[1]}` : `${r.protectedRange[0]}–${r.protectedRange[1]}`}` : `To ${r.recipientTeam}, unprotected` });
+        } else if (r.type === "split_conveyance" && r.originalTeam === code) {
+          Object.assign(cell, { status: "protected", to: (r.routes || []).map((x) => x.team).filter((t) => t !== code).join("/"), verified: v, note: `By slot: ${(r.routes || []).map((x) => `${x.range[0]}–${x.range[1]} → ${x.team}`).join(", ")}` });
+        } else if (r.type === "swap_pool" && (r.pool || []).includes(code) && cell.status === "own") {
+          Object.assign(cell, { status: "swap", to: null, verified: v, note: `Swap pool: ${(r.pool || []).join("/")}` });
+        }
+        if ((r.type === "unprotected" || r.type === "protected") && r.recipientTeam === code) cell.holds.push(r.originalTeam);
+        if (r.type === "split_conveyance" && (r.routes || []).some((x) => x.team === code) && r.originalTeam !== code) cell.holds.push(`${r.originalTeam}*`);
+      }
+      out[code][y] = cell;
+    }
+  }
+  return out;
+}

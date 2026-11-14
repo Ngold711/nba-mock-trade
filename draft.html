@@ -73,7 +73,7 @@ main { max-width: 60rem; margin: 0 auto; padding: 0 max(1rem, env(safe-area-inse
 .actions .btn { min-height: 44px; }
 @media (max-width: 34rem) {
   .actions { display: grid; grid-template-columns: 1fr 1fr; }
-  #simBtn, #takeBtn { grid-column: 1 / -1; width: 100%; }
+  #simBtn { grid-column: 1 / -1; width: 100%; }
 }
 .board.pulse-board { box-shadow: 0 0 0 3px var(--ring); transition: box-shadow .6s ease; }
 .mini-btn { border: 0; background: var(--fill); border-radius: 999px; padding: 0.25rem 0.6rem; font-size: 0.6875rem; font-weight: 650; cursor: pointer; white-space: nowrap; }
@@ -179,6 +179,37 @@ th:first-child, td:first-child { text-align: left; }
 .actions .pop > summary { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
 .actions { position: relative; }
 .actions .pop-body { top: calc(100% + 0.4rem); right: 0; }
+
+/* Tankathon-style additions */
+.sim-count { display: inline-grid; place-items: center; min-width: 1.4rem; height: 1.25rem; padding: 0 0.35rem; margin-left: 0.35rem; border-radius: 99px; background: rgba(11,14,20,.85); color: #F59E0B; font: 700 0.6875rem/1 var(--font-mono); vertical-align: 1px; }
+.pick .no small.mv { display: inline-block; margin-top: 0.15rem; padding: 0.05rem 0.3rem; border-radius: 99px; font-size: 0.625rem; font-family: var(--font-mono); background: var(--good-soft); color: var(--good); animation: mvpop 420ms cubic-bezier(.2,1.4,.4,1); }
+.pick .no small.mv.down { background: var(--bad-soft); color: var(--bad); }
+@keyframes mvpop { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .pick .no small.mv { animation: none; } }
+.sos-pill { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 99px; font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700; }
+.sos-pill.easy { background: var(--good-soft); color: var(--good); } .sos-pill.hard { background: var(--bad-soft); color: var(--bad); } .sos-pill.mid { background: var(--fill); color: var(--label-2); }
+.odds-t td.w { color: var(--good); } .odds-t td.l { color: var(--bad); }
+.mc-wrap { margin-top: -0.5rem; }
+.board-mode { width: min(100%, 18rem); margin: 0 0 0.75rem; } .board-mode button { font-size: 0.8125rem; padding: 0.4rem; }
+.pick-grid { padding: 0.75rem; }
+.grid-legend { display: flex; flex-wrap: wrap; gap: 0.35rem 0.5rem; margin-bottom: 0.6rem; align-items: center; font-size: 0.75rem; }
+.grid-hold { color: var(--label-3); }
+.grid-t { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+.grid-t th { text-align: left; font-size: 0.625rem; color: var(--label-3); letter-spacing: 0.07em; text-transform: uppercase; padding: 0.4rem; }
+.grid-t td { padding: 0.4rem; border-top: 1px solid var(--hair); white-space: nowrap; }
+.grid-t .tm { display: inline-flex; align-items: center; gap: 0.4rem; }
+.gp { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 99px; font-size: 0.6875rem; font-weight: 700; }
+.gp.own { background: var(--good-soft); color: var(--good); } .gp.unprotected { background: var(--bad-soft); color: var(--bad); }
+.gp.protected { background: var(--warn-soft); color: var(--warn); } .gp.swap { background: var(--accent-soft); color: var(--accent); }
+.gh { display: inline-block; margin-left: 0.25rem; padding: 0.1rem 0.35rem; border-radius: 99px; font-size: 0.625rem; font-weight: 700; background: rgba(96,165,250,.14); color: #60A5FA; }
+.st-modes { margin: 0.25rem 0 0.5rem; }
+.pk-stat { font-family: var(--font-mono); font-size: 0.6875rem; color: var(--label-2); text-align: right; line-height: 1.35; white-space: nowrap; }
+.pk-stat b { color: var(--label); font-weight: 700; }
+.grid-t .ab { display: none; }
+.grid-t th:first-child, .grid-t td:first-child { width: 1%; padding-right: 0.75rem; }
+.grid-t td { vertical-align: middle; } .grid-t th:not(:first-child) { min-width: 4.5rem; }
+@media (max-width: 34rem) { .grid-t td, .grid-t th { padding: 0.35rem 0.25rem; } .gp { padding: 0.15rem 0.4rem; } .gh { display: block; width: max-content; margin: 0.2rem 0 0; } .pick-grid { padding: 0.5rem; } }
+@media (max-width: 34rem) { .grid-t .full { display: none; } .grid-t .ab { display: inline; } }
 </style>
 </head>
 <body>
@@ -197,12 +228,13 @@ th:first-child, td:first-child { text-align: left; }
   <div class="seg rounds" role="group" aria-label="Draft length" id="rounds" style="margin-bottom:.75rem"><span class="thumb"></span>
     <button type="button" data-rounds="1" aria-pressed="true">Round 1 · Picks 1–30</button><button type="button" data-rounds="2" aria-pressed="false">Full Draft · 1–60</button></div>
   <div class="actions">
-    <button class="btn primary press" type="button" id="simBtn">Sim Lottery</button>
-    <button class="btn ghost press" type="button" id="autoBtn">Auto-draft</button>
+    <button class="btn primary press" type="button" id="simBtn">Sim Lottery <span class="sim-count" id="simCount" hidden></span></button>
+    <button class="btn ghost press" type="button" id="mcBtn">Sim 1,000x</button>
+    <button class="btn ghost press" type="button" id="projBtn">Reset</button>
+    <button class="btn ghost press" type="button" id="takeBtn">Mock Draft This Order</button>
     <details class="pop"><summary class="btn ghost press">Options</summary>
       <div class="pop-body pop-menu">
-        <button class="btn ghost press" type="button" id="takeBtn">Jump to the pick on the clock</button>
-        <button class="btn ghost press" type="button" id="projBtn">Reset to projected order</button>
+        <button class="btn ghost press" type="button" id="autoBtn">Auto-draft remaining picks</button>
         <button class="btn ghost press" type="button" id="clearBtn">Clear all picks</button>
       </div></details>
   </div>
@@ -211,8 +243,12 @@ th:first-child, td:first-child { text-align: left; }
     <div class="seg fmt" role="group" aria-label="Lottery format" id="fmt"><span class="thumb"></span>
       <button type="button" data-format="321" aria-pressed="true">3-2-1 · 16 teams</button><button type="button" data-format="2019" aria-pressed="false">2019 · 14 teams</button></div></div>
   <details class="odds-wrap" id="oddsWrap" open><summary id="oddsSummary">Odds</summary><div class="odds-scroll" id="odds"></div><div class="odds-note" id="oddsNote"></div></details>
+  <details class="odds-wrap mc-wrap" id="mcWrap" hidden open><summary id="mcSummary">1,000x simulation</summary><div class="odds-scroll" id="mc"></div></details>
   <div id="warnings"></div>
+  <div class="seg board-mode" id="boardMode" role="group" aria-label="Board view" style="--n:2"><span class="thumb"></span>
+    <button type="button" data-bm="board" aria-pressed="true">Mock Board</button><button type="button" data-bm="grid" aria-pressed="false">Pick Grid</button></div>
   <div class="board" id="board"></div>
+  <div class="board pick-grid" id="grid" hidden></div>
   <p class="fine">Lottery odds are exact (every drawing sequence enumerated) for the selected format. The 3-2-1 format is modeled as described in the app; the 2019 format is the NBA’s current system. Pick obligations come from draft_picks_2027_2029.json and are applied after every simulation and standings refresh; terms marked unconfirmed should be checked against an official source. College stats and headshots come live from ESPN. 2028 and 2029 orders are projections from today’s standings. Not affiliated with the NBA, NCAA or ESPN.</p>
 </main>
 <div class="tip" id="tip" role="tooltip"></div>
@@ -222,7 +258,8 @@ th:first-child, td:first-child { text-align: left; }
 import { createClient } from "./ui/client.js";
 import { avatar, teamLogo, esc } from "./ui/avatar.js";
 import { Spring, createSheet, createToast, scrollEdge, springIn } from "./ui/motion.js";
-import { projectLottery, simulateLottery, resolvePickOwnership, lotteryTable, LOTTERY_FORMATS, DEFAULT_FORMAT } from "./service/draft.js";
+import { projectLottery, simulateLottery, resolvePickOwnership, lotteryTable, LOTTERY_FORMATS, DEFAULT_FORMAT, monteCarlo, pickGrid } from "./service/draft.js";
+import { advanced, inMode } from "./service/advanced.js";
 import { collegeHeadshot } from "./service/normalize.js";
 import { mountShell } from "./ui/shell.js";
 const shell = mountShell({ active: "draft" });
@@ -296,13 +333,51 @@ const ballDots = (b) => {
   return `<span class="balls" aria-hidden="true">${"<i></i>".repeat(Math.min(whole, 6))}${half ? '<i class="half"></i>' : ""}</span>`;
 };
 const fmtBalls = (b) => (Math.abs(b - Math.round(b)) < 1e-9 ? String(Math.round(b)) : b.toFixed(1));
+const ESPN_OF = { GSW: "GS", NOP: "NO", NYK: "NY", SAS: "SA", UTA: "UTAH", WAS: "WSH" };
+let sos = null;
+function sosCells(code) {
+  const v = sos?.[ESPN_OF[code] || code];
+  if (!v) return `<td class="sos">${sos === null ? '<span class="sk" style="display:inline-block;width:2.4rem;height:.7rem;border-radius:3px"></span>' : "—"}</td><td>—</td><td>—</td>`;
+  const cls = v.sosRank <= 10 ? "easy" : v.sosRank >= 21 ? "hard" : "mid";
+  return `<td class="sos"><span class="sos-pill ${cls}" title="#${v.sosRank} of 30 (1 = easiest) · ${v.remaining} games left">${v.remSos != null ? v.remSos.toFixed(3).replace(/^0/, "") : "—"}</span></td><td>${esc(v.l10)}</td><td class="${/^W/.test(v.streak) ? "w" : /^L/.test(v.streak) ? "l" : ""}">${esc(v.streak)}</td>`;
+}
+const simCountKey = () => `draft:simcount:${year}`;
+function paintSimCount() { const n = store.get(simCountKey()) || 0; const el = $("#simCount"); el.hidden = !n; el.textContent = n > 999 ? "999+" : String(n); el.title = `${n} simulation${n === 1 ? "" : "s"} this session`; }
+function renderMC(mc) {
+  const max = Math.max(...mc.rows.map((r) => r.p1), 0.0001);
+  $("#mcWrap").hidden = false;
+  $("#mcSummary").textContent = `${mc.runs.toLocaleString()} simulations · ${F().label}`;
+  $("#mc").innerHTML = `<table class="odds-t mc-t"><thead><tr><th>Seed</th><th>Team</th><th>#1 %</th><th>Top 4 %</th><th>Top 10 %</th><th>Most likely</th><th>Avg pick</th></tr></thead><tbody>
+    ${mc.rows.map((r) => { const team = teamOf(r.team); return `<tr><td>${r.seed}</td><td><span class="tm">${teamLogo(team, { size: "1.4rem" })}<span class="nm"><span class="full">${esc(team.name)}</span><span class="ab">${esc(r.team)}</span></span></span></td>
+      <td class="p1"><span class="bar" style="width:${Math.round((r.p1 / max) * 40)}px"></span>${pct(r.p1)}</td><td>${pct(r.top4)}</td><td>${pct(r.top10)}</td><td><b>#${r.mostLikely}</b></td><td>${r.avgPick.toFixed(1)}</td></tr>`; }).join("")}</tbody></table>
+    <div class="odds-note">Random draws using the same rules as the exact table above, so each run of 1,000 lands slightly differently. Most likely = the pick the team landed on most often.</div>`;
+}
+let boardMode = store.get("draft:boardMode") === "grid" ? "grid" : "board";
+const GRID_LABEL = { own: "Own Pick", unprotected: "Traded (Unprotected)", protected: "Protected", swap: "Swap Pool" };
+function renderGrid() {
+  const codes = Object.keys(TEAMS).sort((a, b) => teamOf(a).name.localeCompare(teamOf(b).name));
+  const grid = pickGrid(config, codes);
+  const years = ["2027", "2028", "2029"];
+  $("#grid").innerHTML = `<div class="grid-legend">${Object.entries(GRID_LABEL).map(([k, l]) => `<span class="gp ${k}">${l}</span>`).join("")}<span class="grid-hold">+ABC = also holds that team’s 1st</span></div>
+    <div class="odds-scroll"><table class="grid-t"><thead><tr><th>Team</th>${years.map((y) => `<th>${y}</th>`).join("")}</tr></thead><tbody>
+    ${codes.map((c) => { const team = teamOf(c); return `<tr><td><span class="tm" data-team-hub="${esc(c)}">${teamLogo(team, { size: "1.4rem" })}<span class="nm"><span class="full">${esc(team.name)}</span><span class="ab">${esc(c)}</span></span></span></td>
+      ${years.map((y) => { const g = grid[c][y]; return `<td><span class="gp ${g.status}" title="${esc(g.note)}${g.verified ? "" : " (terms unconfirmed)"}">${g.status === "own" ? "Own" : g.status === "swap" ? "Swap" : g.status === "protected" ? `Prot → ${esc(g.to || "")}` : `→ ${esc(g.to || "")}`}${g.verified ? "" : "*"}</span>${g.holds.map((h) => `<span class="gh">+${esc(h)}</span>`).join("")}</td>`; }).join("")}</tr>`; }).join("")}
+    </tbody></table></div><p class="odds-note">From draft_picks_2027_2029.json. * terms unconfirmed. Hover or long-press a pill for the exact protection.</p>`;
+}
+function paintBoardMode() {
+  $("#board").hidden = boardMode !== "board"; $("#grid").hidden = boardMode !== "grid";
+  const seg = $("#boardMode"); seg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.bm === boardMode)));
+  seg.querySelector(".thumb").style.transform = `translateX(${boardMode === "grid" ? 100 : 0}%)`;
+  if (boardMode === "grid" && config) renderGrid();
+}
+
 function renderOdds(table) {
   const restricted = new Set(restrictedFor());
   const maxP1 = Math.max(...table.map((r) => r.p1), 0.0001);
   const unit = F().unit;
   const total = proj.balls.slice(0, F().teams).reduce((a, b) => a + b, 0);
   $("#oddsSummary").textContent = `${F().label}: ${F().teams} teams · ${F().draws} drawings · ${Math.round(total)} ${unit}${restricted.size ? ` · ${restricted.size} barred from #1` : ""}`;
-  $("#odds").innerHTML = `<table class="odds-t"><thead><tr><th>Seed</th><th>Team</th><th>${unit === "balls" ? "Balls" : "Combos"}</th><th>#1 Pick</th><th>Top 4</th><th>Floor</th><th>#1 rule</th></tr></thead><tbody>
+  $("#odds").innerHTML = `<table class="odds-t"><thead><tr><th>Seed</th><th>Team</th><th>${unit === "balls" ? "Balls" : "Combos"}</th><th>#1 Pick</th><th>Top 4</th><th>Floor</th><th title="Remaining strength of schedule: opponents' win %">Rem SOS</th><th>L10</th><th>Strk</th><th>#1 rule</th></tr></thead><tbody>
     ${table.map((r) => {
       const t = proj.lottery[r.seed - 1] || {};
       const team = teamOf(t.team || "");
@@ -317,6 +392,7 @@ function renderOdds(table) {
         <td class="p1"><span class="bar" style="width:${Math.round((r.p1 / maxP1) * 2.5 * 16)}px"></span>${pct(r.p1)}</td>
         <td>${pct(r.top4)}</td>
         <td>#${r.floor}${r.relegated ? "" : ""}</td>
+        ${sosCells(t.team)}
         <td><button class="mini-btn ${barred ? "on" : ""}" type="button" data-restrict="${esc(t.team || "")}" aria-pressed="${barred}" title="Bar this team from the #1 pick (e.g. it won #1 last year)" aria-label="${barred ? "Allow" : "Bar"} ${esc(team.name)} ${barred ? "to win" : "from"} the #1 pick"><span class="full">${barred ? "No #1 ✓" : "Bar from #1"}</span><span class="ab">${barred ? "Barred" : "Bar"}</span></button></td>
       </tr>`;
     }).join("")}</tbody></table>`;
@@ -370,7 +446,7 @@ function render() {
       : p.status === "swap_kept" ? `<span class="pill swap">Swap · kept</span>`
       : p.status === "conveyed" ? `<span class="pill conv">Traded</span>` : "";
     const mv = moved[p.pick];
-    const mvTxt = simmed && mv ? `<small class="${mv < 0 ? "down" : ""}">${mv > 0 ? "▲" : "▼"}${Math.abs(mv)}</small>` : "";
+    const mvTxt = simmed && mv ? `<small class="mv ${mv < 0 ? "down" : "up"}">${mv > 0 ? "↑ +" : "↓ −"}${Math.abs(mv)}</small>` : "";
     const odds = !simmed && p.pick <= F().teams && table[p.pick - 1] ? `#1 odds ${pct(table[p.pick - 1].p1)}` : "";
     const pr = prosById[s.picks[p.pick]];
     const slot = pr
@@ -441,7 +517,8 @@ $("#simBtn").addEventListener("click", () => {
   if (!proj) return;
   const s = yearState();
   const sim = simulateLottery(proj.order, Math.random, { format, balls: proj.balls, restricted: restrictedFor() });
-  s.format = format; s.order = sim.order; s.lottery = sim.lottery; save(); render();
+  s.format = format; s.order = sim.order; s.lottery = sim.lottery; save();
+  store.set(simCountKey(), (store.get(simCountKey()) || 0) + 1); paintSimCount(); render();
   document.querySelectorAll("#board .pick").forEach((row, i) => { if (i < F().teams) springIn(row); });
   const jump = sim.lottery.filter((l) => l.moved > 0).sort((a, b) => b.moved - a.moved)[0];
   toast(jump ? `${teamOf(jump.team).name} jump ${jump.moved} spot${jump.moved > 1 ? "s" : ""} to #${jump.pick}` : "Lottery held to form");
@@ -453,7 +530,17 @@ $("#takeBtn").addEventListener("click", () => {
   (row || b).scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
   b.classList.add("pulse-board"); setTimeout(() => b.classList.remove("pulse-board"), 900);
 });
-$("#projBtn").addEventListener("click", () => { const s = yearState(); s.order = null; s.lottery = null; save(); render(); });
+$("#projBtn").addEventListener("click", () => { const s = yearState(); s.order = null; s.lottery = null; save(); store.set(simCountKey(), 0); paintSimCount(); $("#mcWrap").hidden = true; render(); toast("Reset to the projected order"); });
+$("#mcBtn").addEventListener("click", () => {
+  if (!proj) return;
+  const t0 = performance.now();
+  const mc = monteCarlo(proj.order, 1000, { format, balls: proj.balls, restricted: restrictedFor() });
+  renderMC(mc);
+  store.set(simCountKey(), (store.get(simCountKey()) || 0) + 1000); paintSimCount();
+  $("#mcWrap").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  toast(`1,000 lotteries in ${Math.round(performance.now() - t0)} ms`);
+});
+$("#boardMode").addEventListener("click", (e) => { const b = e.target.closest("[data-bm]"); if (!b) return; boardMode = b.dataset.bm; store.set("draft:boardMode", boardMode); paintBoardMode(); });
 $("#clearBtn").addEventListener("click", () => {
   const s = yearState(); const prev = { ...s.picks };
   s.picks = {}; save(); render();
@@ -476,7 +563,7 @@ yearsSeg.addEventListener("click", (e) => {
   // Clean switch: close any open sheet/tooltip, then load that year's own simulation, restrictions,
   // pick-ownership rules and prospect pool (pruneBoard drops picks for players not on this board).
   if (sheet.isOpen) sheet.close();
-  hideTip(); render();
+  hideTip(); $("#mcWrap").hidden = true; paintSimCount(); render(); paintBoardMode();
   window.scrollTo(0, 0);
 });
 
@@ -497,7 +584,20 @@ const POS_WORDS = { GUARD: ["PG", "SG"], G: ["PG", "SG"], WING: ["SG", "SF"], FO
 const posSet = (pos) => new Set(String(pos || "").toUpperCase().split(/[\/\s,-]+/).flatMap((t) => POS_WORDS[t] || (["PG", "SG", "SF", "PF", "C"].includes(t) ? [t] : [])));
 const ORIGIN = { all: "All", college: "NCAA", international: "International", high_school: "High School / Prep" };
 const inches = (h) => { const m = /(\d)\s*'\s*(\d{1,2})/.exec(String(h || "")); return m ? +m[1] * 12 + +m[2] : 0; };
-const pk = { pos: "all", origin: "all", sort: "rank" };
+const pk = { pos: "all", origin: "all", sort: "rank", stat: store.get("draft:statMode") || "pg" };
+const STAT_MODES = [["pg", "Per Game"], ["p40", "Per 40"], ["eff", "Efficiency"]];
+/** Prospect line in the chosen mode, from live averages or the prospects.json snapshot (same field names). */
+function prospectLine(st, mode) {
+  if (!st || !st.gp) return null;
+  const base = { gp: st.gp, min: st.min, pts: st.ppg, reb: st.rpg, ast: st.apg, stl: st.spg, blk: st.bpg, tov: st.tov, fgm: st.fgm, fga: st.fga, tpm: st.tpm, tpa: st.tpa, ftm: st.ftm, fta: st.fta, oreb: st.oreb, dreb: st.dreb };
+  if (mode === "eff") {
+    const a = advanced(base);
+    return { cells: [["TS%", a?.ts != null ? (a.ts * 100).toFixed(1) : "—"], ["eFG%", a?.efg != null ? (a.efg * 100).toFixed(1) : "—"], ["AST/TO", a?.astTo != null ? a.astTo.toFixed(2) : "—"]], short: a?.ts != null ? `TS <b>${(a.ts * 100).toFixed(1)}</b> · eFG <b>${a.efg != null ? (a.efg * 100).toFixed(1) : "—"}</b><br>AST/TO <b>${a.astTo != null ? a.astTo.toFixed(2) : "—"}</b>` : "no attempts data" };
+  }
+  const m = mode === "p40" ? inMode(base, "per40") : base;
+  const f = (x) => (x == null ? "—" : Number(x).toFixed(1));
+  return { cells: [["PTS", f(m.pts)], ["REB", f(m.reb)], ["AST", f(m.ast)], ["STL", f(m.stl)], ["BLK", f(m.blk)]], short: `<b>${f(m.pts)}</b>p <b>${f(m.reb)}</b>r <b>${f(m.ast)}</b>a<br>${mode === "p40" ? "per 40" : `${f(st.min)} min`}` };
+}
 const needCache = new Map();
 /** Positional need from the team's live roster: groups below a 6 guard / 6 forward / 3 center balance. */
 async function teamNeed(code) {
@@ -539,20 +639,22 @@ function pickSheet(pickNo) {
       body.innerHTML = `<div class="pk-filters">
           ${pills("pos", [["all", "All"], ["PG", "PG"], ["SG", "SG"], ["SF", "SF"], ["PF", "PF"], ["C", "C"]])}
           ${pills("origin", Object.entries(ORIGIN))}
+          ${pills("stat", STAT_MODES)}
         </div>
         <div class="pk-bar"><span>Showing ${list.length} available ${posWord}${originWord}${filtered ? ` · <button class="link" type="button" data-reset>Reset Filters</button>` : ""}</span>
           <label>Sort <select data-sort><option value="rank"${pk.sort === "rank" ? " selected" : ""}>Consensus Rank</option><option value="height"${pk.sort === "height" ? " selected" : ""}>Height</option><option value="ppg"${pk.sort === "ppg" ? " selected" : ""}>PPG</option></select></label></div>
         ${list.length ? `<ul class="list">${list.map((p) => {
           const fit = [...posSet(p.position)].some((x) => needSet.has(x));
-          const num = pk.sort === "height" ? esc(p.height || "—") : pk.sort === "ppg" ? (p.stats ? p.stats.ppg.toFixed(1) : "—") : "";
+          const num = pk.sort === "height" ? esc(p.height || "—") : "";
+          const line = !num ? prospectLine(p.stats, pk.stat) : null;
           return `<li style="display:flex;align-items:center;gap:.25rem">
           <button class="row" type="button" data-choose="${esc(p.id)}">${avatar(p, { size: "2.75rem", color: teamOf(owner).color })}
             <span class="meta"><span class="nm">${p.rank ? `${p.rank}. ` : ""}${esc(p.name)}${fit ? '<span class="need">TEAM NEED</span>' : ""}</span><span class="sub">${esc([p.position, p.school || ORIGIN[p.type]].filter(Boolean).join(" · "))}</span></span>
-            ${num ? `<span class="pk-num">${num}</span>` : ""}</button>
+            ${num ? `<span class="pk-num">${num}</span>` : line ? `<span class="pk-stat">${line.short}</span>` : p.type !== "college" ? `<span class="pk-stat">${p.type === "international" ? "Intl" : "HS"}</span>` : ""}</button>
           <button class="info" type="button" data-scout-only="${esc(p.id)}" aria-label="Scouting report for ${esc(p.name)}">i</button></li>`; }).join("")}</ul>`
         : `<div class="empty">No available prospects match. <button class="link" type="button" data-reset style="background:none;border:0;color:var(--accent);font-weight:650;cursor:pointer">Reset Filters</button></div>`}
-        ${pk.sort === "ppg" ? `<p class="stat-note">PPG is the Nov 14 snapshot in prospects.json; open a report for live stats.</p>` : ""}`;
-      body.querySelectorAll("[data-f]").forEach((b) => b.addEventListener("click", () => { pk[b.dataset.f] = b.dataset.v; sheet.refresh(); }));
+        <p class="stat-note">List stats are the Nov 14 snapshot in prospects.json; open a report (i) for live numbers.</p>`;
+      body.querySelectorAll("[data-f]").forEach((b) => b.addEventListener("click", () => { pk[b.dataset.f] = b.dataset.v; if (b.dataset.f === "stat") store.set("draft:statMode", pk.stat); sheet.refresh(); }));
       body.querySelector("[data-sort]")?.addEventListener("change", (e) => { pk.sort = e.target.value; sheet.refresh(); });
       body.querySelectorAll("[data-reset]").forEach((b) => b.addEventListener("click", () => { pk.pos = "all"; pk.origin = "all"; pk.sort = "rank"; const sr = document.querySelector(".sheet .search"); if (sr) sr.value = ""; sheet.refresh(); }));
       body.querySelectorAll("[data-choose]").forEach((b) => b.addEventListener("click", () => {
@@ -579,10 +681,16 @@ function scout(id, pickNo) {
       let statsHtml;
       if (p.type !== "college") statsHtml = `<div class="empty">No college stats: ${esc(p.type === "international" ? "international" : "high school")} prospect.</div>`;
       else if (loading) statsHtml = `<div class="skel"></div>`;
-      else if (!a) statsHtml = `<div class="empty">${err ? `Couldn’t load live stats (${esc(err)}).` : "No games played yet this season."}</div>`;
-      else statsHtml = `<div class="stats">${[["PPG", fmt(a.ppg)], ["RPG", fmt(a.rpg)], ["APG", fmt(a.apg)], ["FG%", fmt(a.fgPct)], ["3P%", fmt(a.threePct)]]
-          .map(([k, v]) => `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join("")}</div>
-        <p class="stat-note">${esc(a.season)} · ${a.gp ?? 0} games · ${fmt(a.min)} min · FT ${fmt(a.ftPct)}% · updates every 30 min</p>`;
+      else if (!a && !p.stats) statsHtml = `<div class="empty">${err ? `Couldn’t load live stats (${esc(err)}).` : "No games played yet this season."}</div>`;
+      else {
+        const src = a && a.gp ? a : { ...p.stats, season: "Nov 14 snapshot" };
+        const line = prospectLine(src, pk.stat);
+        const cells = pk.stat === "pg" ? [["PPG", fmt(src.ppg)], ["RPG", fmt(src.rpg)], ["APG", fmt(src.apg)], ["FG%", fmt(src.fgPct)], ["3P%", fmt(src.threePct)]] : line?.cells || [];
+        statsHtml = `<div class="pills st-modes" role="group" aria-label="Stat view">${STAT_MODES.map(([k, l]) => `<button type="button" data-smode="${k}" aria-pressed="${pk.stat === k}">${l}</button>`).join("")}</div>
+          <div class="stats">${cells.map(([k, v]) => `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join("")}</div>`;
+      }
+      if (a && statsHtml.includes("st-modes")) statsHtml += `
+<p class="stat-note">${esc(a.season)} · ${a.gp ?? 0} games · ${fmt(a.min)} min · FT ${fmt(a.ftPct)}% · ${pk.stat === "p40" ? "scaled to 40 minutes · " : pk.stat === "eff" ? "TS% = PTS ÷ (2 × (FGA + 0.44 × FTA)) · " : ""}updates every 30 min</p>`;
       const games = (live?.games || []).slice(0, 6);
       body.innerHTML = `<div class="scout-head">${avatar(p, { size: "5rem", color: bio.team?.color || "#8e8e93", full: true })}
           <div class="t"><h5>${esc(p.name)}</h5>
@@ -598,6 +706,7 @@ function scout(id, pickNo) {
         <div class="notes"><p>${esc(p.summary || "No notes yet.")}</p>${p.comp ? `<p><span class="comp">NBA comp:</span> ${esc(p.comp)}</p>` : ""}<div class="editorial">Draft notes are editorial — edit them in prospects.json.</div></div>
         ${pickNo && s.picks[pickNo] !== p.id ? `<div style="margin-top:1rem"><button class="btn primary press" type="button" data-draft style="width:100%">Draft at #${pickNo}</button></div>` : ""}`;
       body.querySelector("[data-draft]")?.addEventListener("click", () => { s.picks[pickNo] = p.id; save(); sheet.close(); render(); });
+      body.querySelectorAll("[data-smode]").forEach((b) => b.addEventListener("click", () => { pk.stat = b.dataset.smode; store.set("draft:statMode", pk.stat); sheet.refresh(); }));
     },
   });
   if (loading) {
@@ -612,8 +721,9 @@ function scout(id, pickNo) {
 (async () => {
   [config, prospects] = await Promise.all([loadJson("draft_picks_2027_2029.json"), loadJson("prospects.json")]).catch((e) => { toast(`Couldn’t load draft data: ${e.message}`); return [{ years: {} }, {}]; });
   proj = placeholderProj();             // until standings arrive
-  render();
+  paintSimCount(); render(); paintBoardMode();
   client = await createClient();
+  client.watch("sos", {}, (d) => { sos = d.teams; render(); }, () => { if (sos === null) { sos = {}; render(); } });
   // Standings refresh → re-project the order and re-run the ownership engine automatically.
   client.watch("standings", {}, (st, meta) => {
     standings = st;

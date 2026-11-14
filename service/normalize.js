@@ -423,6 +423,7 @@ const STAT_KEYS = {
   avgSteals: "stl", avgBlocks: "blk", avgTurnovers: "tov", avgFieldGoalsMade: "fgm", avgFieldGoalsAttempted: "fga",
   fieldGoalPct: "fgPct", threePointFieldGoalPct: "threePct", avgThreePointFieldGoalsMade: "tpm",
   freeThrowPct: "ftPct", avgFreeThrowsMade: "ftm", avgFreeThrowsAttempted: "fta", doubleDouble: "dd", tripleDouble: "td",
+  avgThreePointFieldGoalsAttempted: "tpa", avgFouls: "pf",
 };
 export function normalizePlayerStats(json) {
   const catNames = Object.fromEntries(arr(get(json, "categories")).map((c) => [str(get(c, "name")), arr(get(c, "names")).map((n) => str(n))]));
@@ -467,4 +468,40 @@ export function normalizeSchedule(json) {
     };
   });
   return { team: { id: teamId, abbr: str(get(json, "team.abbreviation"), "") }, games };
+}
+
+/* ------------------------------------------------------------- player bio */
+/** Encyclopedia bio from ESPN's athlete endpoint: draft pedigree, birthplace, size, experience. */
+export function normalizeBio(json) {
+  const a = get(json, "athlete", json) || {};
+  const draftTxt = str(get(a, "displayDraft"), "");
+  const m = /^(\d{4}):\s*Rd\s*(\d+),\s*Pk\s*(\d+)(?:\s*\(([A-Z]{2,4})\))?/i.exec(draftTxt);
+  const round = m ? +m[2] : null, pick = m ? +m[3] : null;
+  return {
+    id: str(get(a, "id"), ""),
+    name: str(get(a, "displayName"), ""),
+    draft: m ? { year: +m[1], round, pick, overall: round && pick ? (round - 1) * 30 + pick : null, team: m[4] || "", text: draftTxt } : { text: draftTxt || "Undrafted" },
+    college: str(get(a, "college.name") || get(a, "college.shortName"), ""),
+    birthPlace: str(get(a, "displayBirthPlace"), ""),
+    country: str(get(a, "birthPlace.country") || String(get(a, "displayBirthPlace", "")).split(",").pop(), "").trim(),
+    height: str(get(a, "displayHeight"), ""), weight: str(get(a, "displayWeight"), ""),
+    age: num(get(a, "age"), null), dob: str(get(a, "displayDOB"), ""),
+    experience: str(get(a, "displayExperience"), ""), debutYear: num(get(a, "debutYear"), null),
+  };
+}
+
+/* ----------------------------------------------------- college shooting splits */
+/** Per-game shooting splits from ESPN's college athlete stats (FGM-FGA, 3PM-3PA, FTM-FTA, OREB/DREB, TOV). */
+export function collegeSplits(json, season) {
+  const cat = arr(get(json, "categories")).find((c) => get(c, "name") === "averages");
+  if (!cat) return null;
+  const names = arr(get(cat, "names")).map((n) => str(n));
+  const rows = arr(get(cat, "statistics"));
+  const row = (season && rows.find((r) => get(r, "season.displayName") === season)) || rows.at(-1);
+  if (!row) return null;
+  const v = arr(get(row, "stats"));
+  const at = (n) => v[names.indexOf(n)];
+  const pair = (n) => { const x = String(at(n) ?? "").split("-").map(Number); return x.length === 2 && x.every(Number.isFinite) ? x : [null, null]; };
+  const [fgm, fga] = pair("avgFieldGoalsMade-avgFieldGoalsAttempted"), [tpm, tpa] = pair("avgThreePointFieldGoalsMade-avgThreePointFieldGoalsAttempted"), [ftm, fta] = pair("avgFreeThrowsMade-avgFreeThrowsAttempted");
+  return { season: str(get(row, "season.displayName"), ""), fgm, fga, tpm, tpa, ftm, fta, oreb: num(at("avgOffensiveRebounds"), null), dreb: num(at("avgDefensiveRebounds"), null), tov: num(at("avgTurnovers"), null), pf: num(at("avgFouls"), null) };
 }
