@@ -156,6 +156,15 @@ th:first-child, td:first-child { text-align: left; }
   .stats { grid-template-columns: repeat(3, 1fr); }
   .brand p .long { display: none; }
 }
+
+/* Rounds toggle + prospect picker filters */
+.rounds { --n: 2; min-width: 15rem; }
+.pk-filters { display: grid; gap: 0.45rem; margin: 0.25rem 0 0.5rem; }
+.pk-bar { display: flex; align-items: center; gap: 0.5rem; justify-content: space-between; font-size: 0.8125rem; color: var(--label-2); margin: 0.35rem 0; }
+.pk-bar select { border: 1px solid var(--hair); background: transparent; border-radius: 99px; padding: 0.3rem 0.6rem; font-size: 0.8125rem; font-weight: 600; color: var(--label); }
+.pk-bar .link { background: none; border: 0; color: var(--accent); font-weight: 650; cursor: pointer; padding: 0; }
+.need { font-size: 0.625rem; font-weight: 750; letter-spacing: 0.04em; padding: 0.1rem 0.4rem; border-radius: 99px; background: var(--good-soft); color: var(--good); margin-left: 0.35rem; white-space: nowrap; vertical-align: 1px; }
+.pk-num { font-family: var(--font-mono); font-size: 0.75rem; color: var(--label-2); text-align: right; min-width: 3rem; }
 </style>
 </head>
 <body>
@@ -171,6 +180,8 @@ th:first-child, td:first-child { text-align: left; }
       <button type="button" data-year="2029" aria-pressed="false">2029</button>
     </div>
   </div>
+  <div class="seg rounds" role="group" aria-label="Draft length" id="rounds" style="margin-bottom:.75rem"><span class="thumb"></span>
+    <button type="button" data-rounds="1" aria-pressed="true">Round 1 · Picks 1–30</button><button type="button" data-rounds="2" aria-pressed="false">Full Draft · 1–60</button></div>
   <div class="actions">
     <button class="btn primary press" type="button" id="simBtn">Sim Lottery</button>
     <button class="btn press" type="button" id="takeBtn">Take Order to Mock Draft</button>
@@ -222,6 +233,10 @@ let year = "2027";
 let format = LOTTERY_FORMATS[store.get("draft:format")] ? store.get("draft:format") : DEFAULT_FORMAT;
 let proj = null;                      // projectLottery(): { order, balls, lottery[] } from live standings
 const F = () => LOTTERY_FORMATS[format];
+let rounds = store.get("draft:rounds") === 2 ? 2 : 1;
+/** Second round: every team in record order (worst first, no lottery); owners stay with the original team
+    because second-round obligations aren't in the pick config. */
+const secondRound = () => (proj?.order || []).map((team, i) => ({ pick: 31 + i, owner: team, originalTeam: team, status: "own", second: true }));
 const perYear = {};                   // year -> { format, order, lottery, picks: {pickNo: prospectId} }
 // v2: simulations now record their lottery format; v1 (2019-only) saves are dropped.
 const yearState = () => (perYear[year] ||= store.get(`draft:v2:${year}`) || { format: null, order: null, lottery: null, picks: {} });
@@ -326,10 +341,11 @@ function render() {
   const prosById = Object.fromEntries(board().map((p) => [p.id, p]));
   const simmed = simValid(s);
   const moved = simmed ? Object.fromEntries((s.lottery || []).map((l) => [l.pick, l.moved])) : {};
-  const nextOpen = picks.find((p) => !s.picks[p.pick])?.pick;
+  const allPicks = rounds === 2 ? [...picks, ...secondRound()] : picks;
+  const nextOpen = allPicks.find((p) => !s.picks[p.pick])?.pick;
 
   $("#warnings").innerHTML = warnings.length ? `<p class="warn-line">${warnings.map(esc).join("<br>")}</p>` : "";
-  const rows = picks.map((p) => {
+  const rows = allPicks.map((p) => {
     const orig = teamOf(p.originalTeam), own = teamOf(p.owner);
     const traded = p.owner !== p.originalTeam;
     const badge = p.status === "protected_retained" ? `<span class="pill prot">Protected – Retained</span>`
@@ -344,7 +360,7 @@ function render() {
       ? `<button class="sel" type="button" data-scout="${esc(pr.id)}">${avatar(pr, { size: "2.5rem", color: own.color })}
           <span class="meta"><span class="nm">${esc(pr.name)}</span><span class="sub">${esc([pr.position, pr.school || pr.type].filter(Boolean).join(" · "))}</span></span></button>`
       : `<button class="make press${p.pick === nextOpen ? " next" : ""}" type="button" data-make="${p.pick}">${p.pick === nextOpen ? "On the clock · Make pick" : "Make pick"}</button>`;
-    return `${p.pick === 1 ? `<div class="section-head">Lottery · ${F().teams} teams</div>` : p.pick === F().teams + 1 ? `<div class="section-head">Picks ${F().teams + 1}–30</div>` : ""}
+    return `${p.pick === 1 ? `<div class="section-head">Lottery · ${F().teams} teams</div>` : p.pick === F().teams + 1 ? `<div class="section-head">Picks ${F().teams + 1}–30</div>` : p.pick === 31 ? `<div class="section-head">Round 2 · Picks 31–60 · by record</div>` : ""}
       <div class="pick" data-row="${p.pick}">
         <div class="no">${p.pick}${mvTxt}</div>
         <div class="own">
@@ -429,7 +445,7 @@ $("#clearBtn").addEventListener("click", () => {
 $("#autoBtn").addEventListener("click", () => {
   const s = yearState(); const taken = new Set(Object.values(s.picks));
   const avail = board().filter((p) => !taken.has(p.id));
-  for (let n = 1; n <= 30 && avail.length; n++) if (!s.picks[n]) s.picks[n] = avail.shift().id;
+  for (let n = 1; n <= 30 * rounds && avail.length; n++) if (!s.picks[n]) s.picks[n] = avail.shift().id;
   save(); render();
 });
 const yearsSeg = $("#years");
@@ -447,22 +463,81 @@ yearsSeg.addEventListener("click", (e) => {
   window.scrollTo(0, 0);
 });
 
+const roundsSeg = $("#rounds");
+const roundThumb = new Spring(rounds - 1, (x) => { roundsSeg.querySelector(".thumb").style.transform = `translateX(${x * 100}%)`; }, 0.001);
+const paintRounds = () => roundsSeg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.rounds === rounds)));
+paintRounds(); roundThumb.onUpdate(roundThumb.x);
+roundsSeg.addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  rounds = +b.dataset.rounds; store.set("draft:rounds", rounds); paintRounds();
+  roundThumb.to(rounds - 1, { damping: 1, response: 0.3 });
+  render();
+});
+
 /* ---------- pick sheet ---------- */
+// Positions: prospects use PG/SG/SF/PF/C combos plus a few words ("Guard", "Forward", "Center").
+const POS_WORDS = { GUARD: ["PG", "SG"], G: ["PG", "SG"], WING: ["SG", "SF"], FORWARD: ["SF", "PF"], F: ["SF", "PF"], CENTER: ["C"], BIG: ["PF", "C"] };
+const posSet = (pos) => new Set(String(pos || "").toUpperCase().split(/[\/\s,-]+/).flatMap((t) => POS_WORDS[t] || (["PG", "SG", "SF", "PF", "C"].includes(t) ? [t] : [])));
+const ORIGIN = { all: "All", college: "NCAA", international: "International", high_school: "High School / Prep" };
+const inches = (h) => { const m = /(\d)\s*'\s*(\d{1,2})/.exec(String(h || "")); return m ? +m[1] * 12 + +m[2] : 0; };
+const pk = { pos: "all", origin: "all", sort: "rank" };
+const needCache = new Map();
+/** Positional need from the team's live roster: groups below a 6 guard / 6 forward / 3 center balance. */
+async function teamNeed(code) {
+  if (needCache.has(code)) return needCache.get(code);
+  let need = [];
+  try {
+    const { data } = await client.get("roster", { team: TEAMS[code]?.espn || code });
+    const n = { G: 0, F: 0, C: 0 };
+    for (const a of data.athletes) { const g = (a.position || "F")[0]; if (n[g] != null) n[g]++; }
+    const gap = [["G", 6 - n.G, ["PG", "SG"]], ["F", 6 - n.F, ["SF", "PF"]], ["C", 3 - n.C, ["C"]]].sort((a, b) => b[1] - a[1]);
+    need = gap.filter((g, i) => i === 0 || g[1] > 0).slice(0, 2).flatMap((g) => g[2]);
+  } catch {}
+  needCache.set(code, need);
+  return need;
+}
+
 function pickSheet(pickNo) {
   const s = yearState();
   const order = currentOrder();
-  const owner = resolvePickOwnership(order, year, config).picks[pickNo - 1].owner;
+  const owner = pickNo > 30 ? secondRound()[pickNo - 31]?.owner : resolvePickOwnership(order, year, config).picks[pickNo - 1].owner;
+  let need = needCache.get(owner) || [];
+  if (client && !needCache.has(owner)) teamNeed(owner).then((n) => { need = n; if (sheet.isOpen) sheet.refresh(); });
+  const pills = (key, opts) => `<div class="pills" role="group">${opts.map(([v, l]) => `<button type="button" data-f="${key}" data-v="${v}" aria-pressed="${pk[key] === v}">${l}</button>`).join("")}</div>`;
   sheet.open({
     title: `Pick ${pickNo} · ${teamOf(owner).name}`, searchable: true, placeholder: "Search prospects",
     render(body, q) {
-      const taken = new Set(Object.values(s.picks));
-      const list = board().filter((p) => !taken.has(p.id) && (!q || `${p.name} ${p.school || ""} ${p.position || ""}`.toLowerCase().includes(q)));
       if (!board().length) { body.innerHTML = `<div class="empty">No prospects on the ${year} board yet. Add them to prospects.json.</div>`; return; }
-      body.innerHTML = list.length ? `<ul class="list">${list.map((p) => `<li style="display:flex;align-items:center;gap:.25rem">
+      const taken = new Set(Object.values(s.picks));
+      const needSet = new Set(need);
+      let list = board().filter((p) => !taken.has(p.id)
+        && (!q || `${p.name} ${p.school || ""} ${p.position || ""}`.toLowerCase().includes(q))
+        && (pk.pos === "all" || posSet(p.position).has(pk.pos))
+        && (pk.origin === "all" || p.type === pk.origin));
+      if (pk.sort === "height") list.sort((a, b) => inches(b.height) - inches(a.height) || a.rank - b.rank);
+      if (pk.sort === "ppg") list.sort((a, b) => (b.stats?.ppg ?? -1) - (a.stats?.ppg ?? -1) || a.rank - b.rank);
+      const posWord = { all: "prospects", PG: "point guards", SG: "shooting guards", SF: "small forwards", PF: "power forwards", C: "centers" }[pk.pos];
+      const originWord = pk.origin === "all" ? "" : ` · ${ORIGIN[pk.origin]}`;
+      const filtered = pk.pos !== "all" || pk.origin !== "all" || q;
+      body.innerHTML = `<div class="pk-filters">
+          ${pills("pos", [["all", "All"], ["PG", "PG"], ["SG", "SG"], ["SF", "SF"], ["PF", "PF"], ["C", "C"]])}
+          ${pills("origin", Object.entries(ORIGIN))}
+        </div>
+        <div class="pk-bar"><span>Showing ${list.length} available ${posWord}${originWord}${filtered ? ` · <button class="link" type="button" data-reset>Reset Filters</button>` : ""}</span>
+          <label>Sort <select data-sort><option value="rank"${pk.sort === "rank" ? " selected" : ""}>Consensus Rank</option><option value="height"${pk.sort === "height" ? " selected" : ""}>Height</option><option value="ppg"${pk.sort === "ppg" ? " selected" : ""}>PPG</option></select></label></div>
+        ${list.length ? `<ul class="list">${list.map((p) => {
+          const fit = [...posSet(p.position)].some((x) => needSet.has(x));
+          const num = pk.sort === "height" ? esc(p.height || "—") : pk.sort === "ppg" ? (p.stats ? p.stats.ppg.toFixed(1) : "—") : "";
+          return `<li style="display:flex;align-items:center;gap:.25rem">
           <button class="row" type="button" data-choose="${esc(p.id)}">${avatar(p, { size: "2.75rem", color: teamOf(owner).color })}
-            <span class="meta"><span class="nm">${p.rank ? `${p.rank}. ` : ""}${esc(p.name)}</span><span class="sub">${esc([p.position, p.school || p.type, p.height].filter(Boolean).join(" · "))}</span></span></button>
-          <button class="info" type="button" data-scout-only="${esc(p.id)}" aria-label="Scouting report for ${esc(p.name)}">i</button></li>`).join("")}</ul>`
-        : `<div class="empty">Everyone on the board is drafted.</div>`;
+            <span class="meta"><span class="nm">${p.rank ? `${p.rank}. ` : ""}${esc(p.name)}${fit ? '<span class="need">TEAM NEED</span>' : ""}</span><span class="sub">${esc([p.position, p.school || ORIGIN[p.type]].filter(Boolean).join(" · "))}</span></span>
+            ${num ? `<span class="pk-num">${num}</span>` : ""}</button>
+          <button class="info" type="button" data-scout-only="${esc(p.id)}" aria-label="Scouting report for ${esc(p.name)}">i</button></li>`; }).join("")}</ul>`
+        : `<div class="empty">No available prospects match. <button class="link" type="button" data-reset style="background:none;border:0;color:var(--accent);font-weight:650;cursor:pointer">Reset Filters</button></div>`}
+        ${pk.sort === "ppg" ? `<p class="stat-note">PPG is the Nov 14 snapshot in prospects.json; open a report for live stats.</p>` : ""}`;
+      body.querySelectorAll("[data-f]").forEach((b) => b.addEventListener("click", () => { pk[b.dataset.f] = b.dataset.v; sheet.refresh(); }));
+      body.querySelector("[data-sort]")?.addEventListener("change", (e) => { pk.sort = e.target.value; sheet.refresh(); });
+      body.querySelectorAll("[data-reset]").forEach((b) => b.addEventListener("click", () => { pk.pos = "all"; pk.origin = "all"; pk.sort = "rank"; const sr = document.querySelector(".sheet .search"); if (sr) sr.value = ""; sheet.refresh(); }));
       body.querySelectorAll("[data-choose]").forEach((b) => b.addEventListener("click", () => {
         s.picks[pickNo] = b.dataset.choose; save(); sheet.close(); render();
         const row = document.querySelector(`[data-row="${pickNo}"]`); row && springIn(row);
