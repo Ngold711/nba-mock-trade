@@ -132,8 +132,13 @@ test("3-2-1 format: 16 teams, 37 balls, 2.7%–8.1% #1 odds, relegated floors", 
   assert.ok(near(t[15].p1, 1 / 37));                        // 2.7%
   assert.ok(near(t[0].p1, 2 / 37));
   assert.deepEqual(t.slice(0, 3).map((r) => r.relegated), [true, true, true]);
-  assert.deepEqual(t.slice(0, 3).map((r) => r.floor), [12, 13, 14]);   // behind the seven 3-ball teams
-  assert.equal(t[3].floor, 5);                                          // best 3-ball seed can't fall past 5th
+  assert.deepEqual(t.slice(0, 3).map((r) => r.floor), [12, 12, 12]);   // draft-relegated: never past #12
+  assert.ok(t.slice(3).every((r) => r.floor === 16));                   // everyone else can fall to #16
+  // published odds for the bottom three: 5.4% #1, ~16% top-3, ~28% top-5, ~61% top-10
+  const top = (k) => t[0].row.slice(0, k).reduce((a, b) => a + b, 0);
+  assert.ok(Math.abs(top(3) - 0.16) < 0.01 && Math.abs(top(5) - 0.28) < 0.01 && Math.abs(top(10) - 0.61) < 0.01);
+  let seed = 9; const rng = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 3000; i++) for (const l of simulateLottery([...ALL], rng, { format: "321" }).lottery) if (l.seed <= 3) assert.ok(l.pick <= 12);
   for (let pick = 0; pick < 16; pick++) assert.ok(near(t.reduce((s, r) => s + r.row[pick], 0), 1), `pick ${pick + 1} sums to 1`);
 });
 

@@ -104,11 +104,16 @@ fallback, with the abbreviation on the team color.
 Lottery simulator and mock draft for 2027–2029.
 
 - **Lottery formats** (`LOTTERY_FORMATS` in `service/draft.js`, switchable in the UI):
-  - **3-2-1 (default):** 16 teams (conference seeds 8–15), 37 balls. Seeds 1–3 get 2 balls and are marked
-    "relegated", seeds 4–10 get 3, seeds 11–14 get 2, and seeds 15–16 get 1. Four drawings; the rest are
-    ordered by balls, then worst record, so seeds 1–3 can fall to #12, #13 and #14.
+  - **3-2-1 (default, approved May 2026 for the 2027–2029 drafts):** 16 teams, 37 balls. Seeds 1–3 get 2 balls and are
+    "draft relegated", seeds 4–10 get 3, seeds 11–14 get 2, and seeds 15–16 get 1. All 16 picks are drawn. The relegated
+    teams can't fall past #12: once the picks left before #12 only cover the relegated teams still undrawn, the draw is
+    limited to them. Everyone else can fall to #16. Exact odds come from a dynamic program over the 2^16 drawn-team sets
+    (bottom three: 5.4% #1, 16.5% top-3, 28.0% top-5, 60.5% top-10).
   - **2019:** 14 teams, 1,000 combinations, four drawings.
-- **Exact odds:** `lotteryTable()` enumerates every drawing sequence to give #1 %, top-4 % and floor for each seed.
+- **Exact odds:** `lotteryTable()` gives #1 %, top-4 % and floor for each seed (sequence enumeration for 2019, DP for 3-2-1).
+- **Sim UX:** Sim Lottery switches the lottery card to **Simulated Order**: picks 1–16 with logos, ↑/↓ badges and swap or
+  protection pills, scrolled into view. **Pre-Lottery Odds** is one tap away. Once you scroll down into the board, a floating
+  **🎲 Sim Again (count) · Reset** pill sits above the tab bar.
 - **Ties and restrictions:** tied records split their balls evenly, and their order is a coin flip. A team can be
   barred from #1 (the "Bar" toggle, per year), which removes its balls from the first drawing only.
 - **Pick ownership:** `resolvePickOwnership(simulatedOrder, draftYear, config)` in `service/draft.js`

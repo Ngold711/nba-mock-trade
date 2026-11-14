@@ -210,6 +210,32 @@ th:first-child, td:first-child { text-align: left; }
 .grid-t td { vertical-align: middle; } .grid-t th:not(:first-child) { min-width: 4.5rem; }
 @media (max-width: 34rem) { .grid-t td, .grid-t th { padding: 0.35rem 0.25rem; } .gp { padding: 0.15rem 0.4rem; } .gh { display: block; width: max-content; margin: 0.2rem 0 0; } .pick-grid { padding: 0.5rem; } }
 @media (max-width: 34rem) { .grid-t .full { display: none; } .grid-t .ab { display: inline; } }
+
+/* Simulated results card + floating Sim Again */
+.lot-card { scroll-margin-top: calc(env(safe-area-inset-top) + 4.5rem); }
+.lot-view { width: min(100%, 22rem); margin: 0 0 0.6rem; } .lot-view button { font-size: 0.8125rem; padding: 0.45rem 0.2rem; min-height: 40px; }
+.lot-view button:disabled { opacity: .4; cursor: default; }
+.sim-results { padding: 0.25rem 0 0.4rem; }
+.sr-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; padding: 0.7rem 1rem 0.4rem; }
+.sr-head b { font-size: 1rem; } .sr-head span { font-size: 0.75rem; color: var(--label-3); font-family: var(--font-mono); }
+.sr-list { list-style: none; margin: 0; padding: 0; }
+.sr-row { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; align-items: center; gap: 0.6rem; padding: 0.45rem 1rem; border-top: 1px solid var(--hair); animation: srin 360ms cubic-bezier(.2,.9,.3,1) both; }
+.sr-row.top .sr-pick { color: var(--accent); }
+.sr-pick { font: 800 1.0625rem/1 var(--font-mono); text-align: right; }
+.sr-team { display: flex; align-items: center; gap: 0.55rem; min-width: 0; cursor: pointer; }
+.sr-team b { display: block; font-size: 0.9375rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .sr-team small { display: block; font-size: 0.6875rem; color: var(--label-3); }
+.sr-tags { display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; justify-content: flex-end; }
+.mvb { font: 700 0.6875rem/1 var(--font-mono); padding: 0.25rem 0.45rem; border-radius: 99px; white-space: nowrap; }
+.mvb.up { background: var(--good-soft); color: var(--good); } .mvb.down { background: var(--bad-soft); color: var(--bad); } .mvb.flat { color: var(--label-3); }
+@keyframes srin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .sr-row { animation: none; } }
+.sim-fab { position: fixed; z-index: 30; left: 50%; transform: translateX(-50%); bottom: calc(var(--tabbar-h, 0px) + 0.75rem);
+  display: flex; gap: 0.35rem; padding: 0.35rem; border-radius: 999px; background: var(--chrome); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: var(--shadow-lg); }
+.sim-fab button { border: 0; border-radius: 999px; padding: 0.6rem 1rem; font-weight: 750; font-size: 0.9375rem; cursor: pointer; min-height: 44px; background: var(--accent); color: var(--on-accent); white-space: nowrap; }
+.sim-fab button.ghosty { background: var(--fill); color: var(--label); font-weight: 650; }
+.sim-fab .sim-count { background: rgba(11,14,20,.85); color: #F59E0B; }
+@media (min-width: 768px) { .sim-fab { bottom: calc(1.25rem + env(safe-area-inset-bottom)); } }
 </style>
 </head>
 <body>
@@ -239,10 +265,15 @@ th:first-child, td:first-child { text-align: left; }
       </div></details>
   </div>
   <p class="source" id="source"></p>
-  <div class="lot-head"><h3>Lottery odds</h3>
+  <section id="lotCard" class="lot-card">
+  <div class="lot-head"><h3>Lottery</h3>
     <div class="seg fmt" role="group" aria-label="Lottery format" id="fmt"><span class="thumb"></span>
       <button type="button" data-format="321" aria-pressed="true">3-2-1 · 16 teams</button><button type="button" data-format="2019" aria-pressed="false">2019 · 14 teams</button></div></div>
+  <div class="seg lot-view" id="lotView" role="tablist" aria-label="Lottery view" style="--n:2"><span class="thumb"></span>
+    <button type="button" role="tab" data-lv="odds" aria-pressed="true">Pre-Lottery Odds</button><button type="button" role="tab" data-lv="sim" aria-pressed="false">Simulated Order</button></div>
+  <div class="odds-wrap sim-results" id="simResults" hidden></div>
   <details class="odds-wrap" id="oddsWrap" open><summary id="oddsSummary">Odds</summary><div class="odds-scroll" id="odds"></div><div class="odds-note" id="oddsNote"></div></details>
+  </section>
   <details class="odds-wrap mc-wrap" id="mcWrap" hidden open><summary id="mcSummary">1,000x simulation</summary><div class="odds-scroll" id="mc"></div></details>
   <div id="warnings"></div>
   <div class="seg board-mode" id="boardMode" role="group" aria-label="Board view" style="--n:2"><span class="thumb"></span>
@@ -252,6 +283,7 @@ th:first-child, td:first-child { text-align: left; }
   <p class="fine">Lottery odds are exact (every drawing sequence enumerated) for the selected format. The 3-2-1 format is modeled as described in the app; the 2019 format is the NBA’s current system. Pick obligations come from draft_picks_2027_2029.json and are applied after every simulation and standings refresh; terms marked unconfirmed should be checked against an official source. College stats and headshots come live from ESPN. 2028 and 2029 orders are projections from today’s standings. Not affiliated with the NBA, NCAA or ESPN.</p>
 </main>
 <div class="tip" id="tip" role="tooltip"></div>
+<div class="sim-fab" id="simFab" hidden><button class="press" type="button" id="fabSim">🎲 Sim Again <span class="sim-count" id="fabCount"></span></button><button class="press ghosty" type="button" id="fabReset">Reset</button></div>
 
 <script src="data.js"></script>
 <script type="module">
@@ -341,6 +373,37 @@ function sosCells(code) {
   const cls = v.sosRank <= 10 ? "easy" : v.sosRank >= 21 ? "hard" : "mid";
   return `<td class="sos"><span class="sos-pill ${cls}" title="#${v.sosRank} of 30 (1 = easiest) · ${v.remaining} games left">${v.remSos != null ? v.remSos.toFixed(3).replace(/^0/, "") : "—"}</span></td><td>${esc(v.l10)}</td><td class="${/^W/.test(v.streak) ? "w" : /^L/.test(v.streak) ? "l" : ""}">${esc(v.streak)}</td>`;
 }
+let lotView = "odds";
+function paintLotView() {
+  const simmed = simValid(yearState());
+  if (!simmed) lotView = "odds";
+  const seg = $("#lotView");
+  seg.querySelectorAll("button").forEach((b) => { b.setAttribute("aria-pressed", String(b.dataset.lv === lotView)); if (b.dataset.lv === "sim") b.disabled = !simmed; });
+  seg.querySelector(".thumb").style.transform = `translateX(${lotView === "sim" ? 100 : 0}%)`;
+  $("#simResults").hidden = lotView !== "sim"; $("#oddsWrap").hidden = lotView !== "odds";
+  paintFab();
+}
+const STATUS_PILL = { protected_retained: '<span class="pill prot">Protected – Retained</span>', swapped: '<span class="pill swap">Swap</span>', swap_kept: '<span class="pill swap">Swap · kept</span>', conveyed: '<span class="pill conv">Traded</span>' };
+function renderSimResults(picks, lottery) {
+  const bySlot = Object.fromEntries((lottery || []).map((l) => [l.pick, l]));
+  const n = Math.min(F().teams, picks.length);
+  $("#simResults").innerHTML = `<div class="sr-head"><b>Simulated Lottery Results</b><span>${F().label} · sim #${store.get(simCountKey()) || 1}</span></div>
+    <ol class="sr-list">${picks.slice(0, n).map((p) => {
+      const l = bySlot[p.pick] || {};
+      const own = teamOf(p.owner), orig = teamOf(p.originalTeam);
+      const mv = l.moved || 0;
+      const traded = p.owner !== p.originalTeam;
+      return `<li class="sr-row${p.pick <= 4 ? " top" : ""}"><span class="sr-pick">${p.pick}</span>
+        <span class="sr-team" data-team-hub="${esc(p.owner)}">${teamLogo(own, { size: "1.75rem" })}<span><b>${esc(own.name)}</b><small>${traded ? `via ${esc(orig.city || p.originalTeam)} · ` : ""}seed ${l.seed ?? "—"}</small></span></span>
+        <span class="sr-tags">${STATUS_PILL[p.status] || ""}${mv ? `<span class="mvb ${mv > 0 ? "up" : "down"}">${mv > 0 ? "↑ +" : "↓ −"}${Math.abs(mv)}</span>` : `<span class="mvb flat">—</span>`}</span></li>`;
+    }).join("")}</ol>`;
+}
+let fabObs = null, lotVisible = true;
+function paintFab() {
+  const show = simValid(yearState()) && !lotVisible;
+  $("#simFab").hidden = !show;
+  $("#fabCount").textContent = String(store.get(simCountKey()) || 0);
+}
 const simCountKey = () => `draft:simcount:${year}`;
 function paintSimCount() { const n = store.get(simCountKey()) || 0; const el = $("#simCount"); el.hidden = !n; el.textContent = n > 999 ? "999+" : String(n); el.title = `${n} simulation${n === 1 ? "" : "s"} this session`; }
 function renderMC(mc) {
@@ -386,7 +449,7 @@ function renderOdds(table) {
       return `<tr class="${barred ? "barred" : ""}">
         <td>${r.seed}</td>
         <td><span class="tm" data-team-hub="${esc(t.team || "")}">${teamLogo(team, { size: "1.5rem" })}<span><span class="nm"><span class="full">${esc(team.name)}</span><span class="ab">${esc(t.team || "")}</span></span> <span class="rec">${t.wins != null ? `${t.wins}-${t.losses}` : ""}</span></span>
-          ${r.relegated ? `<span class="pill rel" title="Seeds 1–3 hold fewer balls and slot behind the 3-ball teams if not drawn"><span class="full">Relegated</span><span class="ab">REL</span></span>` : ""}
+          ${r.relegated ? `<span class="pill rel" title="Draft relegated: the three worst records get 2 balls, but can't fall past pick 12"><span class="full">Relegated</span><span class="ab">REL</span></span>` : ""}
           ${split ? `<span class="pill split" title="Tied record: the tied seeds' balls are split evenly and the order between them is a coin flip"><span class="full">Tied · split</span><span class="ab">TIE</span></span>` : ""}</span></td>
         <td>${fmtBalls(r.balls)}${unit === "balls" ? ballDots(r.balls) : ""}</td>
         <td class="p1"><span class="bar" style="width:${Math.round((r.p1 / maxP1) * 2.5 * 16)}px"></span>${pct(r.p1)}</td>
@@ -398,7 +461,7 @@ function renderOdds(table) {
     }).join("")}</tbody></table>`;
   const relegated = F().relegated;
   $("#oddsNote").textContent = format === "321"
-    ? `37 balls: seeds ${relegated.join("–")} get 2 (relegated), 4–10 get 3, 11–14 get 2, 15–16 get 1. Four drawings set picks 1–4; everyone else is ordered by balls, then worst record, so a relegated seed can fall as far as #${table[0]?.floor}–#${table[relegated.length - 1]?.floor}. Tied records split their balls evenly. Barring a team from #1 removes its balls from the first drawing only, which raises everyone else's #1 odds.`
+    ? `37 balls: seeds ${relegated.join("–")} get 2 (draft relegated), 4–10 get 3, 11–14 get 2, 15–16 get 1. All 16 picks are drawn by lottery. The three relegated teams can't fall past #${table[0]?.floor}; everyone else can fall as far as #16. Tied records split their balls evenly. Barring a team from #1 removes its balls from the first drawing only, which raises everyone else's #1 odds.`
     : "1,000 combinations: 14% for each of the three worst records down to 0.5%. Four drawings; everyone else keeps their seed order, so the worst team can fall no lower than #5.";
 }
 $("#odds").addEventListener("click", (e) => {
@@ -434,6 +497,7 @@ function render() {
   const prosById = Object.fromEntries(board().map((p) => [p.id, p]));
   const simmed = simValid(s);
   const moved = simmed ? Object.fromEntries((s.lottery || []).map((l) => [l.pick, l.moved])) : {};
+  if (simmed) renderSimResults(picks, s.lottery);
   const allPicks = rounds === 2 ? [...picks, ...secondRound()] : picks;
   const nextOpen = allPicks.find((p) => !s.picks[p.pick])?.pick;
 
@@ -513,7 +577,7 @@ $("#board").addEventListener("click", (e) => {
   const make = e.target.closest("[data-make]"); if (make) return pickSheet(+make.dataset.make);
   const sc = e.target.closest("[data-scout]"); if (sc) return scout(sc.dataset.scout, +sc.closest("[data-row]").dataset.row);
 });
-$("#simBtn").addEventListener("click", () => {
+function runSim({ reveal = true } = {}) {
   if (!proj) return;
   const s = yearState();
   const sim = simulateLottery(proj.order, Math.random, { format, balls: proj.balls, restricted: restrictedFor() });
@@ -522,7 +586,19 @@ $("#simBtn").addEventListener("click", () => {
   document.querySelectorAll("#board .pick").forEach((row, i) => { if (i < F().teams) springIn(row); });
   const jump = sim.lottery.filter((l) => l.moved > 0).sort((a, b) => b.moved - a.moved)[0];
   toast(jump ? `${teamOf(jump.team).name} jump ${jump.moved} spot${jump.moved > 1 ? "s" : ""} to #${jump.pick}` : "Lottery held to form");
-});
+  lotView = "sim"; paintLotView();
+  document.querySelectorAll("#simResults .sr-row").forEach((row, i) => { row.style.animationDelay = `${i * 18}ms`; });
+  if (reveal) $("#lotCard").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+}
+$("#simBtn").addEventListener("click", () => runSim());
+$("#fabSim").addEventListener("click", () => runSim({ reveal: false }));
+$("#fabReset").addEventListener("click", () => $("#projBtn").click());
+$("#lotView").addEventListener("click", (e) => { const b = e.target.closest("[data-lv]"); if (!b || b.disabled) return; lotView = b.dataset.lv; paintLotView(); });
+if ("IntersectionObserver" in window) {
+  // Show "Sim Again" once the Odds / Simulated toggle has scrolled above the viewport (i.e. you're down in the board).
+  fabObs = new IntersectionObserver(([en]) => { lotVisible = en.isIntersecting || en.boundingClientRect.top > 0; paintFab(); }, { rootMargin: "-64px 0px 0px 0px" });
+  fabObs.observe($("#lotView"));
+}
 // The board always drafts in the current order (simulated if you ran the lottery, projected otherwise);
 // this jumps to it with the team on the clock in view.
 $("#takeBtn").addEventListener("click", () => {
@@ -530,7 +606,7 @@ $("#takeBtn").addEventListener("click", () => {
   (row || b).scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
   b.classList.add("pulse-board"); setTimeout(() => b.classList.remove("pulse-board"), 900);
 });
-$("#projBtn").addEventListener("click", () => { const s = yearState(); s.order = null; s.lottery = null; save(); store.set(simCountKey(), 0); paintSimCount(); $("#mcWrap").hidden = true; render(); toast("Reset to the projected order"); });
+$("#projBtn").addEventListener("click", () => { const s = yearState(); s.order = null; s.lottery = null; save(); store.set(simCountKey(), 0); paintSimCount(); $("#mcWrap").hidden = true; render(); lotView = "odds"; paintLotView(); toast("Reset to the projected order"); });
 $("#mcBtn").addEventListener("click", () => {
   if (!proj) return;
   const t0 = performance.now();
@@ -563,7 +639,7 @@ yearsSeg.addEventListener("click", (e) => {
   // Clean switch: close any open sheet/tooltip, then load that year's own simulation, restrictions,
   // pick-ownership rules and prospect pool (pruneBoard drops picks for players not on this board).
   if (sheet.isOpen) sheet.close();
-  hideTip(); $("#mcWrap").hidden = true; paintSimCount(); render(); paintBoardMode();
+  hideTip(); $("#mcWrap").hidden = true; paintSimCount(); render(); paintBoardMode(); lotView = simValid(yearState()) ? "sim" : "odds"; paintLotView();
   window.scrollTo(0, 0);
 });
 
@@ -721,7 +797,7 @@ function scout(id, pickNo) {
 (async () => {
   [config, prospects] = await Promise.all([loadJson("draft_picks_2027_2029.json"), loadJson("prospects.json")]).catch((e) => { toast(`Couldn’t load draft data: ${e.message}`); return [{ years: {} }, {}]; });
   proj = placeholderProj();             // until standings arrive
-  paintSimCount(); render(); paintBoardMode();
+  paintSimCount(); render(); paintBoardMode(); lotView = simValid(yearState()) ? "sim" : "odds"; paintLotView();
   client = await createClient();
   client.watch("sos", {}, (d) => { sos = d.teams; render(); }, () => { if (sos === null) { sos = {}; render(); } });
   // Standings refresh → re-project the order and re-run the ownership engine automatically.

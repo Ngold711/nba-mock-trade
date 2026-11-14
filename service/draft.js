@@ -20,8 +20,10 @@ export const LOTTERY_FORMATS = {
     relegated: [],
   },
   "321": {
+    // Approved May 2026 for the 2027–2029 drafts: the lottery is drawn all the way through pick 16, and the
+    // three "draft relegated" teams (worst records) can't fall past pick 12.
     key: "321", label: "3-2-1 format", short: "3-2-1 · 16 teams",
-    teams: 16, draws: 4, orderRest: "balls",
+    teams: 16, draws: 16, orderRest: "balls", guarantee: { seeds: [0, 1, 2], floor: 12 },
     // seeds 1–3: 2 balls (relegated) · 4–10: 3 · 11–14: 2 · 15–16: 1  → 37 balls
     balls: [2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 1, 1], unit: "balls",
     relegated: [1, 2, 3],
@@ -98,6 +100,16 @@ export function splitTies(pcts, base) {
 }
 
 /** Order of the teams not drawn: by balls (3-2-1) or by seed (2019); worse record first within a tier. */
+/**
+ * 3-2-1 floor guarantee: once the picks left before the floor (pick 12) are only enough for the relegated teams
+ * still undrawn, the draw is limited to those teams, so none of them can land past the floor.
+ * Returns the set of seeds that may be drawn at drawing `d` (0-based), or null when the draw is open.
+ */
+function guaranteedOnly(F, pool, d) {
+  const g = F.guarantee; if (!g || d >= g.floor) return null;
+  const left = pool.filter((s) => g.seeds.includes(s));
+  return left.length && left.length >= g.floor - d ? new Set(left) : null;
+}
 function restOrder(F, seeds, balls) {
   return [...seeds].sort((a, b) => (F.orderRest === "balls" ? balls[b] - balls[a] : 0) || a - b);
 }
@@ -114,7 +126,8 @@ export function simulateLottery(order, rng = Math.random, opts = {}) {
   const pool = [...Array(n).keys()];
   const winners = [];
   for (let d = 0; d < F.draws && pool.length; d++) {
-    const w = pool.map((s) => (d === 0 && restricted.has(order[s]) ? 0 : balls[s]));
+    const only = guaranteedOnly(F, pool, d);
+    const w = pool.map((s) => (only && !only.has(s) ? 0 : d === 0 && restricted.has(order[s]) && !only ? 0 : balls[s]));
     const total = w.reduce((a, b) => a + b, 0);
     if (total <= 0) break;
     let x = rng() * total, k = w.findIndex((wi) => (x -= wi) < 0);
@@ -139,6 +152,21 @@ export function lotteryOdds(format = "2019", { balls: ballsIn, restricted = [], 
   const barred = new Set(order ? order.slice(0, n).map((t, i) => (restricted.includes(t) ? i : -1)).filter((i) => i >= 0) : []);
   const tie = ties || Array(n).fill(null);
   const odds = Array.from({ length: n }, () => Array(n).fill(0));
+  if (F.draws >= n) {
+    // Every pick is drawn: dynamic programming over the set of seeds already drawn (2^n states).
+    const prob = new Float64Array(1 << n); prob[0] = 1;
+    for (let mask = 0; mask < (1 << n) - 1; mask++) {
+      const p = prob[mask]; if (!p) continue;
+      let k = 0; for (let m = mask; m; m &= m - 1) k++;
+      const left = []; for (let s = 0; s < n; s++) if (!(mask & (1 << s))) left.push(s);
+      const only = guaranteedOnly(F, left, k);
+      let w = left.map((s) => (only && !only.has(s) ? 0 : k === 0 && barred.has(s) && !only ? 0 : balls[s]));
+      let total = w.reduce((a, b) => a + b, 0);
+      if (total <= 0) { w = left.map((s) => (only && !only.has(s) ? 0 : balls[s])); total = w.reduce((a, b) => a + b, 0); }
+      left.forEach((s, i) => { if (!w[i]) return; const q = (p * w[i]) / total; odds[s][k] += q; prob[mask | (1 << s)] += q; });
+    }
+    return odds;
+  }
   const walk = (drawn, p) => {
     if (drawn.length === F.draws) {
       drawn.forEach((s, i) => { odds[s][i] += p; });
