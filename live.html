@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>NBA Live</title>
+<meta name="description" content="Live NBA scores, box scores, standings, injuries and transactions from ESPN's public feeds." />
+<link rel="stylesheet" href="ui/base.css" />
+<style>
+main { max-width: 72rem; margin: 0 auto; padding: 0 max(1rem, env(safe-area-inset-right)) 3rem max(1rem, env(safe-area-inset-left)); }
+.toolbar { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; padding: 1.25rem 0 1rem; }
+.toolbar h2 { margin: 0; font-size: clamp(1.75rem, 4vw, 2.5rem); line-height: 1.05; letter-spacing: -0.026em; font-weight: 750; flex: 1; min-width: 10rem; }
+.tabs { --n: 4; width: min(100%, 26rem); }
+.tabs button { font-size: 0.8125rem; padding: 0.4rem 0.25rem; }
+.status-line { font-size: 0.8125rem; color: var(--label-2); display: flex; align-items: center; gap: 0.4rem; }
+.err-banner { display: flex; gap: 0.6rem; align-items: center; padding: 0.7rem 0.9rem; border-radius: var(--r-md); background: var(--warn-soft); color: var(--warn); font-size: 0.875rem; font-weight: 550; margin-bottom: 1rem; }
+.view[hidden] { display: none; }
+
+/* Games */
+.datebar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+.datebar .d { font-weight: 650; font-size: 1.0625rem; letter-spacing: -0.012em; min-width: 9rem; text-align: center; }
+.datebar .today { margin-left: auto; }
+.games { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); }
+.game { all: unset; box-sizing: border-box; cursor: pointer; background: var(--surface); border-radius: var(--r-lg); padding: 0.9rem 1rem; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 0.55rem; min-width: 0; }
+.game:hover { box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--sep); }
+.game:focus-visible { outline: 3px solid var(--focus); }
+.g-top { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: var(--label-2); }
+.g-top .bc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-team { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.65rem; }
+.g-team .nm { font-weight: 650; letter-spacing: -0.012em; }
+.g-team .rec { font-size: 0.75rem; color: var(--label-3); margin-left: 0.35rem; font-weight: 500; }
+.g-team .sc { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.g-team.lose .sc, .g-team.lose .nm { color: var(--label-3); }
+.g-lead { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; border-top: 0.5px solid var(--sep); padding-top: 0.6rem; }
+.lead { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.lead .t { min-width: 0; font-size: 0.75rem; line-height: 1.3; }
+.lead .t b { display: block; font-size: 0.8125rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.005em; }
+.lead .t span { color: var(--label-2); }
+
+/* Tables */
+.panel { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); padding: 0.5rem 0 0.25rem; min-width: 0; }
+.panel h3 { margin: 0.5rem 1rem 0.25rem; font-size: 1.125rem; letter-spacing: -0.016em; }
+.panel .note { margin: 0 1rem 0.5rem; font-size: 0.75rem; color: var(--label-3); }
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { border-collapse: collapse; width: 100%; font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
+th { text-align: right; font-weight: 600; font-size: 0.6875rem; color: var(--label-3); letter-spacing: 0.04em; text-transform: uppercase; padding: 0.4rem 0.5rem; white-space: nowrap; }
+td { text-align: right; padding: 0.45rem 0.5rem; white-space: nowrap; border-top: 0.5px solid var(--sep); }
+th:first-child, td:first-child { text-align: left; padding-left: 1rem; position: sticky; left: 0; background: var(--surface); z-index: 1; }
+th:last-child, td:last-child { padding-right: 1rem; }
+tr.cut td { border-top: 1.5px dashed var(--fill-strong); }
+.who { display: flex; align-items: center; gap: 0.6rem; min-width: 10.5rem; }
+.who .nm { font-weight: 600; letter-spacing: -0.008em; }
+.who .sub { color: var(--label-3); font-size: 0.6875rem; }
+.seed { color: var(--label-3); width: 1.25rem; display: inline-block; font-weight: 600; }
+.standings { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 30rem), 1fr)); }
+.pos { color: var(--good); } .neg { color: var(--bad); }
+
+/* Injuries / moves */
+.filters { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
+.filters .seg { --n: 4; width: min(100%, 22rem); }
+.filters .search { margin: 0; flex: 1; min-width: 12rem; background-color: var(--surface); }
+.groups { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); align-items: start; }
+.group { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); padding: 0.75rem 0.75rem 0.25rem; min-width: 0; }
+.group-head { display: flex; align-items: center; gap: 0.6rem; padding: 0 0.25rem 0.4rem; font-weight: 650; letter-spacing: -0.012em; }
+.group-head .count { margin-left: auto; font-size: 0.75rem; color: var(--label-3); font-weight: 500; }
+.inj .meta .sub { white-space: normal; }
+.inj .cmt { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--label-3); font-size: 0.75rem; margin-top: 0.15rem; }
+.inj { align-items: flex-start; }
+.inj .pill { margin-top: 0.15rem; }
+.moves .row { align-items: flex-start; }
+.moves .when { font-size: 0.6875rem; color: var(--label-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.moves .desc { font-size: 0.9375rem; line-height: 1.4; }
+
+/* Box score sheet */
+.box-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 0.5rem; padding: 0.25rem 0 0.75rem; }
+.box-team { display: flex; align-items: center; gap: 0.6rem; }
+.box-team.home { flex-direction: row-reverse; text-align: right; }
+.box-team .sc { font-size: 2rem; font-weight: 750; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1; }
+.box-team .ab { font-size: 0.8125rem; font-weight: 600; color: var(--label-2); }
+.box-mid { text-align: center; font-size: 0.75rem; color: var(--label-2); font-weight: 600; }
+.box-seg { --n: 2; margin: 0.25rem 0 0.5rem; }
+.box-seg button { font-size: 0.8125rem; padding: 0.35rem; }
+.sheet .panel { box-shadow: none; padding: 0; background: transparent; }
+.sheet th:first-child, .sheet td:first-child { background: var(--surface); padding-left: 0; }
+.sheet th:last-child, .sheet td:last-child { padding-right: 0; }
+.starter-tag { font-size: 0.625rem; color: var(--accent); font-weight: 700; margin-left: 0.3rem; }
+.dnp { font-size: 0.75rem; color: var(--label-3); padding: 0.5rem 0; line-height: 1.6; }
+.plays .row { padding: 0.45rem 0; gap: 0.6rem; }
+.plays .clk { font-size: 0.6875rem; color: var(--label-3); width: 3.4rem; flex: none; font-variant-numeric: tabular-nums; font-weight: 600; }
+.plays .txt { flex: 1; font-size: 0.8125rem; }
+.plays .scr { font-size: 0.75rem; font-variant-numeric: tabular-nums; color: var(--label-2); font-weight: 600; }
+.plays .row.scoring .txt { font-weight: 600; }
+.skeleton { height: 7.5rem; border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-sm); opacity: .6; }
+.fine { color: var(--label-3); font-size: 0.75rem; margin-top: 2rem; line-height: 1.5; }
+@media (max-width: 30rem) { .brand p .long { display: none; } }
+</style>
+</head>
+<body>
+<header class="bar" id="bar">
+  <div class="bar-inner">
+    <div class="brand">
+      <h1>NBA Live</h1>
+      <p><span class="pulse" id="pulse"></span><span id="sync">Connecting…</span></p>
+    </div>
+    <nav class="nav" aria-label="Sections"><a href="index.html">Trade</a><a href="live.html" aria-current="page">Live</a></nav>
+  </div>
+</header>
+
+<main>
+  <div class="toolbar">
+    <h2 id="viewTitle">Games</h2>
+    <div class="seg tabs" role="tablist" aria-label="View" id="tabs">
+      <span class="thumb"></span>
+      <button type="button" role="tab" data-view="games">Games</button>
+      <button type="button" role="tab" data-view="standings">Standings</button>
+      <button type="button" role="tab" data-view="injuries">Injuries</button>
+      <button type="button" role="tab" data-view="moves">Moves</button>
+    </div>
+  </div>
+  <div id="banner"></div>
+
+  <section class="view" id="view-games">
+    <div class="datebar">
+      <button class="icon-btn press" type="button" id="prevDay" aria-label="Previous day"><svg viewBox="0 0 12 12"><path d="M7.5 2.5L4 6l3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <span class="d" id="dayLabel">Today</span>
+      <button class="icon-btn press" type="button" id="nextDay" aria-label="Next day"><svg viewBox="0 0 12 12"><path d="M4.5 2.5L8 6 4.5 9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="btn press today" type="button" id="todayBtn" hidden>Today</button>
+    </div>
+    <div class="games" id="games"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+  </section>
+  <section class="view" id="view-standings" hidden><div class="standings" id="standings"></div></section>
+  <section class="view" id="view-injuries" hidden>
+    <div class="filters">
+      <div class="seg" id="injFilter" role="group" aria-label="Status">
+        <span class="thumb"></span>
+        <button type="button" data-f="all" aria-pressed="true">All</button>
+        <button type="button" data-f="Out" aria-pressed="false">Out</button>
+        <button type="button" data-f="Day-To-Day" aria-pressed="false">Day-to-day</button>
+        <button type="button" data-f="other" aria-pressed="false">Other</button>
+      </div>
+      <input class="search" id="injSearch" type="search" placeholder="Search players or teams" autocomplete="off" />
+    </div>
+    <div class="groups" id="injuries"></div>
+  </section>
+  <section class="view" id="view-moves" hidden><div class="panel moves"><ul class="list" id="moves" style="padding:0 1rem"></ul></div></section>
+
+  <p class="fine">Data from ESPN’s public feeds, refreshed every 20 seconds while games are live and every 15–60 minutes for standings, injuries and rosters. Player photos are served by ESPN’s image CDN; players without one show their initials. Not affiliated with the NBA or ESPN.</p>
+</main>
+
+<script type="module">
+import { createClient } from "./ui/client.js";
+import { avatar, teamLogo, esc } from "./ui/avatar.js";
+import { Spring, createSheet, scrollEdge, springIn } from "./ui/motion.js";
+
+const $ = (s, r = document) => r.querySelector(s);
+let client = { mode: "direct" };   // replaced once detection finishes (no top-level await: iOS 14 lacks it)
+const sheet = createSheet();
+scrollEdge($("#bar"));
+
+/* ---------- sync status ---------- */
+const sync = { at: 0, live: 0, error: null, stale: false };
+function ago(ts) {
+  const s = Math.round((Date.now() - ts) / 1000);
+  return s < 10 ? "just now" : s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`;
+}
+function paintSync() {
+  const p = $("#pulse");
+  p.className = "pulse " + (sync.error ? "err" : sync.live ? "live" : sync.at ? "on" : "");
+  const src = client.mode === "service" ? "local service" : "ESPN direct";
+  $("#sync").innerHTML = sync.error && !sync.at ? "Can’t reach ESPN"
+    : `${sync.live ? `${sync.live} live · ` : ""}Updated ${sync.at ? ago(sync.at) : "—"}<span class="long"> · ${src}</span>`;
+}
+setInterval(paintSync, 5000);
+function noteMeta(meta) {
+  sync.at = meta?.fetchedAt ? Date.parse(meta.fetchedAt) : Date.now();
+  sync.error = meta?.error || null;
+  $("#banner").innerHTML = meta?.error
+    ? `<div class="err-banner">Couldn’t refresh from ESPN (${esc(meta.error)}). Showing data from ${ago(sync.at)}; retrying automatically.</div>` : "";
+  paintSync();
+}
+function noteError(err, target) {
+  sync.error = err.message; paintSync();
+  const hint = client.mode === "direct" ? " ESPN sometimes refuses requests made straight from a browser; run the local service (npm start) for reliable data." : "";
+  if (target && !target.dataset.loaded) target.innerHTML = `<div class="empty">Couldn’t load this from ESPN: ${esc(err.message)}. Retrying automatically.${hint}</div>`;
+}
+
+/* ---------- formatting ---------- */
+const fmtTime = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); };
+const fmtDay = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString([], { month: "short", day: "numeric" }); };
+const ymd = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+const parseYmd = (s) => new Date(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8));
+
+function statusPill(g) {
+  const s = g.status;
+  if (s.state === "in") return `<span class="pill live"><span class="pulse live"></span>${esc(s.shortDetail || `Q${s.period} ${s.clock}`)}</span>`;
+  if (s.state === "pre") return `<span class="pill">${esc(fmtTime(g.date) || s.shortDetail)}</span>`;
+  return `<span class="pill">${esc(s.shortDetail || "Final")}</span>`;
+}
+
+/* ---------- views ---------- */
+const VIEWS = ["games", "standings", "injuries", "moves"];
+const TITLES = { games: "Games", standings: "Standings", injuries: "Injury report", moves: "Transactions" };
+let current = null, stopView = null;
+const tabs = $("#tabs");
+const tabThumb = new Spring(0, (x) => { tabs.querySelector(".thumb").style.transform = `translateX(${x * 100}%)`; }, 0.001);
+
+function show(view, animate = true) {
+  if (!VIEWS.includes(view)) view = "games";
+  if (view === current) return;
+  stopView?.(); stopView = null;
+  current = view;
+  VIEWS.forEach((v) => { $(`#view-${v}`).hidden = v !== view; });
+  tabs.querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === view)));
+  tabs.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === view)));
+  const i = VIEWS.indexOf(view);
+  animate ? tabThumb.to(i, { damping: 1, response: 0.3 }) : tabThumb.set(i);
+  $("#viewTitle").textContent = TITLES[view];
+  $("#banner").innerHTML = "";
+  stopView = ({ games: startGames, standings: startStandings, injuries: startInjuries, moves: startMoves })[view]();
+}
+tabs.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) location.hash = b.dataset.view; });
+addEventListener("hashchange", () => show(location.hash.slice(1)));
+
+/* Games */
+let day = null; // null = ESPN's current day
+function startGames() {
+  const el = $("#games");
+  el.dataset.loaded = "";
+  const stop = client.watch("scoreboard", day ? { date: day } : {}, (sb, meta) => {
+    noteMeta(meta);
+    sync.live = sb.live;
+    paintSync();
+    const shown = sb.date ? sb.date.replace(/-/g, "") : day;
+    el.dataset.day = shown || "";
+    $("#dayLabel").textContent = shown ? parseYmd(shown).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }) : "Today";
+    $("#todayBtn").hidden = !day;
+    const first = !el.dataset.loaded;
+    el.dataset.loaded = "1";
+    if (!sb.games.length) { el.innerHTML = `<div class="empty">No games scheduled.</div>`; return; }
+    const order = { in: 0, pre: 1, post: 2, unknown: 3 };
+    const games = [...sb.games].sort((a, b) => order[a.status.state] - order[b.status.state] || a.date.localeCompare(b.date));
+    el.innerHTML = games.map(gameCard).join("");
+    if (first) el.querySelectorAll(".game").forEach(springIn);
+    if (sheet.isOpen && openGame) sheet.refresh();
+  }, (err) => noteError(err, el));
+  return () => { stop(); sync.live = 0; };
+}
+function gameCard(g) {
+  const teams = [g.away, g.home].filter(Boolean);
+  const final = g.status.state === "post";
+  const row = (t) => {
+    const lose = final && teams.some((o) => o !== t && (o.score ?? 0) > (t.score ?? 0));
+    return `<div class="g-team${lose ? " lose" : ""}">${teamLogo(t, { size: "2rem" })}
+      <span><span class="nm">${esc(t.name || t.abbr)}</span><span class="rec">${esc(t.record)}</span></span>
+      <span class="sc">${g.status.state === "pre" || t.score == null ? "" : t.score}</span></div>`;
+  };
+  const lead = (t) => {
+    const l = t.leaders.find((x) => /^pts$|points/i.test(x.category)) || t.leaders[0];
+    if (!l) return `<div></div>`;
+    return `<div class="lead">${avatar(l.athlete, { size: "2.25rem", color: t.color })}
+      <span class="t"><b>${esc(l.athlete.shortName)}</b><span>${esc(l.value)} ${esc(l.category.toLowerCase())} · ${esc(t.abbr)}</span></span></div>`;
+  };
+  return `<button class="game press" type="button" data-game="${esc(g.id)}" aria-label="${esc(g.name)}, ${esc(g.status.shortDetail)}">
+    <div class="g-top">${statusPill(g)}<span class="bc">${esc(g.broadcast || g.note)}</span></div>
+    ${teams.map(row).join("")}
+    ${teams.some((t) => t.leaders.length) ? `<div class="g-lead">${teams.map(lead).join("")}</div>` : ""}
+  </button>`;
+}
+$("#games").addEventListener("click", (e) => { const b = e.target.closest("[data-game]"); if (b) openBox(b.dataset.game); });
+function shiftDay(n) {
+  const base = $("#games").dataset.day || ymd(new Date());
+  const d = parseYmd(base); d.setDate(d.getDate() + n);
+  day = ymd(d);
+  current = null; show("games");
+}
+$("#prevDay").addEventListener("click", () => shiftDay(-1));
+$("#nextDay").addEventListener("click", () => shiftDay(1));
+$("#todayBtn").addEventListener("click", () => { day = null; current = null; show("games"); });
+
+/* Box score sheet — polls the game summary while open (20s when live) */
+let openGame = null;
+function openBox(id) {
+  let data = null, side = 1, stop = null, err = null;
+  openGame = id;
+  sheet.open({
+    title: "Box score",
+    render(body) {
+      if (err && !data) { body.innerHTML = `<div class="empty">Couldn’t load this game: ${esc(err)}</div>`; return; }
+      if (!data) { body.innerHTML = `<div class="skeleton" style="height:12rem;box-shadow:none;background:var(--fill)"></div>`; return; }
+      body.innerHTML = boxScore(data, side);
+      body.querySelectorAll("[data-side]").forEach((b) => b.addEventListener("click", () => { side = +b.dataset.side; sheet.refresh(); }));
+    },
+    onClose() { stop?.(); openGame = null; },
+  });
+  stop = client.watch("summary", { id }, (d, meta) => {
+    data = d; err = meta?.error || null;
+    const g = d.game;
+    sheet.setTitle(g.away && g.home ? `${g.away.abbr} @ ${g.home.abbr}` : "Box score");
+    if (sheet.isOpen && openGame === id) sheet.refresh();
+  }, (e) => { err = e.message; if (sheet.isOpen && openGame === id) sheet.refresh(); });
+}
+function boxScore(d, side) {
+  const g = d.game;
+  const T = (t, cls) => t ? `<div class="box-team ${cls}">${teamLogo(t, { size: "2.5rem" })}<div><div class="sc">${t.score ?? "–"}</div><div class="ab">${esc(t.abbr)}</div></div></div>` : "<div></div>";
+  let html = `<div class="box-head">${T(g.away, "away")}<div class="box-mid">${statusPill(g)}</div>${T(g.home, "home")}</div>`;
+  if (!d.teams.length) return html + `<div class="empty">Box score appears once the game tips off.</div>`;
+  html += `<div class="seg box-seg" role="group" aria-label="Team"><span class="thumb" style="transform:translateX(${side * 100}%)"></span>
+    ${d.teams.map((t, i) => `<button type="button" data-side="${i}" aria-pressed="${i === side}">${esc(t.team.displayName)}</button>`).join("")}</div>`;
+  const tm = d.teams[side] || d.teams[0];
+  const cols = ["MIN", "PTS", "REB", "AST", "FG", "3PT", "FT", "STL", "BLK", "TO", "+/-"].filter((c) => tm.labels.includes(c));
+  const played = tm.players.filter((p) => !p.didNotPlay);
+  const dnp = tm.players.filter((p) => p.didNotPlay);
+  const rowFor = (p, i) => `<tr${i === 5 ? ' class="cut"' : ""}><td><div class="who">${avatar(p, { size: "2rem", color: tm.team.color })}
+      <div><div class="nm">${esc(p.shortName)}${p.starter ? '<span class="starter-tag">S</span>' : ""}</div><div class="sub">${esc(p.position)}${p.jersey ? ` · #${esc(p.jersey)}` : ""}</div></div></div></td>
+      ${cols.map((c) => { const v = p.stats[c] ?? ""; const cls = c === "+/-" ? (v.startsWith("+") && v !== "+0" ? "pos" : v.startsWith("-") ? "neg" : "") : ""; return `<td class="${cls}">${esc(v)}</td>`; }).join("")}</tr>`;
+  html += `<div class="panel"><div class="scroll-x"><table><thead><tr><th>Player</th>${cols.map((c) => `<th>${c}</th>`).join("")}</tr></thead><tbody>
+    ${played.map(rowFor).join("")}
+    <tr><td><b>Team</b></td>${cols.map((c) => `<td><b>${esc(tm.totals[c] ?? "")}</b></td>`).join("")}</tr></tbody></table></div></div>`;
+  if (dnp.length) html += `<div class="dnp">Did not play: ${dnp.map((p) => `${esc(p.shortName)}${p.reason ? ` (${esc(p.reason.toLowerCase())})` : ""}`).join(", ")}</div>`;
+  if (d.plays.length) {
+    const names = Object.fromEntries(d.teams.map((t) => [t.team.id, t.team.abbr]));
+    html += `<div class="sheet-sub">Latest plays</div><ul class="list plays">${d.plays.slice(0, 20).map((p) => `
+      <li class="row${p.scoring ? " scoring" : ""}"><span class="clk">${p.period ? `Q${p.period > 4 ? `OT${p.period - 4 > 1 ? p.period - 4 : ""}` : p.period}` : ""} ${esc(p.clock)}</span>
+      <span class="txt">${esc(p.text)}</span><span class="scr">${p.awayScore ?? ""}–${p.homeScore ?? ""}</span></li>`).join("")}</ul>`;
+  }
+  return html;
+}
+
+/* Standings */
+function startStandings() {
+  const el = $("#standings"); el.dataset.loaded = "";
+  return client.watch("standings", {}, (s, meta) => {
+    noteMeta(meta);
+    const first = !el.dataset.loaded; el.dataset.loaded = "1";
+    el.innerHTML = s.conferences.map((c) => `<section class="panel"><h3>${esc(c.name)}</h3>
+      <p class="note">Seeds 1–6 make the playoffs; 7–10 go to the play-in.</p>
+      <div class="scroll-x"><table><thead><tr><th>Team</th><th>W</th><th>L</th><th>Pct</th><th>GB</th><th>L10</th><th>Strk</th><th>Home</th><th>Away</th><th>Diff</th></tr></thead><tbody>
+      ${c.teams.map((t, i) => `<tr${i === 6 || i === 10 ? ' class="cut"' : ""}>
+        <td><div class="who"><span class="seed">${t.seed ?? i + 1}</span>${teamLogo(t.team, { size: "1.6rem" })}<span class="nm">${esc(t.team.name || t.team.displayName)}</span></div></td>
+        <td>${t.wins}</td><td>${t.losses}</td><td>${esc(t.pctText)}</td><td>${esc(t.gb)}</td><td>${esc(t.lastTen)}</td><td>${esc(t.streak)}</td><td>${esc(t.home)}</td><td>${esc(t.road)}</td>
+        <td class="${(t.diff ?? 0) > 0 ? "pos" : (t.diff ?? 0) < 0 ? "neg" : ""}">${t.diff == null ? "" : (t.diff > 0 ? "+" : "") + t.diff.toFixed(1)}</td></tr>`).join("")}
+      </tbody></table></div></section>`).join("");
+    if (first) el.querySelectorAll(".panel").forEach(springIn);
+  }, (err) => noteError(err, el));
+}
+
+/* Injuries */
+let injFilter = "all", injData = [];
+const injThumb = new Spring(0, (x) => { $("#injFilter .thumb").style.transform = `translateX(${x * 100}%)`; }, 0.001);
+function renderInjuries() {
+  const el = $("#injuries");
+  const q = $("#injSearch").value.trim().toLowerCase();
+  const list = injData.filter((i) =>
+    (injFilter === "all" || (injFilter === "other" ? !["Out", "Day-To-Day"].includes(i.status) : i.status === injFilter)) &&
+    (!q || `${i.athlete.name} ${i.team.displayName} ${i.team.abbr}`.toLowerCase().includes(q)));
+  if (!list.length) { el.innerHTML = `<div class="empty">No injuries match.</div>`; return; }
+  const byTeam = new Map();
+  list.forEach((i) => { const k = i.team.id || i.team.displayName; if (!byTeam.has(k)) byTeam.set(k, { team: i.team, items: [] }); byTeam.get(k).items.push(i); });
+  el.innerHTML = [...byTeam.values()].sort((a, b) => a.team.displayName.localeCompare(b.team.displayName)).map(({ team, items }) => `
+    <section class="group"><div class="group-head">${teamLogo(team, { size: "1.75rem" })}${esc(team.displayName)}<span class="count">${items.length}</span></div>
+    <ul class="list">${items.map((i) => `<li class="row inj">${avatar(i.athlete, { size: "2.75rem", color: team.color })}
+      <span class="meta"><span class="nm">${esc(i.athlete.name)}</span>
+        <span class="sub">${[i.athlete.position, i.injury, i.returnDate ? `est. return ${fmtDay(i.returnDate + "T12:00")}` : ""].filter(Boolean).map(esc).join(" · ")}</span>
+        ${i.comment ? `<span class="cmt">${esc(i.comment)}</span>` : ""}</span>
+      <span class="pill ${i.status === "Out" ? "out" : i.status === "Day-To-Day" ? "dtd" : ""}">${esc(i.status)}</span></li>`).join("")}</ul></section>`).join("");
+}
+function startInjuries() {
+  const el = $("#injuries"); el.dataset.loaded = "";
+  return client.watch("injuries", {}, (list, meta) => { noteMeta(meta); injData = list; el.dataset.loaded = "1"; renderInjuries(); }, (err) => noteError(err, el));
+}
+$("#injFilter").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  injFilter = b.dataset.f;
+  const btns = [...$("#injFilter").querySelectorAll("button")];
+  btns.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  injThumb.to(btns.indexOf(b), { damping: 1, response: 0.3 });
+  renderInjuries();
+});
+$("#injSearch").addEventListener("input", renderInjuries);
+
+/* Transactions */
+const KIND = { trade: "Trade", release: "Waived", signing: "Signed", assignment: "Assigned", suspension: "Suspended", other: "Move" };
+function startMoves() {
+  const el = $("#moves"); el.dataset.loaded = "";
+  return client.watch("transactions", {}, (list, meta) => {
+    noteMeta(meta); el.dataset.loaded = "1";
+    el.innerHTML = list.length ? list.map((t) => `<li class="row">${teamLogo(t.team, { size: "2.25rem" })}
+      <span class="meta"><span class="when">${esc(fmtDay(t.date))} · ${esc(t.team.abbr)}</span><span class="desc">${esc(t.description)}</span></span>
+      <span class="pill${t.kind === "trade" ? " live" : ""}">${KIND[t.kind] || "Move"}</span></li>`).join("") : `<li class="empty">No recent transactions.</li>`;
+  }, (err) => noteError(err, el));
+}
+
+createClient().then((c) => {
+  client = c;
+  show(location.hash.slice(1) || "games", false);
+  paintSync();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "nba-mock-trade",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NBA mock trade builder and live data service backed by ESPN's public JSON feeds.",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  }
+}

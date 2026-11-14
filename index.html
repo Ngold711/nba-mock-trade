@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>NBA Mock Trade</title>
+<meta name="description" content="Build multi-team NBA trades with live ESPN rosters, check salary matching, and grade each side." />
+<link rel="stylesheet" href="ui/base.css" />
+<style>
+body { padding-bottom: calc(6.5rem + env(safe-area-inset-bottom)); }
+
+/* Hero */
+main { max-width: 72rem; margin: 0 auto; padding: 0 max(1rem, env(safe-area-inset-right)) 0 max(1rem, env(safe-area-inset-left)); }
+.hero { padding: 2rem 0 1.25rem; }
+.hero h2 { margin: 0; font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.05; letter-spacing: -0.028em; font-weight: 750; }
+.hero p { margin: 0.6rem 0 0; color: var(--label-2); max-width: 38rem; font-size: 1.0625rem; letter-spacing: -0.01em; }
+
+/* Board */
+.board { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); align-items: start; }
+.card { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); padding: 1rem; min-width: 0; display: flex; flex-direction: column; gap: 0.75rem; }
+.card-head { display: flex; align-items: center; gap: 0.75rem; }
+.team-btn { flex: 1; min-width: 0; text-align: left; background: none; border: 0; padding: 0.25rem; margin: -0.25rem; border-radius: 0.6rem; cursor: pointer; }
+.team-btn:hover { background: var(--fill); }
+.team-btn .city { display: block; font-size: 0.75rem; color: var(--label-2); letter-spacing: 0.01em; }
+.team-btn .nm { display: block; font-size: 1.125rem; font-weight: 650; letter-spacing: -0.015em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cap-seg { --n: 4; }
+.section-label { font-size: 0.75rem; font-weight: 600; color: var(--label-3); text-transform: uppercase; letter-spacing: 0.06em; margin: 0.25rem 0 -0.25rem; }
+.assets { display: flex; flex-direction: column; gap: 0.5rem; list-style: none; margin: 0; padding: 0; }
+
+.asset-wrap { position: relative; border-radius: var(--r-md); overflow: hidden; }
+.asset-under { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: var(--bad); color: #fff; display: flex; align-items: center; justify-content: flex-end; padding-right: 1rem; font-weight: 600; font-size: 0.875rem; border-radius: var(--r-md); opacity: 0; }
+.asset {
+  position: relative; background: var(--surface-2); border-radius: var(--r-md); padding: 0.55rem 0.6rem;
+  display: flex; align-items: center; gap: 0.6rem; touch-action: pan-y; user-select: none; -webkit-user-select: none;
+  box-shadow: inset 0 0 0 0.5px var(--sep);
+}
+.asset .meta { flex: 1; min-width: 0; }
+.asset .nm { font-weight: 600; font-size: 0.9375rem; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.asset .sub { font-size: 0.75rem; color: var(--label-2); display: flex; gap: 0.4rem; align-items: center; letter-spacing: 0.005em; }
+.asset .money, .row .sal { font-variant-numeric: tabular-nums; }
+.pick-icon { width: 2.25rem; height: 2.25rem; border-radius: 999px; display: grid; place-items: center; flex: none; background: var(--fill); color: var(--label-2); font-size: 0.6875rem; font-weight: 700; }
+.dest {
+  appearance: none; -webkit-appearance: none; border: 0; border-radius: 999px; padding: 0.25rem 1.4rem 0.25rem 0.55rem; font-size: 0.75rem; font-weight: 600; cursor: pointer;
+  background: var(--fill) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238e8e93' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 0.5rem center / 0.55rem;
+}
+.dest-static { font-size: 0.75rem; font-weight: 600; color: var(--label-2); background: var(--fill); padding: 0.25rem 0.55rem; border-radius: 999px; white-space: nowrap; }
+.add-btn { border: 0; border-radius: var(--r-md); padding: 0.7rem; background: var(--accent-soft); color: var(--accent); font-weight: 600; font-size: 0.9375rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; }
+.add-btn:hover { background: var(--accent-soft-2); }
+.card-foot { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; border-top: 0.5px solid var(--sep); padding-top: 0.75rem; }
+.stat .k { font-size: 0.6875rem; color: var(--label-3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+.stat .v { font-size: 1.0625rem; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.slot-empty { border: 1.5px dashed var(--sep); background: transparent; border-radius: var(--r-lg); min-height: 11rem; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; color: var(--label-2); font-weight: 600; width: 100%; }
+.slot-empty:hover { background: var(--fill); }
+.slot-empty .plus { width: 2.75rem; height: 2.75rem; border-radius: 999px; background: var(--fill); display: grid; place-items: center; color: var(--accent); }
+
+/* Summary */
+.summary { margin-top: 2.25rem; }
+.summary h3 { font-size: 1.375rem; letter-spacing: -0.02em; line-height: 1.2; margin: 0 0 0.25rem; }
+.summary > p { margin: 0 0 1rem; color: var(--label-2); font-size: 0.9375rem; }
+.sum-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); }
+.sum-card { background: var(--surface); border-radius: var(--r-lg); padding: 1rem; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 0.75rem; }
+.sum-head { display: flex; align-items: center; gap: 0.75rem; }
+.sum-head .badge { width: 2.25rem; height: 2.25rem; border-radius: 0.65rem; font-size: 0.6875rem; }
+.sum-head .t { flex: 1; font-weight: 650; letter-spacing: -0.012em; }
+.grade { font-size: 1.75rem; font-weight: 750; letter-spacing: -0.03em; line-height: 1; min-width: 2.5rem; text-align: right; }
+.flow { font-size: 0.875rem; }
+.flow .lbl { font-size: 0.6875rem; color: var(--label-3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+.flow ul { margin: 0.25rem 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+.flow li { display: flex; align-items: center; gap: 0.5rem; }
+.flow li .n { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.flow li .s { color: var(--label-2); font-variant-numeric: tabular-nums; }
+.flow .none { color: var(--label-3); }
+.check { display: flex; gap: 0.5rem; align-items: flex-start; font-size: 0.8125rem; padding: 0.6rem 0.7rem; border-radius: 0.7rem; }
+.check.ok { background: var(--good-soft); color: var(--good); }
+.check.no { background: var(--bad-soft); color: var(--bad); }
+.check.warn { background: var(--warn-soft); color: var(--warn); }
+.check svg { width: 1rem; height: 1rem; flex: none; margin-top: 0.1rem; }
+.check b { font-weight: 650; }
+.fine { color: var(--label-3); font-size: 0.75rem; margin-top: 1.5rem; line-height: 1.5; }
+
+/* Dock */
+.dock {
+  position: fixed; left: 50%; bottom: calc(0.75rem + env(safe-area-inset-bottom)); z-index: 30;
+  width: min(calc(100% - 1.5rem), 34rem); transform: translateX(-50%);
+  display: flex; align-items: center; gap: 0.75rem; padding: 0.55rem 0.55rem 0.55rem 1rem; border-radius: 999px;
+  background: var(--chrome); -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: var(--shadow-lg), inset 0 0.5px 0 var(--chrome-edge);
+}
+.dock .dot { width: 0.6rem; height: 0.6rem; border-radius: 999px; background: var(--label-3); flex: none; transition: background-color 200ms ease; }
+.dock .dot.ok { background: var(--good); } .dock .dot.no { background: var(--bad); }
+.dock .msg { flex: 1; min-width: 0; font-size: 0.875rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (prefers-reduced-transparency: reduce) { .dock { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+@media (prefers-contrast: more) { .card, .sum-card, .asset, .dock { box-shadow: 0 0 0 1px var(--label-3); } }
+
+/* Sheet contents */
+.team-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 0.5rem; }
+.team-opt { display: flex; align-items: center; gap: 0.6rem; border: 0; background: var(--surface-2); padding: 0.6rem; border-radius: var(--r-md); cursor: pointer; text-align: left; box-shadow: inset 0 0 0 0.5px var(--sep); }
+.team-opt:hover { background: var(--fill); }
+.team-opt:disabled { opacity: .35; cursor: default; }
+.team-opt .badge { width: 2.1rem; height: 2.1rem; border-radius: 0.6rem; font-size: 0.6875rem; }
+.team-opt .t { font-size: 0.875rem; font-weight: 600; line-height: 1.2; letter-spacing: -0.005em; }
+.team-opt .t small { display: block; font-weight: 450; color: var(--label-2); font-size: 0.75rem; }
+.row .sal { font-size: 0.875rem; color: var(--label-2); }
+.tick { width: 1.6rem; height: 1.6rem; border-radius: 999px; display: grid; place-items: center; flex: none; background: var(--fill); color: var(--accent); }
+.tick svg { width: 0.85rem; height: 0.85rem; }
+.row[aria-pressed="true"] .tick { background: var(--accent); color: #fff; }
+.picks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; margin: 0.4rem 0 0.5rem; }
+.chip { border: 0; border-radius: 0.6rem; padding: 0.5rem 0.25rem; background: var(--fill); font-size: 0.8125rem; font-weight: 600; cursor: pointer; font-variant-numeric: tabular-nums; }
+.chip[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.roster-note { font-size: 0.75rem; color: var(--label-3); margin: 0.5rem 0 0; }
+
+@media (max-width: 30rem) {
+  .brand p .long { display: none; }
+  .hero { padding-top: 1.25rem; }
+  #resetBtn { display: none; }
+}
+</style>
+</head>
+<body>
+<header class="bar" id="bar">
+  <div class="bar-inner">
+    <div class="brand">
+      <h1>Mock Trade</h1>
+      <p><span class="pulse" id="rosterPulse"></span><span id="rosterLabel">Loading rosters…</span></p>
+    </div>
+    <nav class="nav" aria-label="Sections"><a href="index.html" aria-current="page">Trade</a><a href="live.html">Live</a></nav>
+    <button class="btn press" id="resetBtn" type="button">Reset</button>
+    <button class="btn primary press" id="shareBtn" type="button">Share</button>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <h2>Build the deal.</h2>
+    <p>Pick two to four teams, move players and picks between them, and see instantly whether the salaries match and who wins the trade.</p>
+  </section>
+  <section class="board" id="board" aria-label="Teams in trade"></section>
+  <section class="summary" id="summary" aria-live="polite"></section>
+  <p class="fine" id="fine"></p>
+</main>
+
+<div class="dock" id="dock">
+  <span class="dot" id="dockDot"></span>
+  <span class="msg" id="dockMsg">Add players to start</span>
+  <button class="btn press" id="reviewBtn" type="button">Review</button>
+</div>
+
+<script src="data.js"></script>
+<script type="module">
+import { Spring, project, rubberband, tracker, reduceMotion, createSheet, createToast, scrollEdge, springIn } from "./ui/motion.js";
+import { avatar, esc } from "./ui/avatar.js";
+import { createClient } from "./ui/client.js";
+
+const D = window.NBA_DATA;
+const TEAMS = D.teams;
+const ABBRS = Object.keys(TEAMS).sort((a, b) => (TEAMS[a].city + TEAMS[a].name).localeCompare(TEAMS[b].city + TEAMS[b].name));
+const $ = (s, r = document) => r.querySelector(s);
+const money = (m) => (m == null ? "—" : "$" + (m >= 10 ? m.toFixed(1) : m.toFixed(2)).replace(/\.?0+$/, "") + "M");
+const slug = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const haptic = (ms = 8) => { try { navigator.vibrate && navigator.vibrate(ms); } catch {} };
+const sheet = createSheet();
+const toast = createToast();
+scrollEdge($("#bar"));
+
+/* =====================================================================
+   Rosters — live from ESPN when reachable, snapshot otherwise.
+   The snapshot also supplies trade-value ratings (and salaries ESPN lacks) by name.
+   ===================================================================== */
+// Snapshot lookups ignore suffixes: ESPN's "Jimmy Butler III" is the snapshot's "Jimmy Butler".
+const nameKey = (name) => slug(name.replace(/,?\s+(jr|sr|ii|iii|iv)\.?$/i, ""));
+const SNAP = new Map();
+for (const abbr of Object.keys(TEAMS)) {
+  for (const [name, pos, salary, v] of TEAMS[abbr].players) SNAP.set(nameKey(name), { abbr, name, pos, salary, v });
+}
+const live = {};            // abbr -> { players, season }
+const rosterState = {};     // abbr -> "loading" | "live" | "failed"
+let client = null, liveSeason = null;
+
+function estimateValue(salaryM, age) {
+  let v = salaryM == null ? 60 : 58 + Math.min(salaryM, 55) * 0.45;
+  if (age != null && age <= 22) v += 3;
+  return Math.max(55, Math.min(85, v));
+}
+function fromLive(abbr, a) {
+  const snap = SNAP.get(nameKey(a.name));
+  const salary = a.salary != null ? a.salary / 1e6 : snap ? snap.salary : null;
+  return {
+    id: `${abbr}:${slug(a.name)}`, kind: "player", from: abbr, name: a.name, pos: a.position || "—",
+    salary: salary ?? 0, salaryKnown: salary != null, salarySource: a.salary != null ? "espn" : snap ? "estimate" : "none",
+    v: snap ? snap.v : estimateValue(salary, a.age),
+    headshot: a.headshot, headshotSmall: a.headshotSmall, initials: a.initials, injury: a.injury,
+  };
+}
+function fromSnapshot(abbr, [name, pos, salary, v]) {
+  return { id: `${abbr}:${slug(name)}`, kind: "player", from: abbr, name, pos, salary, salaryKnown: true, salarySource: "snapshot", v, headshot: null, headshotSmall: null };
+}
+function playerList(abbr) {
+  return live[abbr] ? live[abbr].players : TEAMS[abbr].players.map((p) => fromSnapshot(abbr, p));
+}
+async function ensureRoster(abbr) {
+  if (!client || !abbr || rosterState[abbr] === "loading" || rosterState[abbr] === "live") return;
+  rosterState[abbr] = "loading"; paintRosterStatus();
+  try {
+    const { data } = await client.get("roster", { team: TEAMS[abbr].espn });
+    live[abbr] = { players: data.athletes.map((a) => fromLive(abbr, a)), season: data.season };
+    liveSeason = data.season || liveSeason;
+    rosterState[abbr] = "live";
+  } catch {
+    rosterState[abbr] = "failed";
+  }
+  state.assets = state.assets.filter((a) => !a.id.startsWith(abbr + ":") || findAsset(a.id));
+  commit({ history: false });
+  paintRosterStatus();
+}
+function paintRosterStatus() {
+  const vals = activeTeams().map((t) => rosterState[t]);
+  const p = $("#rosterPulse"), l = $("#rosterLabel");
+  const season = liveSeason ? `${liveSeason - 1}–${String(liveSeason).slice(2)}` : "";
+  if (vals.includes("loading")) { p.className = "pulse"; l.textContent = "Loading live rosters…"; }
+  else if (vals.length && vals.every((v) => v === "live")) { p.className = "pulse on"; l.innerHTML = `Live ESPN rosters<span class="long"> · ${season} salaries</span>`; }
+  else if (vals.includes("failed") || !client) { p.className = "pulse err"; l.innerHTML = `${D.season} snapshot<span class="long"> · live rosters unavailable</span>`; }
+  else { p.className = "pulse on"; l.innerHTML = `NBA<span class="long"> · live ESPN rosters</span>`; }
+}
+
+/* =====================================================================
+   State
+   ===================================================================== */
+const fresh = () => ({ teams: [null, null], assets: [], cap: {} });
+let state = fresh();
+const justAdded = new Set();
+
+function pickAsset(abbr, year, round) {
+  return { id: `${abbr}:${year}-${round}`, kind: "pick", from: abbr, name: `${year} ${round === 1 ? "1st" : "2nd"}-round pick`, pos: "Pick", salary: 0, salaryKnown: true, v: round === 1 ? 72 - (year - 2027) * 0.5 : 58, year, round };
+}
+function findAsset(id) {
+  const [abbr, rest] = id.split(":");
+  if (!TEAMS[abbr]) return null;
+  const m = /^(\d{4})-(1|2)$/.exec(rest);
+  if (m) return pickAsset(abbr, +m[1], +m[2]);
+  const hit = playerList(abbr).find((p) => p.id === id);
+  if (hit) return hit;
+  const snap = SNAP.get(rest) || [...SNAP.values()].find((s) => slug(s.name) === rest);   // e.g. a shared link from before a roster move
+  return snap ? fromSnapshot(abbr, [snap.name, snap.pos, snap.salary, snap.v]) : null;
+}
+const activeTeams = () => state.teams.filter(Boolean);
+const capOf = (t) => state.cap[t] || "over";
+
+function addAsset(asset) {
+  if (state.assets.some((a) => a.id === asset.id)) return;
+  const others = activeTeams().filter((t) => t !== asset.from);
+  state.assets.push({ id: asset.id, to: others[0] || null });
+  justAdded.add(asset.id);
+  haptic();
+  commit();
+}
+function removeAsset(id) { state.assets = state.assets.filter((a) => a.id !== id); haptic(); commit(); }
+function setTeam(slot, abbr) {
+  const prev = state.teams[slot];
+  state.teams[slot] = abbr;
+  if (prev && prev !== abbr) state.assets = state.assets.filter((a) => !a.id.startsWith(prev + ":"));
+  fixDestinations(); commit();
+  ensureRoster(abbr);
+}
+function removeSlot(slot) {
+  const prev = state.teams[slot];
+  state.teams.splice(slot, 1);
+  if (prev) state.assets = state.assets.filter((a) => !a.id.startsWith(prev + ":"));
+  while (state.teams.length < 2) state.teams.push(null);
+  fixDestinations(); commit();
+}
+function fixDestinations() {
+  const act = activeTeams();
+  state.assets.forEach((a) => {
+    const from = a.id.split(":")[0];
+    if (!a.to || !act.includes(a.to) || a.to === from) a.to = act.find((t) => t !== from) || null;
+  });
+}
+
+/* =====================================================================
+   Rules — simplified CBA salary matching + value grading
+   ===================================================================== */
+function allowedIncoming(out, cap) {
+  const c = D.cba;
+  if (cap === "apron1" || cap === "apron2") return out;
+  if (out <= c.tierLow) return 2 * out + c.cushion;
+  if (out <= c.tierHigh) return out + c.flatAdd;
+  return c.pctHigh * out + c.cushion;
+}
+const worth = (v) => Math.pow(2, (v - 60) / 6);
+function analyze(team) {
+  const sent = [], got = [];
+  state.assets.forEach((a) => {
+    const asset = findAsset(a.id); if (!asset) return;
+    if (asset.from === team) sent.push(asset);
+    if (a.to === team) got.push(asset);
+  });
+  const out = sent.reduce((s, a) => s + a.salary, 0);
+  const inc = got.reduce((s, a) => s + a.salary, 0);
+  const cap = capOf(team);
+  let ok = true, reason = "", short = "takes back too much salary";
+  if (!sent.length && !got.length) { ok = false; short = "isn't in the deal yet"; reason = "Not involved yet — add an asset."; }
+  else if (cap === "under") reason = "Absorbs salary with cap room.";
+  else if (inc <= out) reason = "Sends out more salary than it takes back.";
+  else {
+    const allow = allowedIncoming(out, cap);
+    if (inc > allow + 1e-6) { ok = false; reason = `Takes back ${money(inc - allow)} too much. Max incoming is ${money(allow)}.`; }
+    else reason = `Within ${money(allow)} incoming limit.`;
+  }
+  if (ok && cap === "apron2") {
+    const outPlayers = sent.filter((a) => a.kind === "player");
+    const maxOut = Math.max(0, ...outPlayers.map((a) => a.salary));
+    if (outPlayers.length > 1 && got.some((a) => a.salary > maxOut + 1e-6)) {
+      ok = false; short = "can't aggregate salaries"; reason = "Second-apron teams can't combine salaries to take in a bigger contract.";
+    }
+  }
+  const unknown = [...sent, ...got].filter((a) => a.kind === "player" && !a.salaryKnown).map((a) => a.name);
+  const vin = got.reduce((s, a) => s + worth(a.v), 0), vout = sent.reduce((s, a) => s + worth(a.v), 0);
+  const r = (vin - vout) / Math.max(vin, vout, 1);
+  const scale = [[0.35,"A+"],[0.2,"A"],[0.08,"A−"],[-0.02,"B+"],[-0.1,"B"],[-0.2,"B−"],[-0.3,"C+"],[-0.4,"C"],[-0.5,"C−"],[-0.65,"D"],[-Infinity,"F"]];
+  const grade = sent.length || got.length ? scale.find(([t]) => r >= t)[1] : "—";
+  return { team, sent, got, out, inc, ok, reason, short, grade, r, unknown };
+}
+
+/* =====================================================================
+   Rendering
+   ===================================================================== */
+const ICON = {
+  x: '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 2.5l7 7m0-7l-7 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  plus: '<svg viewBox="0 0 12 12" width="14" height="14" aria-hidden="true"><path d="M6 1.5v9M1.5 6h9" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>',
+  check: '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.3l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  warn: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 4.5v4.2M8 11.2v.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  ok: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 8.2l2 2 4-4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+};
+const CAPS = [["under","Under cap"],["over","Over cap"],["apron1","1st apron"],["apron2","2nd apron"]];
+const badge = (abbr) => `<span class="badge" style="--c:${TEAMS[abbr].color}">${abbr}</span>`;
+const assetFace = (asset, size = "2.25rem") => asset.kind === "pick"
+  ? `<span class="pick-icon" style="width:${size};height:${size}" aria-hidden="true">${String(asset.year).slice(2)}′</span>`
+  : avatar(asset, { size, color: TEAMS[asset.from]?.color });
+
+function renderBoard() {
+  const board = $("#board");
+  const act = activeTeams();
+  let html = "";
+  state.teams.forEach((abbr, slot) => {
+    if (!abbr) {
+      html += `<button class="slot-empty press" data-pick-team="${slot}" type="button"><span class="plus">${ICON.plus}</span>Choose team ${slot + 1}</button>`;
+      return;
+    }
+    const T = TEAMS[abbr];
+    const a = analyze(abbr);
+    const mine = state.assets.filter((x) => x.id.startsWith(abbr + ":"));
+    html += `<article class="card" data-team="${abbr}">
+      <div class="card-head">
+        ${badge(abbr)}
+        <button class="team-btn" data-pick-team="${slot}" type="button" aria-label="Change team, currently ${esc(T.city)} ${esc(T.name)}">
+          <span class="city">${esc(T.city)}</span><span class="nm">${esc(T.name)}</span>
+        </button>
+        ${state.teams.length > 2 ? `<button class="icon-btn press" data-remove-slot="${slot}" type="button" aria-label="Remove ${esc(T.name)} from trade">${ICON.x}</button>` : ""}
+      </div>
+      <div class="seg cap-seg" role="group" aria-label="Cap status" data-seg="${abbr}">
+        <span class="thumb" data-thumb></span>
+        ${CAPS.map(([k, l]) => `<button type="button" data-cap="${k}" aria-pressed="${capOf(abbr) === k}">${l}</button>`).join("")}
+      </div>
+      <div class="section-label">Sends</div>
+      <ul class="assets">
+        ${mine.length ? mine.map((m) => assetRow(m, abbr, act)).join("") : `<li class="empty">Nothing outgoing yet</li>`}
+      </ul>
+      <button class="add-btn press" data-add="${abbr}" type="button">${ICON.plus} Add player or pick</button>
+      <div class="card-foot">
+        <div class="stat"><div class="k">Out</div><div class="v">${money(a.out)}</div></div>
+        <div class="stat"><div class="k">In</div><div class="v">${money(a.inc)}</div></div>
+      </div>
+    </article>`;
+  });
+  if (state.teams.length < 4) html += `<button class="slot-empty press" data-add-slot type="button"><span class="plus">${ICON.plus}</span>Add another team</button>`;
+  board.innerHTML = html;
+  board.querySelectorAll("[data-seg]").forEach(initSeg);
+  board.querySelectorAll(".asset").forEach(initSwipe);
+  board.querySelectorAll(".asset-wrap").forEach((w) => {
+    if (!justAdded.has(w.dataset.id)) return;
+    justAdded.delete(w.dataset.id);
+    springIn(w);
+  });
+}
+
+function assetRow(m, from, act) {
+  const asset = findAsset(m.id);
+  if (!asset) return "";
+  const others = act.filter((t) => t !== from);
+  let dest = "";
+  if (others.length > 1) {
+    dest = `<select class="dest" data-dest="${esc(m.id)}" aria-label="Send ${esc(asset.name)} to">
+      ${others.map((t) => `<option value="${t}" ${m.to === t ? "selected" : ""}>→ ${t}</option>`).join("")}</select>`;
+  } else if (others.length === 1) dest = `<span class="dest-static">→ ${others[0]}</span>`;
+  const sal = asset.salaryKnown ? money(asset.salary) : "salary n/a";
+  const sub = asset.kind === "pick" ? `<span>Draft pick</span>` : `<span>${esc(asset.pos)}</span><span>·</span><span class="money">${sal}</span>${asset.injury ? `<span class="pill dtd">${esc(asset.injury.status)}</span>` : ""}`;
+  return `<li class="asset-wrap" data-id="${esc(m.id)}">
+    <div class="asset-under" aria-hidden="true">Remove</div>
+    <div class="asset" data-asset="${esc(m.id)}">
+      ${assetFace(asset)}
+      <div class="meta"><div class="nm">${esc(asset.name)}</div><div class="sub">${sub}</div></div>
+      ${dest}
+      <button class="icon-btn press" data-remove="${esc(m.id)}" type="button" aria-label="Remove ${esc(asset.name)}">${ICON.x}</button>
+    </div>
+  </li>`;
+}
+
+function renderSummary() {
+  const act = activeTeams();
+  const el = $("#summary");
+  if (act.length < 2 || !state.assets.length) {
+    el.innerHTML = `<h3>Trade summary</h3><p>Choose at least two teams and add an asset to see salary checks and grades.</p>`;
+    updateDock(null); return;
+  }
+  const res = act.map(analyze);
+  el.innerHTML = `<h3>Trade summary</h3><p>Grades weigh talent, age and contract. Salary checks use simplified CBA rules.</p>
+  <div class="sum-grid">${res.map((r) => `
+    <article class="sum-card">
+      <div class="sum-head">${badge(r.team)}<span class="t">${esc(TEAMS[r.team].city)} ${esc(TEAMS[r.team].name)}</span>
+        <span class="grade" style="color:${r.grade.startsWith("A") ? "var(--good)" : r.grade.startsWith("B") ? "var(--label)" : r.grade === "—" ? "var(--label-3)" : "var(--bad)"}" aria-label="Grade ${r.grade}">${r.grade}</span></div>
+      <div class="flow"><div class="lbl">Receives</div>${list(r.got)}</div>
+      <div class="flow"><div class="lbl">Sends</div>${list(r.sent)}</div>
+      <div class="check ${r.ok ? "ok" : "no"}">${r.ok ? ICON.ok : ICON.warn}<span><b>${r.ok ? "Salary works." : "Salary fails."}</b> ${esc(r.reason)}</span></div>
+      ${r.unknown.length ? `<div class="check warn">${ICON.warn}<span>ESPN lists no current salary for ${esc(r.unknown.join(", "))}; counted as $0.</span></div>` : ""}
+    </article>`).join("")}</div>`;
+  updateDock(res);
+}
+const list = (arr) => arr.length
+  ? `<ul>${arr.map((a) => `<li>${assetFace(a, "1.6rem")}<span class="n">${esc(a.name)}</span><span class="s">${a.kind === "pick" ? "Pick" : a.salaryKnown ? money(a.salary) : "n/a"}</span></li>`).join("")}</ul>`
+  : `<ul><li class="none">Nothing</li></ul>`;
+
+function updateDock(res) {
+  const dot = $("#dockDot"), msg = $("#dockMsg");
+  dot.className = "dot";
+  if (!res) { msg.textContent = activeTeams().length < 2 ? "Choose two teams to start" : "Add players or picks"; return; }
+  const bad = res.filter((r) => !r.ok);
+  if (!bad.length) { dot.classList.add("ok"); msg.textContent = "Trade works — salaries match"; }
+  else { dot.classList.add("no"); msg.textContent = bad.length === 1 ? `${bad[0].team} ${bad[0].short}` : `${bad.length} teams fail salary matching`; }
+}
+
+function commit({ history = true } = {}) {
+  renderBoard(); renderSummary();
+  if (sheet.isOpen) sheet.refresh();
+  paintRosterStatus();
+  if (history) { try { window.history.replaceState(null, "", encodeState()); } catch {} }
+}
+
+/* Segmented cap control with a spring thumb that remembers its position across renders */
+const segSprings = new Map();
+function initSeg(seg) {
+  const abbr = seg.dataset.seg, thumb = seg.querySelector("[data-thumb]");
+  const idx = CAPS.findIndex(([k]) => k === capOf(abbr));
+  const prev = segSprings.get(abbr);
+  const sp = new Spring(prev ? prev.x : idx, (x) => { thumb.style.transform = `translateX(${x * 100}%)`; }, 0.001);
+  sp.v = prev ? prev.v : 0;
+  segSprings.set(abbr, sp);
+  sp.onUpdate(sp.x);
+  if (sp.x !== idx) sp.to(idx, { damping: 1, response: 0.3 });
+}
+
+/* Swipe-to-remove: 1:1 tracking, rubber band, momentum projection */
+function initSwipe(row) {
+  const wrap = row.parentElement, under = wrap.querySelector(".asset-under");
+  const sp = new Spring(0, (x) => { row.style.transform = x ? `translateX(${x}px)` : ""; under.style.opacity = x < -1 ? "1" : "0"; });
+  let start = null, dragging = false, base = 0;
+  const vt = tracker();
+  row.addEventListener("pointerdown", (e) => {
+    if (e.target.closest("button, select") || e.button !== 0) return;
+    sp.stop(); base = sp.x;
+    start = { x: e.clientX, y: e.clientY, id: e.pointerId }; dragging = false; vt.reset(); vt.push(e.clientX);
+  });
+  row.addEventListener("pointermove", (e) => {
+    if (!start || e.pointerId !== start.id) return;
+    const dx = e.clientX - start.x, dy = e.clientY - start.y;
+    if (!dragging) {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      if (Math.abs(dy) > Math.abs(dx)) { start = null; return; }
+      dragging = true; row.setPointerCapture(e.pointerId);
+    }
+    vt.push(e.clientX);
+    let x = base + dx;
+    if (x > 0) x = rubberband(x, row.offsetWidth);
+    sp.set(x);
+  });
+  const end = (e) => {
+    if (!start || e.pointerId !== start.id) return;
+    start = null;
+    if (!dragging) return;
+    dragging = false;
+    const v = vt.velocity(), w = row.offsetWidth;
+    if (sp.x + project(v, 0.99) < -w * 0.45) {
+      sp.to(-w - 20, { damping: 1, response: 0.3, velocity: v, onDone: () => { wrap.style.opacity = "0"; removeAsset(row.dataset.asset); } });
+    } else sp.to(0, { damping: 1, response: 0.35, velocity: v });
+  };
+  row.addEventListener("pointerup", end);
+  row.addEventListener("pointercancel", end);
+}
+
+/* ---------- Sheet contents ---------- */
+function teamPicker(slot) {
+  sheet.open({
+    title: "Choose a team", searchable: true, placeholder: "Search teams",
+    render(body, q) {
+      const taken = new Set(activeTeams());
+      const teams = ABBRS.filter((a) => !q || `${TEAMS[a].city} ${TEAMS[a].name} ${a}`.toLowerCase().includes(q));
+      body.innerHTML = teams.length ? `<div class="team-grid">${teams.map((a) => `
+        <button class="team-opt press" type="button" data-choose="${a}" ${taken.has(a) && state.teams[slot] !== a ? "disabled" : ""}>
+          ${badge(a)}<span class="t">${esc(TEAMS[a].name)}<small>${esc(TEAMS[a].city)}</small></span></button>`).join("")}</div>`
+        : `<p class="empty">No teams match “${esc(q)}”.</p>`;
+      body.querySelectorAll("[data-choose]").forEach((b) => b.addEventListener("click", () => {
+        if (slot >= state.teams.length) state.teams.push(null);
+        setTeam(slot, b.dataset.choose); sheet.close();
+      }));
+    },
+  });
+}
+function assetPicker(abbr) {
+  const T = TEAMS[abbr];
+  ensureRoster(abbr);
+  sheet.open({
+    title: `${T.name} assets`, searchable: true, placeholder: `Search ${T.name} roster`,
+    render(body, q) {
+      const picked = new Set(state.assets.map((a) => a.id));
+      const players = playerList(abbr).filter((p) => !q || p.name.toLowerCase().includes(q));
+      const source = rosterState[abbr] === "live" ? "Live ESPN roster." : rosterState[abbr] === "loading" ? "Loading live roster…" : `${D.season} snapshot — live roster unavailable.`;
+      let html = `<p class="roster-note">${source}</p><div class="sheet-sub">Players</div><ul class="list">` + (players.length ? players.map((p) => `
+        <li><button class="row" type="button" data-toggle="${esc(p.id)}" aria-pressed="${picked.has(p.id)}">
+          ${avatar(p, { size: "2.5rem", color: T.color })}
+          <span class="meta"><span class="nm">${esc(p.name)}</span><span class="sub">${esc(p.pos)}${p.injury ? ` · ${esc(p.injury.status)}` : ""}${p.salarySource === "estimate" ? " · salary from snapshot" : ""}</span></span>
+          <span class="sal">${p.salaryKnown ? money(p.salary) : "—"}</span>
+          <span class="tick">${picked.has(p.id) ? ICON.check : ICON.plus}</span>
+        </button></li>`).join("") : `<li class="row sub">No players match.</li>`) + `</ul>`;
+      if (!q) {
+        [1, 2].forEach((round) => {
+          html += `<div class="sheet-sub">${round === 1 ? "First" : "Second"}-round picks</div><div class="picks">`;
+          for (let y = 2027; y <= 2032; y++) {
+            const id = `${abbr}:${y}-${round}`;
+            html += `<button class="chip press" type="button" data-toggle="${id}" aria-pressed="${picked.has(id)}">${y}</button>`;
+          }
+          html += `</div>`;
+        });
+      }
+      body.innerHTML = html;
+      body.querySelectorAll("[data-toggle]").forEach((b) => b.addEventListener("click", () => {
+        const id = b.dataset.toggle;
+        if (state.assets.some((a) => a.id === id)) removeAsset(id); else addAsset(findAsset(id));
+      }));
+    },
+  });
+}
+
+/* ---------- Board events ---------- */
+$("#board").addEventListener("click", (e) => {
+  const t = e.target.closest("button"); if (!t) return;
+  if (t.dataset.pickTeam !== undefined) return teamPicker(+t.dataset.pickTeam);
+  if (t.hasAttribute("data-add-slot")) return teamPicker(state.teams.length);
+  if (t.dataset.removeSlot !== undefined) return removeSlot(+t.dataset.removeSlot);
+  if (t.dataset.add) return assetPicker(t.dataset.add);
+  if (t.dataset.remove) return removeAsset(t.dataset.remove);
+  if (t.dataset.cap) { state.cap[t.closest("[data-seg]").dataset.seg] = t.dataset.cap; haptic(5); commit(); }
+});
+$("#board").addEventListener("change", (e) => {
+  const s = e.target.closest("[data-dest]"); if (!s) return;
+  const a = state.assets.find((x) => x.id === s.dataset.dest); if (a) { a.to = s.value; commit(); }
+});
+
+$("#reviewBtn").addEventListener("click", () => $("#summary").scrollIntoView({ behavior: reduceMotion.matches ? "auto" : "smooth", block: "start" }));
+$("#resetBtn").addEventListener("click", () => {
+  const prev = JSON.stringify(state);
+  state = fresh(); segSprings.clear(); commit();
+  toast("Trade cleared", { label: "Undo", run: () => { state = JSON.parse(prev); commit(); } });
+});
+$("#shareBtn").addEventListener("click", async () => {
+  const url = location.href.split("#")[0] + encodeState();
+  try {
+    if (navigator.share && matchMedia("(pointer: coarse)").matches) { await navigator.share({ title: "My NBA mock trade", url }); return; }
+    await navigator.clipboard.writeText(url); toast("Link copied");
+  } catch (err) { if (err && err.name !== "AbortError") toast("Couldn't copy — use the address bar"); }
+});
+
+/* ---------- URL state ---------- */
+function encodeState() {
+  const t = state.teams.map((x) => x || "_").join(",");
+  const a = state.assets.map((x) => `${x.id}>${x.to || "_"}`).join(";");
+  const c = Object.entries(state.cap).filter(([k, v]) => v !== "over" && state.teams.includes(k)).map(([k, v]) => `${k}=${v}`).join(",");
+  return `#t=${encodeURIComponent(t)}${a ? "&a=" + encodeURIComponent(a) : ""}${c ? "&c=" + encodeURIComponent(c) : ""}`;
+}
+function decodeState() {
+  try {
+    const p = new URLSearchParams(location.hash.slice(1));
+    if (!p.get("t")) return;
+    const teams = p.get("t").split(",").slice(0, 4).map((x) => (TEAMS[x] ? x : null));
+    while (teams.length < 2) teams.push(null);
+    const assets = (p.get("a") || "").split(";").filter(Boolean).map((s) => {
+      const [id, to] = s.split(">"); return { id, to: TEAMS[to] ? to : null };
+    }).filter((a) => teams.includes(a.id.split(":")[0]));   // unknown ids are pruned once that roster resolves
+    const cap = {};
+    (p.get("c") || "").split(",").filter(Boolean).forEach((s) => { const [k, v] = s.split("="); if (TEAMS[k] && CAPS.some(([c]) => c === v)) cap[k] = v; });
+    state = { teams, assets, cap }; fixDestinations();
+  } catch {}
+}
+
+$("#fine").textContent = `Rosters, salaries and headshots come live from ESPN when reachable; otherwise a ${D.season} snapshot is used. Salary matching is simplified: over-cap teams use the tiered 200% / +$${D.cba.flatAdd}M / 125% rule, apron teams are limited to 100% of outgoing salary, and second-apron teams can’t aggregate. Not affiliated with the NBA or ESPN.`;
+decodeState();
+commit({ history: false });
+
+createClient().then((c) => {
+  client = c;
+  activeTeams().forEach(ensureRoster);
+  paintRosterStatus();
+}).catch(() => {
+  activeTeams().forEach((t) => { rosterState[t] = "failed"; });
+  state.assets = state.assets.filter((a) => findAsset(a.id));
+  commit({ history: false });
+});
+</script>
+</body>
+</html>
