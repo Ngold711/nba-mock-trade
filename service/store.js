@@ -22,6 +22,12 @@ export const TTL = {
   teams: 24 * 60 * MIN,
   historical: 10 * MIN,
   college: 30 * MIN,       // NCAA prospect stats
+  news: 1 * MIN,
+  players: 30 * MIN,
+  playersPrev: 24 * 60 * MIN,
+  starts: 6 * 60 * MIN,
+  coaches: 12 * 60 * MIN,
+  honors: 24 * 60 * MIN,
 };
 const MAX_BACKOFF = 5 * MIN;
 
@@ -56,10 +62,15 @@ export const POLICIES = {
   summary: summaryTtl,
   roster: () => TTL.roster,
   injuries: () => TTL.injuries,
-  standings: () => TTL.standings,
+  standings: (d, t, p = {}) => (p.season ? TTL.playersPrev : TTL.standings),
   transactions: () => TTL.transactions,
   teams: () => TTL.teams,
   college: () => TTL.college,
+  news: () => TTL.news,
+  players: (d, t, p = {}) => (p.season ? TTL.playersPrev : TTL.players),
+  starts: () => TTL.starts,
+  coaches: () => TTL.coaches,
+  honors: () => TTL.honors,
 };
 
 const keyOf = (resource, params = {}) =>

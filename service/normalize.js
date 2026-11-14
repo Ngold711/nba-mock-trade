@@ -377,3 +377,61 @@ export function collegeBioFromRoster(json, athleteIdWanted) {
     team: team(get(json, "team", {})),
   };
 }
+
+/* ------------------------------------------------------------------ honors */
+const HONOR_ORDER = ["MVP", "Finals MVP", "Defensive Player of the Year", "All-NBA 1st Team", "All-NBA 2nd Team", "All-NBA 3rd Team",
+  "All-Defensive 1st Team", "All-Defensive 2nd Team", "Rookie of the Year", "Sixth Man of the Year", "Most Improved Player", "All-Star MVP"];
+/** Career honors from ESPN's athlete overview. ESPN doesn't list plain All-Star selections. */
+export function normalizeHonors(json) {
+  return arr(get(json, "awards")).map((a) => ({
+    name: str(get(a, "name"), ""), count: num(get(a, "displayCount"), arr(get(a, "seasons")).length) ?? 0, seasons: arr(get(a, "seasons")).map((x) => str(x)),
+  })).filter((a) => a.name && HONOR_ORDER.includes(a.name)).sort((a, b) => HONOR_ORDER.indexOf(a.name) - HONOR_ORDER.indexOf(b.name));
+}
+
+/* ------------------------------------------------------------------- news */
+export function normalizeNews(json) {
+  return arr(get(json, "articles")).map((a) => {
+    const cats = arr(get(a, "categories"));
+    return {
+      id: str(get(a, "id"), ""),
+      headline: str(get(a, "headline"), ""),
+      description: str(get(a, "description"), ""),
+      published: str(get(a, "published") || get(a, "lastModified"), ""),
+      url: get(a, "links.web.href", null),
+      image: get(a, "images.0.url", null),
+      byline: str(get(a, "byline"), ""),
+      teamIds: cats.filter((c) => get(c, "type") === "team").map((c) => str(get(c, "teamId") || get(c, "team.id"))).filter(Boolean),
+      athleteIds: cats.filter((c) => get(c, "type") === "athlete").map((c) => str(get(c, "athleteId") || get(c, "athlete.id"))).filter(Boolean),
+      premium: Boolean(get(a, "premium", false)),
+    };
+  }).filter((n) => n.headline);
+}
+
+/* ------------------------------------------------- league-wide player stats */
+const STAT_KEYS = {
+  gamesPlayed: "gp", avgMinutes: "min", avgPoints: "pts", avgRebounds: "reb", avgAssists: "ast",
+  avgSteals: "stl", avgBlocks: "blk", avgTurnovers: "tov", avgFieldGoalsMade: "fgm", avgFieldGoalsAttempted: "fga",
+  fieldGoalPct: "fgPct", threePointFieldGoalPct: "threePct", avgThreePointFieldGoalsMade: "tpm",
+  freeThrowPct: "ftPct", avgFreeThrowsMade: "ftm", avgFreeThrowsAttempted: "fta", doubleDouble: "dd", tripleDouble: "td",
+};
+export function normalizePlayerStats(json) {
+  const catNames = Object.fromEntries(arr(get(json, "categories")).map((c) => [str(get(c, "name")), arr(get(c, "names")).map((n) => str(n))]));
+  const players = arr(get(json, "athletes")).map((row) => {
+    const a = get(row, "athlete", {});
+    const stats = {};
+    for (const cat of arr(get(row, "categories"))) {
+      const names = catNames[str(get(cat, "name"))] || arr(get(cat, "names"));
+      names.forEach((n, i) => { if (STAT_KEYS[n] && !(STAT_KEYS[n] in stats)) stats[STAT_KEYS[n]] = num(arr(get(cat, "totals"))[i], 0); });
+    }
+    for (const k of Object.values(STAT_KEYS)) if (!(k in stats)) stats[k] = 0;
+    const t = get(a, "teams.0", {});
+    return athlete(a, {
+      teamId: str(get(a, "teamId") || get(t, "id"), ""),
+      teamAbbr: str(get(a, "teamShortName") || get(t, "abbreviation"), ""),
+      age: num(get(a, "age"), null),
+      debutYear: num(get(a, "debutYear"), null),
+      stats,
+    });
+  }).filter((p) => p.id);
+  return { season: num(get(json, "requestedSeason.year"), null), players };
+}

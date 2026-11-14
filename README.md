@@ -114,3 +114,33 @@ Lottery simulator and mock draft for 2027–2029.
   `collegeTeamId`. `GET /api/college/{athleteId}?team={collegeTeamId}` returns live season averages,
   recent games and roster measurables, cached for 30 minutes. Headshots come from
   `https://a.espncdn.com/i/headshots/mens-college-basketball/players/full/{id}.png`, with the initials fallback.
+
+## LiveWire ticker (`ui/ticker.js`, on `live.html`)
+
+`mountLiveWire(el, { client, onSelect })` renders a market-tape rail that merges news, transactions,
+injuries and the scoreboard (`service/wire.js` → `buildWire`, at most 25 items per source). It polls every
+60 seconds. New items are inserted at the top while the row in view stays put, then the tape glides up with
+a NEW flash; if you're hovering, a "N NEW" chip waits for you instead. The tape scrolls on
+`requestAnimationFrame` and pauses on hover, focus, touch or a hidden tab. Reduced motion turns it into a
+plain scroll list. Filters: ALL, MOVES, INJURIES, SCORES. Scores open the box score; trades and injuries
+open a detail sheet; news links to ESPN.
+
+## Awards (`awards.html`, `service/awards.js`)
+
+`computeAwards({ players, prevPlayers, standings, prevStandings, starts, coaches })` is pure. New API routes:
+
+| Route | Source | Cache |
+| --- | --- | --- |
+| `/api/players[?season=2026]` | ESPN `statistics/byathlete` (every player's season averages) | 30 min (24 h for past seasons) |
+| `/api/standings?season=2026` | last season's standings (Coach of the Year baseline) | 24 h |
+| `/api/starts` | games started, aggregated from regular-season box scores (finished games cached for good) | 6 h |
+| `/api/coaches` | head coach from each team roster | 12 h |
+| `/api/honors/{athleteId}` | career honors from the athlete overview | 24 h |
+| `/api/news` | ESPN NBA news | 1 min |
+
+- **Model:** AwardScore = production (Game Score–style) × (0.7 + 0.6 × team win %) × √availability.
+  Projected games = GP ÷ team GP × 82. Under 65 earns a badge and keeps the player off the MVP, DPOY,
+  Sixth Man, Most Improved and All-NBA ladders.
+- **Inferred fields:** rookies are inferred (ESPN leaves `debutYear` blank for most players). ESPN doesn't
+  publish All-Star selection counts, so ESPN career honors are shown instead.
+- **Saved data:** My Ballot, My Picks and the exported card are stored in `localStorage`.

@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>NBA Awards Race</title>
+<meta name="description" content="All-Star predictor and live NBA season awards tracker built on ESPN stats, with your own ballot." />
+<link rel="stylesheet" href="ui/base.css" />
+<style>
+main { max-width: 76rem; margin: 0 auto; padding: 0 max(1rem, env(safe-area-inset-right)) 3rem max(1rem, env(safe-area-inset-left)); }
+.toolbar { display: flex; align-items: flex-end; gap: 0.75rem; flex-wrap: wrap; padding: 1.25rem 0 0.25rem; }
+.toolbar h2 { margin: 0; font-size: clamp(1.75rem, 4vw, 2.5rem); line-height: 1.05; letter-spacing: -0.026em; font-weight: 750; flex: 1; min-width: 12rem; }
+.lede { color: var(--label-2); font-size: 0.875rem; margin: 0.4rem 0 1.25rem; max-width: 46rem; }
+h3.sec { font-size: 1.375rem; letter-spacing: -0.02em; margin: 2rem 0 0.75rem; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+h3.sec .grow { flex: 1; }
+.mode { --n: 2; width: 15rem; }
+.mode button { font-size: 0.8125rem; padding: 0.35rem; }
+.ballot-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.ballot-actions[hidden] { display: none; }
+.conf-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 30rem), 1fr)); align-items: start; }
+.card { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); padding: 0.9rem 1rem 0.6rem; min-width: 0; }
+.card h4 { margin: 0 0 0.25rem; font-size: 1.125rem; letter-spacing: -0.015em; display: flex; align-items: center; gap: 0.5rem; }
+.card .note { font-size: 0.75rem; color: var(--label-3); margin: 0 0 0.25rem; }
+.grp { font-size: 0.6875rem; font-weight: 650; text-transform: uppercase; letter-spacing: 0.06em; color: var(--label-3); margin: 0.85rem 0 0.15rem; display: flex; justify-content: space-between; }
+.plist { list-style: none; margin: 0; padding: 0; }
+.plist > li { display: grid; grid-template-columns: 1.4rem auto minmax(0, 1fr) auto auto; align-items: center; gap: 0.6rem; padding: 0.45rem 0; border-top: 0.5px solid var(--sep); }
+.plist > li:first-child { border-top: 0; }
+.rk { font-size: 0.8125rem; font-weight: 700; color: var(--label-3); text-align: right; font-variant-numeric: tabular-nums; }
+.who { min-width: 0; }
+.who .nm { font-weight: 650; font-size: 0.9375rem; letter-spacing: -0.01em; display: flex; align-items: center; gap: 0.35rem; min-width: 0; }
+.who .nm span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.who .sub { font-size: 0.75rem; color: var(--label-2); display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+.who .hon { display: block; font-size: 0.6875rem; color: var(--label-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.val { text-align: right; font-variant-numeric: tabular-nums; font-size: 0.8125rem; color: var(--label-2); white-space: nowrap; }
+.val b { display: block; color: var(--label); font-size: 0.9375rem; }
+.ctrl { display: flex; gap: 0.3rem; align-items: center; justify-content: flex-end; }
+.mini { border: 0; background: var(--fill); border-radius: 999px; padding: 0.25rem 0.55rem; font-size: 0.6875rem; font-weight: 650; cursor: pointer; white-space: nowrap; }
+.mini:hover { background: var(--fill-strong); }
+.mini.accent { background: var(--accent-soft); color: var(--accent); }
+.star { border: 0; background: none; cursor: pointer; font-size: 1rem; line-height: 1; padding: 0.15rem; color: var(--label-3); }
+.star[aria-pressed="true"] { color: #f5b301; }
+.pill.risk { background: var(--warn-soft); color: var(--warn); }
+.pill.cap { background: var(--accent-soft); color: var(--accent); }
+.cuts { background: var(--surface-2); border-radius: var(--r-md); padding: 0.1rem 0.6rem; margin-top: 0.3rem; box-shadow: inset 0 0 0 0.5px var(--sep); }
+.awards-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); align-items: start; }
+.card .head { display: flex; align-items: flex-start; gap: 0.5rem; }
+.card .head .t { flex: 1; min-width: 0; }
+.toggle { --n: 2; width: 9.5rem; flex: none; }
+.toggle button { font-size: 0.6875rem; padding: 0.3rem 0.1rem; }
+.allnba { grid-column: 1 / -1; }
+.allnba .teams { display: grid; gap: 0 1.25rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); }
+.empty-picks { font-size: 0.8125rem; color: var(--label-3); padding: 0.75rem 0; }
+.add { margin: 0.4rem 0 0.3rem; width: 100%; border: 1.5px dashed var(--sep); background: none; border-radius: 0.7rem; padding: 0.5rem; color: var(--accent); font-weight: 600; font-size: 0.8125rem; cursor: pointer; }
+.add:hover { background: var(--accent-soft); }
+.fine { color: var(--label-3); font-size: 0.75rem; margin-top: 2rem; line-height: 1.5; }
+.skel { height: 18rem; border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-sm); opacity: .6; }
+.banner { font-size: 0.8125rem; color: var(--warn); background: var(--warn-soft); padding: 0.5rem 0.75rem; border-radius: var(--r-md); margin-bottom: 1rem; }
+@media (max-width: 34rem) {
+  .plist > li { grid-template-columns: 1.1rem auto minmax(0, 1fr); }
+  .plist > li > .val, .plist > li > .ctrl { grid-column: 3; justify-content: flex-start; text-align: left; }
+  .val b { display: inline; margin-right: 0.35rem; }
+  .brand p .long { display: none; }
+}
+</style>
+</head>
+<body>
+<header class="bar" id="bar">
+  <div class="bar-inner">
+    <div class="brand">
+      <h1>Awards</h1>
+      <p><span class="pulse" id="pulse"></span><span id="sync">Loading live stats…</span></p>
+    </div>
+    <nav class="nav" aria-label="Sections"><a href="index.html">Trade</a><a href="live.html">Live</a><a href="draft.html">Draft</a><a href="awards.html" aria-current="page">Awards</a></nav>
+  </div>
+</header>
+
+<main>
+  <div class="toolbar"><h2>2026–27 Awards Race</h2></div>
+  <p class="lede" id="lede">Live model built on ESPN season stats and standings. Switch any section to your own ballot; it’s saved in this browser.</p>
+  <div id="banner"></div>
+
+  <h3 class="sec"><span class="grow">All-Star predictor</span>
+    <span class="ballot-actions" id="ballotActions" hidden>
+      <button class="btn press" type="button" id="resetBallot">Reset ballot</button>
+      <button class="btn primary press" type="button" id="exportBallot">Export card</button>
+    </span>
+    <span class="seg mode" role="group" aria-label="All-Star mode" id="asMode"><span class="thumb"></span>
+      <button type="button" data-mode="model" aria-pressed="true">Live model</button><button type="button" data-mode="ballot" aria-pressed="false">My ballot</button></span>
+  </h3>
+  <div class="conf-grid" id="allstar"><div class="skel"></div><div class="skel"></div></div>
+
+  <h3 class="sec">Season awards</h3>
+  <div class="awards-grid" id="awards"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
+
+  <p class="fine">AwardScore = a Game Score–style production blend (points, shooting efficiency, rebounds, assists, steals, blocks, turnovers) × team win % × availability. Projected games = games played ÷ team games × 82; players under 65 carry a “65-game risk” badge and are left off MVP, DPOY, Sixth Man, Most Improved and All-NBA ladders (All-Star and Rookie of the Year are exempt here). Games started come from ESPN box scores; rookies are inferred (no 2025–26 stats, age 24 or under). ESPN doesn’t publish All-Star selection counts, so career honors from ESPN are shown instead. A statistical model, not a prediction of votes. Not affiliated with the NBA or ESPN.</p>
+</main>
+
+<script src="data.js"></script>
+<script type="module">
+import { createClient } from "./ui/client.js";
+import { avatar, teamLogo, esc } from "./ui/avatar.js";
+import { Spring, createSheet, createToast, scrollEdge, springIn } from "./ui/motion.js";
+import { computeAwards, RULE_GAMES } from "./service/awards.js";
+
+const $ = (s, r = document) => r.querySelector(s);
+const sheet = createSheet();
+const toast = createToast();
+scrollEdge($("#bar"));
+const store = {
+  get(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+let client = null, model = null, byId = {};
+const honors = {};          // athleteId -> [{name,count}]
+let asMode = store.get("awards:asMode", "model");
+let ballot = store.get("awards:ballot", null);      // { East: {starters, reserves, captain}, West: {...} }
+const awardMode = store.get("awards:modes", {});    // award -> "model" | "picks"
+const picks = store.get("awards:picks", {});        // award -> [ids]
+
+const f1 = (x) => (x == null ? "—" : Number(x).toFixed(1));
+const line = (p) => `${f1(p.stats.pts)} / ${f1(p.stats.reb)} / ${f1(p.stats.ast)}`;
+const riskPill = (p) => p.ruleRisk ? `<span class="pill risk" title="Projected ${p.projectedGames} of 82 games (${p.stats.gp} of ${p.team.gp} so far). Needs ${RULE_GAMES} for major awards.">65-game risk · ${p.projectedGames}</span>` : "";
+const honorsLine = (p) => {
+  const h = honors[p.id];
+  if (!h) return "";
+  if (!h.length) return `<span class="hon">No major honors yet</span>`;
+  return `<span class="hon">${h.slice(0, 3).map((x) => `${x.count}× ${esc(x.name.replace(" Team", "").replace("Defensive Player of the Year", "DPOY"))}`).join(" · ")}</span>`;
+};
+const who = (p, extra = "") => `${avatar(p, { size: "2.5rem", color: p.team?.color })}
+  <div class="who"><div class="nm"><span>${esc(p.name)}</span>${extra}</div>
+  <div class="sub">${teamLogo(p.team, { size: "1rem" })}${esc(p.team.abbr)} · ${esc(p.position || "—")} ${riskPill(p)}</div>${honorsLine(p)}</div>`;
+
+/* ---------------- All-Star ---------------- */
+function modelBallot() {
+  const out = {};
+  for (const c of ["East", "West"]) {
+    const m = model.allStar[c];
+    out[c] = { starters: m.starters.map((p) => p.id), reserves: m.reserves.map((p) => p.id), captain: m.starters[0]?.id || null };
+  }
+  return out;
+}
+function cutsFor(conf, roster) {
+  const inRoster = new Set([...roster.starters, ...roster.reserves]);
+  return model.players.filter((p) => p.conference === conf && p.stats.min >= 15 && !inRoster.has(p.id)).sort((a, b) => b.score - a.score).slice(0, 6);
+}
+function renderAllStar() {
+  const ballotMode = asMode === "ballot";
+  if (ballotMode && !ballot) ballot = modelBallot();
+  $("#ballotActions").hidden = !ballotMode;
+  const source = ballotMode ? ballot : modelBallot();
+  $("#allstar").innerHTML = ["East", "West"].map((c) => {
+    const r = source[c];
+    const starters = r.starters.map((id) => byId[id]).filter(Boolean);
+    const reserves = r.reserves.map((id) => byId[id]).filter(Boolean);
+    const cuts = cutsFor(c, r);
+    const row = (p, i, kind) => `<li data-pid="${p.id}"><span class="rk">${kind === "cut" ? 13 + i : i + 1}</span>${who(p, kind === "starter" && r.captain === p.id ? `<span class="pill cap">Captain</span>` : "")}
+      <div class="val"><b>${line(p)}</b>PTS / REB / AST</div>
+      ${ballotMode ? `<div class="ctrl">${kind === "starter" ? `<button class="star" type="button" data-cap="${c}:${p.id}" aria-pressed="${r.captain === p.id}" aria-label="Make ${esc(p.name)} captain">★</button><button class="mini" type="button" data-bench="${c}:${p.id}">Bench</button>`
+        : kind === "reserve" ? `<button class="mini" type="button" data-start="${c}:${p.id}">Start</button><button class="mini" type="button" data-cut="${c}:${p.id}">Cut</button>`
+        : `<button class="mini accent" type="button" data-promote="${c}:${p.id}">Promote to roster</button>`}</div>`
+        : kind === "cut" ? `<div class="ctrl"><button class="mini accent" type="button" data-promote="${c}:${p.id}">Promote to roster</button></div>` : ""}
+    </li>`;
+    return `<section class="card"><h4>${c === "East" ? "Eastern" : "Western"} Conference</h4>
+      <p class="note">${ballotMode ? "Your ballot" : "Live model: 2 guards + 3 frontcourt starters; 7 reserves incl. 2 wildcards"}</p>
+      <div class="grp"><span>Starters</span><span>${starters.length}/5</span></div><ul class="plist">${starters.map((p, i) => row(p, i, "starter")).join("")}</ul>
+      <div class="grp"><span>Reserves</span><span>${reserves.length}/7</span></div><ul class="plist">${reserves.map((p, i) => row(p, i, "reserve")).join("")}</ul>
+      <div class="grp"><span>First cuts · honorable mentions</span><span>#13–18</span></div><div class="cuts"><ul class="plist">${cuts.map((p, i) => row(p, i, "cut")).join("")}</ul></div>
+    </section>`;
+  }).join("");
+}
+function mutateBallot(fn) {
+  if (!ballot) ballot = modelBallot();
+  if (asMode !== "ballot") setAsMode("ballot");
+  fn(); store.set("awards:ballot", ballot); renderAllStar();
+}
+$("#allstar").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  const [key, val] = Object.entries(b.dataset)[0] || [];
+  if (!val) return;
+  const [c, id] = val.split(":");
+  const scoreOf = (x) => byId[x]?.score ?? 0;
+  mutateBallot(() => {
+    const r = ballot[c];
+    if (key === "cap") r.captain = id;
+    if (key === "bench") { r.starters = r.starters.filter((x) => x !== id); r.reserves.unshift(id); if (r.captain === id) r.captain = r.starters[0] || null; }
+    if (key === "cut") r.reserves = r.reserves.filter((x) => x !== id);
+    if (key === "start") {
+      r.reserves = r.reserves.filter((x) => x !== id);
+      if (r.starters.length >= 5) {
+        const weakest = [...r.starters].sort((a, b2) => scoreOf(a) - scoreOf(b2))[0];
+        r.starters = r.starters.map((x) => (x === weakest ? id : x)); r.reserves.unshift(weakest);
+        if (r.captain === weakest) r.captain = id;
+      } else r.starters.push(id);
+    }
+    if (key === "promote") {
+      if (r.reserves.length >= 7) {
+        const weakest = [...r.reserves].sort((a, b2) => scoreOf(a) - scoreOf(b2))[0];
+        r.reserves = r.reserves.filter((x) => x !== weakest);
+        toast(`${byId[id]?.name} in · ${byId[weakest]?.name} to first cuts`);
+      }
+      r.reserves.push(id);
+    }
+    while (r.reserves.length > 7) r.reserves.pop();
+  });
+  const li = document.querySelector(`#allstar li[data-pid="${id}"]`); li && springIn(li);
+});
+const asSeg = $("#asMode");
+const asThumb = new Spring(asMode === "ballot" ? 1 : 0, (x) => { asSeg.querySelector(".thumb").style.transform = `translateX(${x * 100}%)`; }, 0.001);
+asThumb.onUpdate(asThumb.x);
+function setAsMode(m) {
+  asMode = m; store.set("awards:asMode", m);
+  asSeg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === m)));
+  asThumb.to(m === "ballot" ? 1 : 0, { damping: 1, response: 0.3 });
+}
+asSeg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === asMode)));   // reflect the saved mode
+asSeg.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { setAsMode(b.dataset.mode); renderAllStar(); } });
+$("#resetBallot").addEventListener("click", () => {
+  const prev = ballot; ballot = modelBallot(); store.set("awards:ballot", ballot); renderAllStar();
+  toast("Ballot reset to the model", { label: "Undo", run: () => { ballot = prev; store.set("awards:ballot", ballot); renderAllStar(); } });
+});
+
+/* Export: draw the ballot to a 1080×1350 card (ESPN's CDN allows cross-origin images). */
+const loadImg = (src) => new Promise((res) => { if (!src) return res(null); const i = new Image(); i.crossOrigin = "anonymous"; i.onload = () => res(i); i.onerror = () => res(null); i.src = src; });
+$("#exportBallot").addEventListener("click", async () => {
+  const W = 1080, H = 1350, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  const g = cv.getContext("2d");
+  const font = (w, s) => `${w} ${s}px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif`;
+  g.fillStyle = "#0b0d12"; g.fillRect(0, 0, W, H);
+  g.fillStyle = "#f5f5f7"; g.font = font(800, 58); g.fillText("My 2027 All-Star Ballot", 64, 110);
+  g.fillStyle = "#8b97a7"; g.font = font(500, 26); g.fillText(`NBA Awards Race · ${new Date().toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" })}`, 64, 152);
+  const cols = [["East", 64], ["West", 576]];
+  for (const [c, x0] of cols) {
+    const r = ballot[c];
+    g.fillStyle = "#f5f5f7"; g.font = font(750, 34); g.fillText(c === "East" ? "Eastern Conference" : "Western Conference", x0, 230);
+    let y = 270;
+    const section = async (title, ids) => {
+      g.fillStyle = "#5b6675"; g.font = font(700, 20); g.fillText(title.toUpperCase(), x0, y + 20); y += 40;
+      for (const id of ids) {
+        const p = byId[id]; if (!p) continue;
+        const img = await loadImg(p.headshotSmall);
+        g.save(); g.beginPath(); g.arc(x0 + 30, y + 30, 30, 0, Math.PI * 2); g.closePath(); g.fillStyle = p.team.color || "#333"; g.fill(); g.clip();
+        if (img) g.drawImage(img, x0 - 12, y - 2, 84, 62);
+        else { g.fillStyle = "#fff"; g.font = font(700, 22); g.textAlign = "center"; g.fillText(p.initials, x0 + 30, y + 38); g.textAlign = "left"; }
+        g.restore();
+        g.fillStyle = "#f5f5f7"; g.font = font(650, 26); g.fillText(p.name + (r.captain === id ? "  ★" : ""), x0 + 76, y + 28);
+        g.fillStyle = "#8b97a7"; g.font = font(500, 20); g.fillText(`${p.team.abbr} · ${line(p)}`, x0 + 76, y + 56);
+        y += 76;
+      }
+      y += 10;
+    };
+    await section("Starters", r.starters);
+    await section("Reserves", r.reserves);
+  }
+  g.fillStyle = "#5b6675"; g.font = font(500, 20); g.fillText("Stats: ESPN · nba-mock-trade.onrender.com/awards.html", 64, H - 48);
+  const blob = await new Promise((res) => cv.toBlob(res, "image/png"));
+  const file = new File([blob], "my-all-star-ballot.png", { type: "image/png" });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: "My All-Star ballot" }); return; }
+  } catch (err) { if (err.name === "AbortError") return; }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = file.name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  toast("Ballot card saved");
+});
+
+/* ---------------- Awards ---------------- */
+const AWARDS = [
+  { key: "mvp", title: "Most Valuable Player", val: (e) => [`${f1(e.value)}`, "AwardScore"] },
+  { key: "roy", title: "Rookie of the Year", val: (e) => [line(e.player), "PTS / REB / AST"] },
+  { key: "dpoy", title: "Defensive Player of the Year", val: (e) => [`${f1(e.player.stats.stl)} / ${f1(e.player.stats.blk)}`, "STL / BLK"] },
+  { key: "smoy", title: "Sixth Man of the Year", val: (e) => [line(e.player), `Started ${e.player.gs ?? 0} of ${e.player.stats.gp}`] },
+  { key: "mip", title: "Most Improved Player", val: (e) => [`${e.value > 0 ? "+" : ""}${f1(e.value)}`, `${f1(e.player.prev?.pts)} → ${f1(e.player.stats.pts)} PPG`] },
+  { key: "coy", title: "Coach of the Year", team: true, val: (e) => [`${e.delta > 0 ? "+" : ""}${Math.round(e.delta * 100)}`, `${Math.round(e.winPct * 1000) / 10}% vs ${Math.round(e.baseline * 1000) / 10}%`] },
+];
+const awardRow = (a, e, i, { picksMode = false, idx = 0, total = 0 } = {}) => {
+  const [v, sub] = a.val(e);
+  const ctrl = picksMode ? `<div class="ctrl"><button class="mini" type="button" data-up="${a.key}:${idx}" ${idx === 0 ? "disabled" : ""} aria-label="Move up">↑</button><button class="mini" type="button" data-down="${a.key}:${idx}" ${idx === total - 1 ? "disabled" : ""} aria-label="Move down">↓</button><button class="mini" type="button" data-remove="${a.key}:${idx}">Remove</button></div>` : "";
+  if (a.team) return `<li><span class="rk">${i}</span>${teamLogo(e.team, { size: "2.5rem" })}<div class="who"><div class="nm"><span>${esc(e.coach || "Head coach")}</span></div><div class="sub">${esc(e.team.displayName)} · ${e.team.wins}-${e.team.losses}</div></div><div class="val"><b>${v}</b>${sub}</div>${ctrl}</li>`;
+  return `<li><span class="rk">${i}</span>${who(e.player)}<div class="val"><b>${v}</b>${esc(sub)}</div>${ctrl}</li>`;
+};
+function entryFor(a, id) {
+  const pool = model.awards[a.key].pool || [];
+  return a.team ? pool.find((e) => e.team.id === id) : pool.find((e) => e.player.id === id) || (byId[id] ? { player: byId[id], value: byId[id].score } : null);
+}
+function renderAwards() {
+  let html = AWARDS.map((a) => {
+    const lad = model.awards[a.key];
+    const mode = awardMode[a.key] || "model";
+    const toggle = `<span class="seg toggle" role="group" aria-label="${a.title} view"><span class="thumb" style="transform:translateX(${mode === "picks" ? 100 : 0}%)"></span>
+      <button type="button" data-amode="${a.key}:model" aria-pressed="${mode === "model"}">Model</button><button type="button" data-amode="${a.key}:picks" aria-pressed="${mode === "picks"}">My picks</button></span>`;
+    let body;
+    if (mode === "model") {
+      body = `<ul class="plist">${lad.leaders.map((e, i) => awardRow(a, e, i + 1)).join("") || `<li class="empty-picks">Not enough data yet.</li>`}</ul>
+        ${lad.mentions.length ? `<div class="grp"><span>Honorable mentions</span></div><ul class="plist">${lad.mentions.map((e, i) => awardRow(a, e, lad.leaders.length + i + 1)).join("")}</ul>` : ""}`;
+    } else {
+      const mine = (picks[a.key] || []).map((id) => entryFor(a, id)).filter(Boolean);
+      body = `${mine.length ? `<ul class="plist">${mine.map((e, i) => awardRow(a, e, i + 1, { picksMode: true, idx: i, total: mine.length })).join("")}</ul>` : `<p class="empty-picks">No picks yet. Add up to 5.</p>`}
+        ${mine.length < 5 ? `<button class="add press" type="button" data-addpick="${a.key}">Add pick</button>` : ""}`;
+    }
+    return `<section class="card" data-award="${a.key}"><div class="head"><div class="t"><h4>${a.title}</h4>${lad.note ? `<p class="note">${esc(lad.note)}</p>` : ""}${lad.ruleApplies ? `<p class="note">65-game rule applied</p>` : ""}</div>${toggle}</div>${body}</section>`;
+  }).join("");
+
+  const mode = awardMode.allNba || "model";
+  const teamsOf = (list) => [["1st Team", list.slice(0, 5)], ["2nd Team", list.slice(5, 10)], ["3rd Team", list.slice(10, 15)]];
+  const modelList = [...model.awards.allNba.first, ...model.awards.allNba.second, ...model.awards.allNba.third];
+  const myList = (picks.allNba || []).map((id) => byId[id]).filter(Boolean);
+  const list = mode === "model" ? modelList : myList;
+  const anRow = (p, i) => `<li><span class="rk">${i + 1}</span>${who(p)}<div class="val"><b>${line(p)}</b>Score ${f1(p.score)}</div>${mode === "picks" ? `<div class="ctrl"><button class="mini" type="button" data-up="allNba:${i}" ${i === 0 ? "disabled" : ""}>↑</button><button class="mini" type="button" data-down="allNba:${i}" ${i === myList.length - 1 ? "disabled" : ""}>↓</button><button class="mini" type="button" data-remove="allNba:${i}">Remove</button></div>` : ""}</li>`;
+  html += `<section class="card allnba" data-award="allNba"><div class="head"><div class="t"><h4>All-NBA Teams</h4><p class="note">Positionless top 15 by AwardScore · 65-game rule applied</p></div>
+    <span class="seg toggle" role="group" aria-label="All-NBA view"><span class="thumb" style="transform:translateX(${mode === "picks" ? 100 : 0}%)"></span>
+      <button type="button" data-amode="allNba:model" aria-pressed="${mode === "model"}">Model</button><button type="button" data-amode="allNba:picks" aria-pressed="${mode === "picks"}">My picks</button></span></div>
+    <div class="teams">${teamsOf(list).map(([t, ps], k) => `<div><div class="grp"><span>${t}</span><span>${ps.length}/5</span></div><ul class="plist">${ps.map((p, i) => anRow(p, k * 5 + i)).join("") || `<li class="empty-picks">${mode === "picks" ? "Empty" : "—"}</li>`}</ul></div>`).join("")}</div>
+    ${mode === "picks" && myList.length < 15 ? `<button class="add press" type="button" data-addpick="allNba">Add pick (${myList.length}/15)</button>` : ""}</section>`;
+  $("#awards").innerHTML = html;
+}
+function savePicks() { store.set("awards:picks", picks); store.set("awards:modes", awardMode); }
+$("#awards").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  const d = b.dataset;
+  if (d.amode) { const [k, m] = d.amode.split(":"); awardMode[k] = m; savePicks(); renderAwards(); return; }
+  if (d.addpick) return pickSheet(d.addpick);
+  for (const op of ["up", "down", "remove"]) {
+    if (!d[op]) continue;
+    const [k, iStr] = d[op].split(":"); const i = +iStr; const list = picks[k] || [];
+    if (op === "remove") list.splice(i, 1);
+    if (op === "up" && i > 0) [list[i - 1], list[i]] = [list[i], list[i - 1]];
+    if (op === "down" && i < list.length - 1) [list[i + 1], list[i]] = [list[i], list[i + 1]];
+    picks[k] = list; savePicks(); renderAwards();
+  }
+});
+function pickSheet(key) {
+  const a = AWARDS.find((x) => x.key === key);
+  const max = key === "allNba" ? 15 : 5;
+  sheet.open({
+    title: `${a ? a.title : "All-NBA"}: add pick`, searchable: true, placeholder: "Search players",
+    render(body, q) {
+      const chosen = new Set(picks[key] || []);
+      let rows;
+      if (a?.team) {
+        rows = model.awards.coy.pool.filter((e) => !chosen.has(e.team.id) && (!q || `${e.team.displayName} ${e.coach}`.toLowerCase().includes(q)))
+          .map((e) => `<li><button class="row" type="button" data-pick="${e.team.id}">${teamLogo(e.team, { size: "2.25rem" })}<span class="meta"><span class="nm">${esc(e.coach || e.team.displayName)}</span><span class="sub">${esc(e.team.displayName)} · ${e.team.wins}-${e.team.losses}</span></span></button></li>`);
+      } else {
+        const pool = key === "allNba" ? model.awards.allNba.pool : model.awards[key].pool.map((e) => e.player);
+        const extra = q ? model.players.filter((p) => p.name.toLowerCase().includes(q)) : [];
+        const seen = new Set();
+        rows = [...pool, ...extra].filter((p) => !chosen.has(p.id) && !seen.has(p.id) && seen.add(p.id) && (!q || p.name.toLowerCase().includes(q))).slice(0, 40)
+          .map((p) => `<li><button class="row" type="button" data-pick="${p.id}">${avatar(p, { size: "2.25rem", color: p.team.color })}<span class="meta"><span class="nm">${esc(p.name)}</span><span class="sub">${esc(p.team.abbr)} · ${line(p)}${p.ruleRisk ? ` · proj. ${p.projectedGames} games` : ""}</span></span></button></li>`);
+      }
+      body.innerHTML = rows.length ? `<ul class="list">${rows.join("")}</ul>` : `<div class="empty">No matches.</div>`;
+      body.querySelectorAll("[data-pick]").forEach((btn) => btn.addEventListener("click", () => {
+        const list = (picks[key] ||= []);
+        if (list.length < max) list.push(btn.dataset.pick);
+        savePicks(); renderAwards();
+        if (list.length >= max) sheet.close(); else sheet.refresh();
+      }));
+    },
+  });
+}
+
+/* ---------------- data ---------------- */
+async function loadHonors() {
+  if (client.mode !== "service") return;          // ~36 extra requests; only through the caching service
+  const ids = new Set();
+  for (const c of ["East", "West"]) { const m = model.allStar[c]; [...m.starters, ...m.reserves, ...m.mentions].forEach((p) => ids.add(p.id)); }
+  [...model.awards.mvp.leaders].forEach((e) => ids.add(e.player.id));
+  const list = [...ids].filter((id) => !honors[id]);
+  let i = 0;
+  const worker = async () => { while (i < list.length) { const id = list[i++]; try { honors[id] = (await client.get("honors", { id })).data; } catch { honors[id] = null; } } };
+  await Promise.all([worker(), worker(), worker(), worker()]);
+  renderAllStar(); renderAwards();
+}
+async function load() {
+  const names = [["players", {}], ["players", { season: 2026 }], ["standings", {}], ["standings", { season: 2026 }], ["starts", {}], ["coaches", {}]];
+  const res = await Promise.allSettled(names.map(([n, p]) => client.get(n, p)));
+  const [players, prevPlayers, standings, prevStandings, starts, coaches] = res.map((r) => (r.status === "fulfilled" ? r.value.data : null));
+  if (!players || !standings) throw new Error(res.find((r) => r.status === "rejected")?.reason?.message || "No data");
+  model = computeAwards({ players, prevPlayers, standings, prevStandings, starts, coaches });
+  byId = Object.fromEntries(model.players.map((p) => [p.id, p]));
+  const missing = ["last season's stats", "last season's standings", "games started", "coaches"].filter((_, i) => !res[[1, 3, 4, 5][i]].value);
+  $("#banner").innerHTML = missing.length ? `<div class="banner">Some inputs didn’t load (${missing.join(", ")}); related awards may be incomplete.</div>` : "";
+  $("#lede").textContent = `Live model built on ESPN season stats and standings, ${model.teamGamesMax} team games in. Early-season ladders move fast. Switch any section to your own ballot; it’s saved in this browser.`;
+  $("#pulse").className = "pulse on";
+  $("#sync").innerHTML = `Updated ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}<span class="long"> · ${client.mode === "service" ? "local service" : "ESPN direct"}</span>`;
+  renderAllStar(); renderAwards();
+  loadHonors();
+}
+
+(async () => {
+  client = await createClient();
+  try { await load(); }
+  catch (e) {
+    $("#pulse").className = "pulse err"; $("#sync").textContent = "Couldn’t load stats";
+    $("#allstar").innerHTML = $("#awards").innerHTML = `<div class="empty">Couldn’t load live stats from ESPN: ${esc(e.message)}. Retrying in a minute.</div>`;
+    setTimeout(() => location.reload(), 60_000);
+  }
+  // "Auto-updates": stats are cached ~30 min server-side; re-run the model every 30 min while open.
+  setInterval(() => { if (!document.hidden) load().catch(() => {}); }, 30 * 60_000);
+})();
+</script>
+</body>
+</html>

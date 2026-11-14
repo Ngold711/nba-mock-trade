@@ -3,10 +3,12 @@ import {
   normalizeScoreboard, normalizeSummary, normalizeRoster, normalizeInjuries,
   normalizeStandings, normalizeTransactions, normalizeTeams,
   normalizeCollegeOverview, collegeBioFromRoster, collegeHeadshot,
+  normalizeNews, normalizePlayerStats, normalizeHonors,
 } from "./normalize.js";
 
 const SITE = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba";
 const STANDINGS = "https://site.api.espn.com/apis/v2/sports/basketball/nba/standings";
+const NBA_STATS = "https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/statistics/byathlete";
 const NCAA_SITE = "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball";
 const NCAA_ATHLETE = "https://site.web.api.espn.com/apis/common/v3/sports/basketball/mens-college-basketball/athletes";
 
@@ -15,7 +17,10 @@ export const ENDPOINTS = {
   summary: ({ id }) => `${SITE}/summary?event=${encodeURIComponent(id)}`,
   roster: ({ team }) => `${SITE}/teams/${encodeURIComponent(team)}/roster`,
   injuries: () => `${SITE}/injuries`,
-  standings: () => STANDINGS,
+  standings: ({ season } = {}) => `${STANDINGS}${season ? `?season=${encodeURIComponent(season)}` : ""}`,
+  news: () => `${SITE}/news?limit=50`,
+  honors: ({ id }) => `https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/${encodeURIComponent(id)}/overview`,
+  players: ({ season } = {}) => `${NBA_STATS}?region=us&lang=en&contentorigin=espn&isqualified=false&page=1&limit=1000&sort=offensive.avgPoints%3Adesc${season ? `&season=${encodeURIComponent(season)}&seasontype=2` : ""}`,
   transactions: () => `${SITE}/transactions`,
   teams: () => `${SITE}/teams`,
   collegeOverview: ({ id }) => `${NCAA_ATHLETE}/${encodeURIComponent(id)}/overview`,
@@ -30,6 +35,9 @@ export const NORMALIZERS = {
   standings: normalizeStandings,
   transactions: normalizeTransactions,
   teams: normalizeTeams,
+  news: normalizeNews,
+  honors: normalizeHonors,
+  players: normalizePlayerStats,
 };
 
 export class FetchError extends Error {
@@ -73,7 +81,60 @@ async function loadCollege({ id, team, season = "2026-27" }, opts) {
   const hs = collegeHeadshot(id);
   return { id: String(id), headshot: hs.url, headshotSmall: hs.small, ...normalizeCollegeOverview(overview, { season }), bio: roster ? collegeBioFromRoster(roster, id) : null };
 }
-const CUSTOM = { college: loadCollege };
+/** Run fn over items with at most `limit` in flight. */
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length); let i = 0;
+  const worker = async () => { while (i < items.length) { const k = i++; out[k] = await fn(items[k], k).catch(() => null); } };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+const ymdUTC = (d) => d.toISOString().slice(0, 10).replace(/-/g, "");
+
+/* Games started per player, aggregated from regular-season box scores (ESPN's season stats omit GS).
+   Finished games never change, so their starter lists and fully-final dates are cached for the
+   life of the process; each refresh only fetches what's new. */
+const startsCache = { games: new Map(), doneDates: new Set() };
+async function loadStarts(_params, opts) {
+  const today = ymdUTC(new Date());
+  const sb = await fetchJson(ENDPOINTS.scoreboard({}), opts);
+  const dates = arr(sb?.leagues?.[0]?.calendar).map((d) => String(d).slice(0, 10).replace(/-/g, ""))
+    .filter((d) => d <= today && !startsCache.doneDates.has(d));
+  const boards = await mapLimit(dates, 4, (d) => fetchJson(ENDPOINTS.scoreboard({ date: d }), opts));
+  const toFetch = [];
+  boards.forEach((b, i) => {
+    if (!b) return;
+    const events = arr(b.events).filter((e) => e?.season?.slug === "regular-season" || e?.season?.type === 2);
+    const finals = events.filter((e) => e?.status?.type?.completed);
+    finals.forEach((e) => { if (!startsCache.games.has(e.id)) toFetch.push(e.id); });
+    if (finals.length === events.length && dates[i] < today) startsCache.doneDates.add(dates[i]);
+  });
+  await mapLimit(toFetch, 4, async (id) => {
+    const s = await fetchJson(ENDPOINTS.summary({ id }), opts);
+    const rows = [];
+    for (const side of arr(s?.boxscore?.players)) {
+      for (const a of arr(side?.statistics?.[0]?.athletes)) {
+        if (a?.athlete?.id && !a.didNotPlay && arr(a.stats).length) rows.push([String(a.athlete.id), Boolean(a.starter)]);
+      }
+    }
+    if (rows.length) startsCache.games.set(id, rows);
+  });
+  const players = {};
+  for (const rows of startsCache.games.values()) {
+    for (const [pid, started] of rows) { const p = (players[pid] ||= { gp: 0, gs: 0 }); p.gp++; if (started) p.gs++; }
+  }
+  return { asOf: new Date().toISOString(), games: startsCache.games.size, players };
+}
+
+/* Head coach per team, from the 30 team rosters. */
+async function loadCoaches(_params, opts) {
+  const teams = normalizeTeams(await fetchJson(ENDPOINTS.teams(), opts));
+  const rosters = await mapLimit(teams, 5, (t) => fetchJson(ENDPOINTS.roster({ team: t.id }), opts));
+  const out = {};
+  teams.forEach((t, i) => { const r = rosters[i] ? normalizeRoster(rosters[i]) : null; out[t.id] = { team: t, coach: r?.coach || "" }; });
+  return out;
+}
+const arr = (v) => (Array.isArray(v) ? v : []);
+const CUSTOM = { college: loadCollege, starts: loadStarts, coaches: loadCoaches };
 
 /** Fetch + normalize one resource. */
 export async function load(resource, params = {}, opts = {}) {

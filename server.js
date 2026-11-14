@@ -63,7 +63,20 @@ const routes = [
       json(res, 200, { ...out, data: out.data.filter((i) => i.team.id === id) });
     } catch (err) { json(res, 502, { error: `Couldn't reach ESPN: ${err.message}` }); }
   }],
-  [/^\/api\/standings$/, (req, res) => serve(res, "standings", {})],
+  [/^\/api\/standings$/, (req, res, m, q) => {
+    const season = q.get("season");
+    if (season && !/^\d{4}$/.test(season)) return json(res, 400, { error: "season must be a year like 2026" });
+    return serve(res, "standings", season ? { season } : {});
+  }],
+  [/^\/api\/news$/, (req, res) => serve(res, "news", {})],
+  [/^\/api\/players$/, (req, res, m, q) => {
+    const season = q.get("season");
+    if (season && !/^\d{4}$/.test(season)) return json(res, 400, { error: "season must be a year like 2026" });
+    return serve(res, "players", season ? { season } : {});
+  }],
+  [/^\/api\/starts$/, (req, res) => serve(res, "starts", {})],
+  [/^\/api\/coaches$/, (req, res) => serve(res, "coaches", {})],
+  [/^\/api\/honors\/(\d{1,12})$/, (req, res, m) => serve(res, "honors", { id: m[1] })],
   [/^\/api\/college\/(\d{3,12})$/, (req, res, m, q) => {
     const team = q.get("team");
     if (team && !/^\d{1,6}$/.test(team)) return json(res, 400, { error: "team must be an ESPN college team id" });
