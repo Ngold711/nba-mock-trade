@@ -41,7 +41,52 @@ main { max-width: 60rem; margin: 0 auto; padding: 0 max(1rem, env(safe-area-inse
 .sel .meta { min-width: 0; }
 .make { border: 1.5px dashed var(--sep); border-radius: 0.7rem; padding: 0.5rem 0.7rem; color: var(--accent); font-weight: 600; font-size: 0.875rem; background: none; cursor: pointer; width: 100%; text-align: left; }
 .make:hover { background: var(--accent-soft); }
+.mini-btn { border: 0; background: var(--fill); border-radius: 999px; padding: 0.25rem 0.6rem; font-size: 0.6875rem; font-weight: 650; cursor: pointer; white-space: nowrap; }
+.mini-btn:hover { background: var(--fill-strong); }
+.mini-btn.on { background: var(--label); color: var(--bg); }
 .make.next { border-style: solid; border-color: var(--accent); background: var(--accent-soft); }
+
+/* Lottery odds panel */
+.lot-head { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin: 0.25rem 0 0.6rem; }
+.lot-head h3 { margin: 0; font-size: 1.125rem; letter-spacing: -0.015em; flex: 1; min-width: 9rem; }
+.fmt { --n: 2; width: min(100%, 19rem); }
+.fmt button { font-size: 0.75rem; padding: 0.35rem 0.2rem; }
+.odds-wrap { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); margin-bottom: 1.25rem; overflow: hidden; }
+.odds-wrap summary { cursor: pointer; padding: 0.7rem 1rem; font-size: 0.8125rem; color: var(--label-2); list-style: none; display: flex; gap: 0.5rem; align-items: center; }
+.odds-wrap summary::-webkit-details-marker { display: none; }
+.odds-wrap summary::before { content: "›"; font-weight: 700; transition: transform .2s ease; display: inline-block; }
+.odds-wrap[open] summary::before { transform: rotate(90deg); }
+.odds-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.odds-t { border-collapse: collapse; width: 100%; font-size: 0.8125rem; font-variant-numeric: tabular-nums; min-width: 36rem; }
+.odds-t th { text-align: right; font-weight: 650; font-size: 0.625rem; color: var(--label-3); letter-spacing: 0.06em; text-transform: uppercase; padding: 0.45rem 0.6rem; white-space: nowrap; background: var(--surface-2); }
+.odds-t td { text-align: right; padding: 0.45rem 0.6rem; border-top: 0.5px solid var(--sep); white-space: nowrap; }
+.odds-t th:nth-child(2), .odds-t td:nth-child(2) { text-align: left; }
+.odds-t th:first-child, .odds-t td:first-child { text-align: right; width: 2.2rem; color: var(--label-3); font-weight: 650; }
+.odds-t .tm { display: flex; align-items: center; gap: 0.5rem; }
+.odds-t .tm .nm { font-weight: 650; }
+.odds-t .tm .rec { color: var(--label-3); font-size: 0.75rem; }
+.odds-t .p1 { font-weight: 700; }
+.odds-t .bar { display: inline-block; height: 0.35rem; border-radius: 99px; background: var(--accent); vertical-align: middle; margin-right: 0.4rem; opacity: .75; }
+.odds-t tr.barred .p1 { color: var(--label-3); text-decoration: line-through; }
+.pill.rel { background: var(--bad-soft); color: var(--bad); }
+.pill.split { background: var(--warn-soft); color: var(--warn); }
+.pill.nofirst { background: var(--fill); color: var(--label-2); }
+.balls { display: inline-flex; gap: 2px; vertical-align: middle; margin-left: 0.35rem; }
+.balls i { width: 0.45rem; height: 0.45rem; border-radius: 99px; background: var(--label-2); display: inline-block; }
+.balls i.half { background: linear-gradient(90deg, var(--label-2) 50%, var(--fill-strong) 50%); }
+.odds-t .ab { display: none; }
+@media (max-width: 34rem) {
+  .odds-t { min-width: 0; font-size: 0.75rem; }
+  .odds-t th, .odds-t td { padding: 0.45rem 0.3rem; }
+  .odds-t th:first-child, .odds-t td:first-child { width: 1.4rem; }
+  .odds-t .full { display: none; }
+  .odds-t .ab { display: inline; }
+  .odds-t .rec, .odds-t .balls, .odds-t .bar { display: none; }
+  .odds-t .tm { gap: 0.3rem; flex-wrap: wrap; }
+  .odds-t .pill { font-size: 0.5625rem; padding: 0.1rem 0.3rem; }
+  .odds-t .mini-btn { padding: 0.2rem 0.4rem; font-size: 0.625rem; }
+}
+.odds-note { font-size: 0.75rem; color: var(--label-3); padding: 0.6rem 1rem 0.8rem; border-top: 0.5px solid var(--sep); line-height: 1.5; }
 
 /* Tooltip popover */
 .tip { position: absolute; z-index: 35; max-width: min(22rem, calc(100vw - 2rem)); background: var(--surface); color: var(--label); border-radius: 0.9rem; box-shadow: var(--shadow-lg), 0 0 0 0.5px var(--sep); padding: 0.75rem 0.9rem; font-size: 0.8125rem; line-height: 1.45; opacity: 0; pointer-events: none; }
@@ -111,9 +156,13 @@ th:first-child, td:first-child { text-align: left; }
     <button class="btn press" type="button" id="clearBtn">Clear picks</button>
   </div>
   <p class="source" id="source"></p>
+  <div class="lot-head"><h3>Lottery odds</h3>
+    <div class="seg fmt" role="group" aria-label="Lottery format" id="fmt"><span class="thumb"></span>
+      <button type="button" data-format="321" aria-pressed="true">3-2-1 · 16 teams</button><button type="button" data-format="2019" aria-pressed="false">2019 · 14 teams</button></div></div>
+  <details class="odds-wrap" id="oddsWrap" open><summary id="oddsSummary">Odds</summary><div class="odds-scroll" id="odds"></div><div class="odds-note" id="oddsNote"></div></details>
   <div id="warnings"></div>
   <div class="board" id="board"></div>
-  <p class="fine">Lottery uses the 2019 odds (14% for each of the three worst records, four drawings). Pick obligations come from draft_picks_2027_2029.json and are applied after every simulation and standings refresh; terms marked unconfirmed should be checked against an official source. College stats and headshots come live from ESPN. 2028 and 2029 orders are projections from today’s standings. Not affiliated with the NBA, NCAA or ESPN.</p>
+  <p class="fine">Lottery odds are exact (every drawing sequence enumerated) for the selected format. The 3-2-1 format is modeled as described in the app; the 2019 format is the NBA’s current system. Pick obligations come from draft_picks_2027_2029.json and are applied after every simulation and standings refresh; terms marked unconfirmed should be checked against an official source. College stats and headshots come live from ESPN. 2028 and 2029 orders are projections from today’s standings. Not affiliated with the NBA, NCAA or ESPN.</p>
 </main>
 <div class="tip" id="tip" role="tooltip"></div>
 
@@ -122,7 +171,7 @@ th:first-child, td:first-child { text-align: left; }
 import { createClient } from "./ui/client.js";
 import { avatar, teamLogo, esc } from "./ui/avatar.js";
 import { Spring, createSheet, createToast, scrollEdge, springIn } from "./ui/motion.js";
-import { projectOrder, simulateLottery, resolvePickOwnership, lotteryOdds, LOTTERY_TEAMS } from "./service/draft.js";
+import { projectLottery, simulateLottery, resolvePickOwnership, lotteryTable, LOTTERY_FORMATS, DEFAULT_FORMAT } from "./service/draft.js";
 import { collegeHeadshot } from "./service/normalize.js";
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -133,7 +182,6 @@ const teamOf = (code) => ({
   logo: `https://a.espncdn.com/i/teamlogos/nba/500/${ESPN_SLUG[code] || code.toLowerCase()}.png`,
   name: TEAMS[code] ? TEAMS[code].name : code, city: TEAMS[code]?.city || "",
 });
-const ODDS = lotteryOdds();
 const pct = (x) => (x * 100).toFixed(1).replace(/\.0$/, "") + "%";
 const sheet = createSheet();
 const toast = createToast();
@@ -146,17 +194,37 @@ const store = {
 };
 let client = null, config = null, prospects = null, standings = null;
 let year = "2027";
-let projected = null;                 // order from standings
-const perYear = {};                   // year -> { order, lottery, picks: {pickNo: prospectId} }
-const yearState = () => (perYear[year] ||= store.get(`draft:${year}`) || { order: null, lottery: null, picks: {} });
-const save = () => store.set(`draft:${year}`, yearState());
+let format = LOTTERY_FORMATS[store.get("draft:format")] ? store.get("draft:format") : DEFAULT_FORMAT;
+let proj = null;                      // projectLottery(): { order, balls, lottery[] } from live standings
+const F = () => LOTTERY_FORMATS[format];
+const perYear = {};                   // year -> { format, order, lottery, picks: {pickNo: prospectId} }
+// v2: simulations now record their lottery format; v1 (2019-only) saves are dropped.
+const yearState = () => (perYear[year] ||= store.get(`draft:v2:${year}`) || { format: null, order: null, lottery: null, picks: {} });
+const save = () => store.set(`draft:v2:${year}`, yearState());
+const restrictedFor = (y = year) => store.get(`draft:restricted:${y}`) || [];
+const simValid = (s) => s.order && s.order.length === 30 && s.format === format;
+function placeholderProj() {
+  const order = Object.keys(TEAMS).sort();
+  return { format, order, balls: F().balls, lottery: order.slice(0, F().teams).map((team, i) => ({ team, seed: i + 1, balls: F().balls[i], tie: null })) };
+}
 
 /* ---------- data ---------- */
 async function loadJson(path) { const r = await fetch(path, { cache: "no-cache" }); if (!r.ok) throw new Error(`${path}: ${r.status}`); return r.json(); }
 
 function currentOrder() {
   const s = yearState();
-  return s.order && s.order.length === 30 ? s.order : projected;
+  return simValid(s) ? s.order : proj?.order;
+}
+function oddsTable() {
+  return lotteryTable(format, { balls: proj.balls, restricted: restrictedFor(), order: proj.order, ties: proj.lottery.map((t) => t.tie) });
+}
+/** Drop mock picks that point at prospects no longer on this year's board (e.g. moved to 2028). */
+function pruneBoard() {
+  if (!prospects || !prospects[year]) return;          // never prune before the board has loaded
+  const s = yearState(); const ids = new Set(board().map((p) => p.id)); let changed = false;
+  for (const [k, v] of Object.entries(s.picks)) if (!ids.has(v)) { delete s.picks[k]; changed = true; }
+  if (s.order && s.format !== format) { s.order = null; s.lottery = null; changed = true; }
+  if (changed) save();
 }
 function board() {
   return [...(prospects?.[year] || [])].sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999)).map((p) => {
@@ -165,17 +233,75 @@ function board() {
   });
 }
 
+/* ---------- lottery odds panel ---------- */
+const ballDots = (b) => {
+  const whole = Math.floor(b + 1e-9), half = b - whole > 0.01;
+  return `<span class="balls" aria-hidden="true">${"<i></i>".repeat(Math.min(whole, 6))}${half ? '<i class="half"></i>' : ""}</span>`;
+};
+const fmtBalls = (b) => (Math.abs(b - Math.round(b)) < 1e-9 ? String(Math.round(b)) : b.toFixed(1));
+function renderOdds(table) {
+  const restricted = new Set(restrictedFor());
+  const maxP1 = Math.max(...table.map((r) => r.p1), 0.0001);
+  const unit = F().unit;
+  const total = proj.balls.slice(0, F().teams).reduce((a, b) => a + b, 0);
+  $("#oddsSummary").textContent = `${F().label}: ${F().teams} teams · ${F().draws} drawings · ${Math.round(total)} ${unit}${restricted.size ? ` · ${restricted.size} barred from #1` : ""}`;
+  $("#odds").innerHTML = `<table class="odds-t"><thead><tr><th>Seed</th><th>Team</th><th>${unit === "balls" ? "Balls" : "Combos"}</th><th>#1 Pick</th><th>Top 4</th><th>Floor</th><th>#1 rule</th></tr></thead><tbody>
+    ${table.map((r) => {
+      const t = proj.lottery[r.seed - 1] || {};
+      const team = teamOf(t.team || "");
+      const barred = restricted.has(t.team);
+      const split = t.tie != null;
+      return `<tr class="${barred ? "barred" : ""}">
+        <td>${r.seed}</td>
+        <td><span class="tm">${teamLogo(team, { size: "1.5rem" })}<span><span class="nm"><span class="full">${esc(team.name)}</span><span class="ab">${esc(t.team || "")}</span></span> <span class="rec">${t.wins != null ? `${t.wins}-${t.losses}` : ""}</span></span>
+          ${r.relegated ? `<span class="pill rel" title="Seeds 1–3 hold fewer balls and slot behind the 3-ball teams if not drawn"><span class="full">Relegated</span><span class="ab">REL</span></span>` : ""}
+          ${split ? `<span class="pill split" title="Tied record: the tied seeds' balls are split evenly and the order between them is a coin flip"><span class="full">Tied · split</span><span class="ab">TIE</span></span>` : ""}</span></td>
+        <td>${fmtBalls(r.balls)}${unit === "balls" ? ballDots(r.balls) : ""}</td>
+        <td class="p1"><span class="bar" style="width:${Math.round((r.p1 / maxP1) * 2.5 * 16)}px"></span>${pct(r.p1)}</td>
+        <td>${pct(r.top4)}</td>
+        <td>#${r.floor}${r.relegated ? "" : ""}</td>
+        <td><button class="mini-btn ${barred ? "on" : ""}" type="button" data-restrict="${esc(t.team || "")}" aria-pressed="${barred}" title="Bar this team from the #1 pick (e.g. it won #1 last year)" aria-label="${barred ? "Allow" : "Bar"} ${esc(team.name)} ${barred ? "to win" : "from"} the #1 pick"><span class="full">${barred ? "No #1 ✓" : "Bar from #1"}</span><span class="ab">${barred ? "Barred" : "Bar"}</span></button></td>
+      </tr>`;
+    }).join("")}</tbody></table>`;
+  const relegated = F().relegated;
+  $("#oddsNote").textContent = format === "321"
+    ? `37 balls: seeds ${relegated.join("–")} get 2 (relegated), 4–10 get 3, 11–14 get 2, 15–16 get 1. Four drawings set picks 1–4; everyone else is ordered by balls, then worst record, so a relegated seed can fall as far as #${table[0]?.floor}–#${table[relegated.length - 1]?.floor}. Tied records split their balls evenly. Barring a team from #1 removes its balls from the first drawing only, which raises everyone else's #1 odds.`
+    : "1,000 combinations: 14% for each of the three worst records down to 0.5%. Four drawings; everyone else keeps their seed order, so the worst team can fall no lower than #5.";
+}
+$("#odds").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-restrict]"); if (!b || !b.dataset.restrict) return;
+  const list = new Set(restrictedFor()); const t = b.dataset.restrict;
+  list.has(t) ? list.delete(t) : list.add(t);
+  store.set(`draft:restricted:${year}`, [...list]);
+  render();
+});
+const fmtSeg = $("#fmt");
+const fmtThumb = new Spring(format === "321" ? 0 : 1, (x) => { fmtSeg.querySelector(".thumb").style.transform = `translateX(${x * 100}%)`; }, 0.001);
+fmtThumb.onUpdate(fmtThumb.x);
+fmtSeg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.format === format)));
+fmtSeg.addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b || b.dataset.format === format) return;
+  format = b.dataset.format; store.set("draft:format", format);
+  fmtSeg.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  fmtThumb.to(format === "321" ? 0 : 1, { damping: 1, response: 0.3 });
+  proj = standings ? projectLottery(standings, format, () => 0.5) : placeholderProj();
+  hideTip(); render();
+});
+
 /* ---------- render ---------- */
 function render() {
   $("#title").textContent = `${year} Draft`;
+  pruneBoard();
   const order = currentOrder();
   const s = yearState();
   if (!order) { $("#board").innerHTML = `<div class="empty" style="margin:1rem">Loading draft order…</div>`; return; }
+  const table = oddsTable();
+  renderOdds(table);
   const { picks, warnings } = resolvePickOwnership(order, year, config);
   const prosById = Object.fromEntries(board().map((p) => [p.id, p]));
-  const moved = Object.fromEntries((s.lottery || []).map((l) => [l.pick, l.moved]));
+  const simmed = simValid(s);
+  const moved = simmed ? Object.fromEntries((s.lottery || []).map((l) => [l.pick, l.moved])) : {};
   const nextOpen = picks.find((p) => !s.picks[p.pick])?.pick;
-  const simmed = !!s.order;
 
   $("#warnings").innerHTML = warnings.length ? `<p class="warn-line">${warnings.map(esc).join("<br>")}</p>` : "";
   const rows = picks.map((p) => {
@@ -187,14 +313,13 @@ function render() {
       : p.status === "conveyed" ? `<span class="pill conv">Traded</span>` : "";
     const mv = moved[p.pick];
     const mvTxt = simmed && mv ? `<small class="${mv < 0 ? "down" : ""}">${mv > 0 ? "▲" : "▼"}${Math.abs(mv)}</small>` : "";
-    const seedIdx = p.pick - 1;
-    const odds = !simmed && p.pick <= LOTTERY_TEAMS ? `#1 odds ${pct(ODDS[seedIdx][0])}` : "";
+    const odds = !simmed && p.pick <= F().teams && table[p.pick - 1] ? `#1 odds ${pct(table[p.pick - 1].p1)}` : "";
     const pr = prosById[s.picks[p.pick]];
     const slot = pr
       ? `<button class="sel" type="button" data-scout="${esc(pr.id)}">${avatar(pr, { size: "2.5rem", color: own.color })}
           <span class="meta"><span class="nm">${esc(pr.name)}</span><span class="sub">${esc([pr.position, pr.school || pr.type].filter(Boolean).join(" · "))}</span></span></button>`
       : `<button class="make press${p.pick === nextOpen ? " next" : ""}" type="button" data-make="${p.pick}">${p.pick === nextOpen ? "On the clock · Make pick" : "Make pick"}</button>`;
-    return `${p.pick === 1 ? `<div class="section-head">Lottery</div>` : p.pick === 15 ? `<div class="section-head">Picks 15–30</div>` : ""}
+    return `${p.pick === 1 ? `<div class="section-head">Lottery · ${F().teams} teams</div>` : p.pick === F().teams + 1 ? `<div class="section-head">Picks ${F().teams + 1}–30</div>` : ""}
       <div class="pick" data-row="${p.pick}">
         <div class="no">${p.pick}${mvTxt}</div>
         <div class="own">
@@ -255,11 +380,11 @@ $("#board").addEventListener("click", (e) => {
   const sc = e.target.closest("[data-scout]"); if (sc) return scout(sc.dataset.scout, +sc.closest("[data-row]").dataset.row);
 });
 $("#simBtn").addEventListener("click", () => {
-  if (!projected) return;
+  if (!proj) return;
   const s = yearState();
-  const sim = simulateLottery(projected);
-  s.order = sim.order; s.lottery = sim.lottery; save(); render();
-  document.querySelectorAll("#board .pick").forEach((row, i) => { if (i < LOTTERY_TEAMS) springIn(row); });
+  const sim = simulateLottery(proj.order, Math.random, { format, balls: proj.balls, restricted: restrictedFor() });
+  s.format = format; s.order = sim.order; s.lottery = sim.lottery; save(); render();
+  document.querySelectorAll("#board .pick").forEach((row, i) => { if (i < F().teams) springIn(row); });
   const jump = sim.lottery.filter((l) => l.moved > 0).sort((a, b) => b.moved - a.moved)[0];
   toast(jump ? `${teamOf(jump.team).name} jump ${jump.moved} spot${jump.moved > 1 ? "s" : ""} to #${jump.pick}` : "Lottery held to form");
 });
@@ -283,7 +408,11 @@ yearsSeg.addEventListener("click", (e) => {
   const btns = [...yearsSeg.querySelectorAll("button")];
   btns.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
   yearThumb.to(btns.indexOf(b), { damping: 1, response: 0.3 });
+  // Clean switch: close any open sheet/tooltip, then load that year's own simulation, restrictions,
+  // pick-ownership rules and prospect pool (pruneBoard drops picks for players not on this board).
+  if (sheet.isOpen) sheet.close();
   hideTip(); render();
+  window.scrollTo(0, 0);
 });
 
 /* ---------- pick sheet ---------- */
@@ -358,13 +487,13 @@ function scout(id, pickNo) {
 /* ---------- boot ---------- */
 (async () => {
   [config, prospects] = await Promise.all([loadJson("draft_picks_2027_2029.json"), loadJson("prospects.json")]).catch((e) => { toast(`Couldn’t load draft data: ${e.message}`); return [{ years: {} }, {}]; });
-  projected = Object.keys(TEAMS).sort();   // placeholder until standings arrive
+  proj = placeholderProj();             // until standings arrive
   render();
   client = await createClient();
   // Standings refresh → re-project the order and re-run the ownership engine automatically.
   client.watch("standings", {}, (st, meta) => {
     standings = st;
-    projected = projectOrder(st, () => 0.5);
+    proj = projectLottery(st, format, () => 0.5);
     $("#pulse").className = "pulse " + (meta?.error ? "err" : "on");
     $("#sync").innerHTML = `Live standings<span class="long"> · ${client.mode === "service" ? "local service" : "ESPN direct"}</span>`;
     render();

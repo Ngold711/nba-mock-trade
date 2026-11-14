@@ -117,3 +117,70 @@ test("prospects.json: every college prospect has ESPN ids", () => {
     }
   }
 });
+
+/* ---------------- 3-2-1 format, ties, restrictions ---------------- */
+import { lotteryTable, LOTTERY_FORMATS, projectLottery, splitTies, tieGroups } from "../service/draft.js";
+
+test("3-2-1 format: 16 teams, 37 balls, 2.7%–8.1% #1 odds, relegated floors", () => {
+  const F = LOTTERY_FORMATS["321"];
+  assert.equal(F.balls.length, 16);
+  assert.equal(F.balls.reduce((a, b) => a + b, 0), 37);
+  const t = lotteryTable("321");
+  const near = (a, b) => Math.abs(a - b) < 1e-9;
+  assert.ok(near(t.reduce((s, r) => s + r.p1, 0), 1));
+  assert.ok(near(t[3].p1, 3 / 37));                         // 8.1%
+  assert.ok(near(t[15].p1, 1 / 37));                        // 2.7%
+  assert.ok(near(t[0].p1, 2 / 37));
+  assert.deepEqual(t.slice(0, 3).map((r) => r.relegated), [true, true, true]);
+  assert.deepEqual(t.slice(0, 3).map((r) => r.floor), [12, 13, 14]);   // behind the seven 3-ball teams
+  assert.equal(t[3].floor, 5);                                          // best 3-ball seed can't fall past 5th
+  for (let pick = 0; pick < 16; pick++) assert.ok(near(t.reduce((s, r) => s + r.row[pick], 0), 1), `pick ${pick + 1} sums to 1`);
+});
+
+test("restriction zeroes #1 odds and redistributes; simulations respect it", () => {
+  const order = [...ALL];
+  const base = lotteryTable("321", { order });
+  const barred = lotteryTable("321", { order, restricted: [order[3]] });
+  assert.equal(barred[3].p1, 0);
+  assert.ok(barred[3].top4 > 0);                            // can still land 2–4
+  assert.ok(barred[4].p1 > base[4].p1);
+  assert.ok(Math.abs(barred.reduce((s, r) => s + r.p1, 0) - 1) < 1e-9);
+  let seed = 3; const rng = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 2000; i++) assert.notEqual(simulateLottery(order, rng, { format: "321", restricted: [order[3]] }).order[0], order[3]);
+});
+
+test("ties split balls evenly and spread the non-drawn order", () => {
+  assert.deepEqual(tieGroups([0.1, 0.1, 0.2, 0.3, 0.3, 0.3]), [1, 1, null, 2, 2, 2]);
+  assert.deepEqual(splitTies([0.1, 0.2, 0.2, 0.3], [2, 2, 3, 3]), [2, 2.5, 2.5, 3]);
+  const pcts = [0.1, 0.2, 0.2, ...Array(13).fill(0).map((_, i) => 0.3 + i * 0.01)];
+  const balls = splitTies(pcts, LOTTERY_FORMATS["321"].balls);
+  const t = lotteryTable("321", { balls, ties: tieGroups(pcts) });
+  assert.ok(Math.abs(t[1].p1 - t[2].p1) < 1e-12);           // tied seeds 2 & 3 get identical odds
+  assert.ok(Math.abs(t.reduce((s, r) => s + r.p1, 0) - 1) < 1e-9);
+});
+
+test("projectLottery: 16 lottery teams for 3-2-1, 14 for 2019", () => {
+  const st = normalizeStandings(JSON.parse(readFileSync(new URL("./fixtures/standings.json", import.meta.url))));
+  // fixture is trimmed to 4 teams per conference; just check shape and ball assignment
+  const p = projectLottery(st, "321", () => 0.5);
+  assert.equal(p.lottery.length, p.balls.length);
+  assert.ok(p.lottery.every((t, i) => t.seed === i + 1 && typeof t.balls === "number"));
+  assert.ok(simulateLottery([...ALL], () => 0.3, { format: "321" }).lottery.length === 16);
+  assert.ok(simulateLottery([...ALL], () => 0.3, { format: "2019" }).lottery.length === 14);
+});
+
+test("prospect boards: 35 / 30 / 30, unique ids, college players linked", () => {
+  assert.equal(PROSPECTS["2027"].length, 35);
+  assert.equal(PROSPECTS["2028"].length, 30);
+  assert.equal(PROSPECTS["2029"].length, 30);
+  const ids = ["2027", "2028", "2029"].flatMap((y) => PROSPECTS[y].map((p) => p.id));
+  assert.equal(new Set(ids).size, ids.length);
+  for (const n of ["joaquim-boumtje-boumtje", "nikola-kusturica"]) {
+    assert.ok(PROSPECTS["2028"].some((p) => p.id === n));
+    assert.ok(!PROSPECTS["2027"].some((p) => p.id === n), `${n} moved out of 2027`);
+  }
+  for (const n of ["deron-rippey", "jordan-scott", "caleb-gaskins", "stefan-vaaks"]) assert.ok(PROSPECTS["2028"].find((p) => p.id === n)?.espnCollegeAthleteId, n);
+  for (const n of ["aziz-olajuwon", "darius-bivins"]) assert.ok(PROSPECTS["2029"].find((p) => p.id === n)?.espnCollegeAthleteId, n);
+  assert.equal(PROSPECTS["2027"].at(-1).name, "Malachi Moreno");
+  for (const y of ["2027", "2028", "2029"]) PROSPECTS[y].forEach((p, i) => assert.equal(p.rank, i + 1));
+});

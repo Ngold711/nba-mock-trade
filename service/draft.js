@@ -1,75 +1,187 @@
 // Draft lottery simulation + pick ownership engine. Pure and isomorphic.
 //
-//   const order = projectOrder(standings)          // 30 team codes, worst record first
-//   const sim = simulateLottery(order)             // { order, lottery: [{team, seed, pick, moved}] }
+//   const proj = projectLottery(standings, "321")   // { order, lottery: [{team, seed, balls, tie, ...}] }
+//   const sim  = simulateLottery(proj.order, rng, { format: "321", balls: proj.balls, restricted: ["WAS"] })
+//   const odds = lotteryTable("321", { balls: proj.balls, restricted: ["WAS"] })   // #1 %, top-4 %, floor
 //   const picks = resolvePickOwnership(sim.order, 2027, config)
 
-// Chances of winning the #1 pick per lottery seed (2019 format), out of 1000 combinations.
-// The same weights drive every draw; a team already drawn is skipped, as in the real lottery.
-export const LOTTERY_WEIGHTS = [140, 140, 140, 125, 105, 90, 75, 60, 45, 30, 20, 15, 10, 5];
+/**
+ * Lottery formats. `balls` is per lottery seed (worst record first); every drawing uses the same
+ * weights, skipping teams already drawn. Teams not drawn are ordered by `orderRest`:
+ *   "seed"  — worst record first (the 2019 format)
+ *   "balls" — most balls first, then worst record; this is what "relegates" the 2-ball bottom seeds
+ *             behind the 3-ball group in the 3-2-1 format.
+ */
+export const LOTTERY_FORMATS = {
+  "2019": {
+    key: "2019", label: "2019 format", short: "2019 · 14 teams",
+    teams: 14, draws: 4, orderRest: "seed",
+    balls: [140, 140, 140, 125, 105, 90, 75, 60, 45, 30, 20, 15, 10, 5], unit: "combos",
+    relegated: [],
+  },
+  "321": {
+    key: "321", label: "3-2-1 format", short: "3-2-1 · 16 teams",
+    teams: 16, draws: 4, orderRest: "balls",
+    // seeds 1–3: 2 balls (relegated) · 4–10: 3 · 11–14: 2 · 15–16: 1  → 37 balls
+    balls: [2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 1, 1], unit: "balls",
+    relegated: [1, 2, 3],
+  },
+};
+export const DEFAULT_FORMAT = "321";
+
+// Back-compat exports (2019 format)
+export const LOTTERY_WEIGHTS = LOTTERY_FORMATS["2019"].balls;
 export const LOTTERY_TEAMS = 14;
 export const LOTTERY_DRAWS = 4;
 
 // ESPN abbreviations → the codes used by data.js and the pick config.
 export const ESPN_TO_CODE = { GS: "GSW", NO: "NOP", NY: "NYK", SA: "SAS", UTAH: "UTA", WSH: "WAS" };
 export const toCode = (abbr) => ESPN_TO_CODE[String(abbr || "").toUpperCase()] || String(abbr || "").toUpperCase();
+const fmt = (f) => (typeof f === "string" ? LOTTERY_FORMATS[f] : f) || LOTTERY_FORMATS[DEFAULT_FORMAT];
 
 /**
- * Draft order from normalized standings (service/normalize.js shape).
- * Non-playoff teams (conference seeds 9–15, i.e. play-in losers approximated) form the
- * lottery, worst record first; the other 16 follow, worst record first.
- * Ties are broken with `rng` so repeated projections stay honest about coin flips.
+ * Project the lottery from normalized standings. The lottery is every team outside each
+ * conference's top (15 − teams/2) seeds — 14 teams (seeds 9–15) for 2019, 16 (seeds 8–15) for 3-2-1 —
+ * worst record first; the rest follow, worst record first.
+ * Teams with identical records split their seeds' combined balls evenly (ball-splitting);
+ * their order is a coin flip (`rng`).
  */
-export function projectOrder(standings, rng = Math.random) {
+export function projectLottery(standings, format = DEFAULT_FORMAT, rng = Math.random) {
+  const F = fmt(format);
+  const cutoff = 15 - F.teams / 2;
   const all = [];
   for (const conf of (standings && standings.conferences) || []) {
     conf.teams.forEach((t, i) => all.push({
-      team: toCode(t.team.abbr),
-      pct: Number.isFinite(t.pct) ? t.pct : 0.5,
-      seed: t.seed ?? i + 1,
-      tie: rng(),
+      team: toCode(t.team.abbr), pct: Number.isFinite(t.pct) ? t.pct : 0.5,
+      wins: t.wins ?? null, losses: t.losses ?? null, confSeed: t.seed ?? i + 1, flip: rng(),
     }));
   }
-  const byRecord = (a, b) => a.pct - b.pct || a.tie - b.tie;
-  const lottery = all.filter((t) => t.seed > 8).sort(byRecord);
-  const playoff = all.filter((t) => t.seed <= 8).sort(byRecord);
-  return [...lottery, ...playoff].map((t) => t.team);
+  const byRecord = (a, b) => a.pct - b.pct || a.flip - b.flip;
+  const lottery = all.filter((t) => t.confSeed > cutoff).sort(byRecord);
+  const rest = all.filter((t) => t.confSeed <= cutoff).sort(byRecord);
+  const balls = splitTies(lottery.map((t) => t.pct), F.balls);
+  const tie = tieGroups(lottery.map((t) => t.pct));
+  return {
+    format: F.key,
+    order: [...lottery, ...rest].map((t) => t.team),
+    balls,
+    lottery: lottery.map((t, i) => ({ ...t, seed: i + 1, balls: balls[i], baseBalls: F.balls[i], tie: tie[i] })),
+  };
+}
+/** Back-compat: just the 30-team order (2019 format by default). */
+export function projectOrder(standings, rng = Math.random, format = "2019") {
+  return projectLottery(standings, format, rng).order;
 }
 
-/** Run one lottery. Returns the full 30-team order and how each lottery team moved. */
-export function simulateLottery(order, rng = Math.random) {
-  const lotteryTeams = order.slice(0, LOTTERY_TEAMS);
-  const winners = [];
-  const remaining = lotteryTeams.map((team, i) => ({ team, seed: i + 1, w: LOTTERY_WEIGHTS[i] ?? 0 }));
-  for (let d = 0; d < LOTTERY_DRAWS && remaining.length; d++) {
-    const total = remaining.reduce((s, t) => s + t.w, 0);
-    let x = rng() * total;
-    let idx = remaining.findIndex((t) => (x -= t.w) < 0);
-    if (idx < 0) idx = remaining.length - 1;
-    winners.push(remaining.splice(idx, 1)[0]);
+/** Group ids for runs of identical records (null when a team isn't tied). */
+export function tieGroups(pcts) {
+  const ids = pcts.map(() => null);
+  let g = 0;
+  for (let i = 0; i < pcts.length;) {
+    let j = i; while (j + 1 < pcts.length && Math.abs(pcts[j + 1] - pcts[i]) < 1e-9) j++;
+    if (j > i) { g++; for (let k = i; k <= j; k++) ids[k] = g; }
+    i = j + 1;
   }
-  const lotteryOrder = [...winners, ...remaining.sort((a, b) => a.seed - b.seed)];
-  const lottery = lotteryOrder.map((t, i) => ({ team: t.team, seed: t.seed, pick: i + 1, moved: t.seed - (i + 1) }));
-  return { order: [...lotteryOrder.map((t) => t.team), ...order.slice(LOTTERY_TEAMS)], lottery };
+  return ids;
+}
+/** Tied teams share their seeds' balls evenly (fractional), as the NBA splits combinations. */
+export function splitTies(pcts, base) {
+  const out = base.slice(0, pcts.length);
+  const ids = tieGroups(pcts);
+  const groups = {};
+  ids.forEach((g, i) => { if (g) (groups[g] ||= []).push(i); });
+  for (const idx of Object.values(groups)) {
+    const avg = idx.reduce((s, i) => s + base[i], 0) / idx.length;
+    idx.forEach((i) => { out[i] = avg; });
+  }
+  return out;
 }
 
-/** Exact odds table (seed × pick) by enumerating every draw sequence. Useful for tooltips. */
-export function lotteryOdds() {
-  const n = LOTTERY_TEAMS;
+/** Order of the teams not drawn: by balls (3-2-1) or by seed (2019); worse record first within a tier. */
+function restOrder(F, seeds, balls) {
+  return [...seeds].sort((a, b) => (F.orderRest === "balls" ? balls[b] - balls[a] : 0) || a - b);
+}
+
+/**
+ * Run one lottery.
+ * opts.format, opts.balls (per seed, after tie-splitting), opts.restricted (team codes barred from #1)
+ */
+export function simulateLottery(order, rng = Math.random, opts = {}) {
+  const F = fmt(opts.format || "2019");
+  const n = Math.min(F.teams, order.length);
+  const balls = opts.balls && opts.balls.length >= n ? opts.balls : F.balls;
+  const restricted = new Set(opts.restricted || []);
+  const pool = [...Array(n).keys()];
+  const winners = [];
+  for (let d = 0; d < F.draws && pool.length; d++) {
+    const w = pool.map((s) => (d === 0 && restricted.has(order[s]) ? 0 : balls[s]));
+    const total = w.reduce((a, b) => a + b, 0);
+    if (total <= 0) break;
+    let x = rng() * total, k = w.findIndex((wi) => (x -= wi) < 0);
+    if (k < 0) k = w.length - 1;
+    winners.push(pool.splice(k, 1)[0]);
+  }
+  const rest = restOrder(F, pool, balls);
+  const lotteryOrder = [...winners, ...rest];
+  const lottery = lotteryOrder.map((s, i) => ({ team: order[s], seed: s + 1, pick: i + 1, moved: s - i, balls: balls[s] }));
+  return { format: F.key, order: [...lotteryOrder.map((s) => order[s]), ...order.slice(n)], lottery };
+}
+
+/**
+ * Exact odds by enumerating every drawing sequence.
+ * Returns odds[seed-1][pick-1]. Teams tied on balls/record that fall to the non-drawn order
+ * have their positions spread evenly across their block (coin flip).
+ */
+export function lotteryOdds(format = "2019", { balls: ballsIn, restricted = [], order = null, ties = null } = {}) {
+  const F = fmt(format);
+  const n = F.teams;
+  const balls = ballsIn && ballsIn.length >= n ? ballsIn : F.balls;
+  const barred = new Set(order ? order.slice(0, n).map((t, i) => (restricted.includes(t) ? i : -1)).filter((i) => i >= 0) : []);
+  const tie = ties || Array(n).fill(null);
   const odds = Array.from({ length: n }, () => Array(n).fill(0));
   const walk = (drawn, p) => {
-    if (drawn.length === LOTTERY_DRAWS) {
-      const rest = [...Array(n).keys()].filter((s) => !drawn.includes(s));
+    if (drawn.length === F.draws) {
       drawn.forEach((s, i) => { odds[s][i] += p; });
-      rest.forEach((s, i) => { odds[s][LOTTERY_DRAWS + i] += p; });
+      const rest = restOrder(F, [...Array(n).keys()].filter((s) => !drawn.includes(s)), balls);
+      for (let i = 0; i < rest.length;) {
+        let j = i;
+        while (j + 1 < rest.length && tie[rest[i]] != null && tie[rest[j + 1]] === tie[rest[i]] && balls[rest[j + 1]] === balls[rest[i]]) j++;
+        const size = j - i + 1;
+        for (let a = i; a <= j; a++) for (let b = i; b <= j; b++) odds[rest[a]][F.draws + b] += p / size;
+        i = j + 1;
+      }
       return;
     }
     const left = [...Array(n).keys()].filter((s) => !drawn.includes(s));
-    const total = left.reduce((sum, s) => sum + LOTTERY_WEIGHTS[s], 0);
-    for (const s of left) walk([...drawn, s], p * LOTTERY_WEIGHTS[s] / total);
+    const w = left.map((s) => (drawn.length === 0 && barred.has(s) ? 0 : balls[s]));
+    const total = w.reduce((a, b) => a + b, 0);
+    if (total <= 0) { walk([...drawn, ...left].slice(0, F.draws), p); return; }
+    left.forEach((s, k) => { if (w[k] > 0) walk([...drawn, s], (p * w[k]) / total); });
   };
   walk([], 1);
-  return odds;   // odds[seed-1][pick-1]
+  return odds;
+}
+
+/** Per-seed summary for the odds panel: balls, #1 %, top-4 %, floor, expected pick. */
+export function lotteryTable(format = DEFAULT_FORMAT, opts = {}) {
+  const F = fmt(format);
+  const odds = lotteryOdds(F, opts);
+  const balls = opts.balls && opts.balls.length >= F.teams ? opts.balls : F.balls;
+  const totalBalls = balls.slice(0, F.teams).reduce((a, b) => a + b, 0);
+  return odds.map((row, i) => {
+    const floor = row.reduce((m, p, k) => (p > 1e-12 ? k + 1 : m), 1);
+    return {
+      seed: i + 1,
+      balls: balls[i],
+      ballShare: balls[i] / totalBalls,
+      p1: row[0],
+      top4: row.slice(0, 4).reduce((a, b) => a + b, 0),
+      floor,
+      expected: row.reduce((s, p, k) => s + p * (k + 1), 0),
+      relegated: F.relegated.includes(i + 1),
+      row,
+    };
+  });
 }
 
 /* ------------------------------------------------------------- ownership */

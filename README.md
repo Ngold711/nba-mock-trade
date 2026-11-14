@@ -103,14 +103,21 @@ fallback, with the abbreviation on the team color.
 
 Lottery simulator and mock draft for 2027–2029.
 
-- **Order:** projected from live standings (non-playoff teams first, worst record first), then
-  `simulateLottery()` runs the 2019 lottery: four weighted drawings, 14% for each of the three worst teams.
+- **Lottery formats** (`LOTTERY_FORMATS` in `service/draft.js`, switchable in the UI):
+  - **3-2-1 (default):** 16 teams (conference seeds 8–15), 37 balls. Seeds 1–3 get 2 balls and are marked
+    "relegated", seeds 4–10 get 3, seeds 11–14 get 2, and seeds 15–16 get 1. Four drawings; the rest are
+    ordered by balls, then worst record, so seeds 1–3 can fall to #12, #13 and #14.
+  - **2019:** 14 teams, 1,000 combinations, four drawings.
+- **Exact odds:** `lotteryTable()` enumerates every drawing sequence to give #1 %, top-4 % and floor for each seed.
+- **Ties and restrictions:** tied records split their balls evenly, and their order is a coin flip. A team can be
+  barred from #1 (the "Bar" toggle, per year), which removes its balls from the first drawing only.
 - **Pick ownership:** `resolvePickOwnership(simulatedOrder, draftYear, config)` in `service/draft.js`
   applies `draft_picks_2027_2029.json` after every simulation and standings refresh. Rule types:
   `unprotected`, `protected` (`protectedRange`), `split_conveyance` (`routes`), and `swap_pool`
   (`assign` by `most_favorable` / `least_favorable` / numeric rank, conditional `overrides`, protected `exclude`).
   Rules marked `"verified": false` show "Terms unconfirmed" in the UI.
-- **Prospects:** `prospects.json` per year. College prospects carry `espnCollegeAthleteId` and
+- **Prospects:** `prospects.json` holds 35 (2027), 30 (2028) and 30 (2029) players. College prospects are matched against
+  ESPN's Division I rosters and carry `espnCollegeAthleteId` and
   `collegeTeamId`. `GET /api/college/{athleteId}?team={collegeTeamId}` returns live season averages,
   recent games and roster measurables, cached for 30 minutes. Headshots come from
   `https://a.espncdn.com/i/headshots/mens-college-basketball/players/full/{id}.png`, with the initials fallback.

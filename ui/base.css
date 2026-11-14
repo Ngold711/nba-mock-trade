@@ -192,6 +192,11 @@ button.row:hover { background: var(--fill); }
   background: var(--chrome); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); box-shadow: var(--shadow-lg);
 }
 
+@media (max-width: 30rem) {
+  .nav a { padding: 0.32rem 0.5rem; font-size: 0.8125rem; }
+  .brand h1 { font-size: 1.1875rem; white-space: nowrap; }
+  .brand p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
 @media (prefers-reduced-transparency: reduce) {
   .bar, .toast { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
