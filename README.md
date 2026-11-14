@@ -193,3 +193,18 @@ Gray means no match.
 - **`HooptraxWatermark()`** (`ui/brand.js`) appears in the app footer, at the foot of every sheet and modal, on the
   exported ballot card, and as the last line of the McConnell share text.
 - **Domain:** OpenGraph tags point at `https://hooptrax.com`. Link previews need that domain to serve this site.
+
+## All-Star Voting (`awards.html`, `service/allstar.js`)
+
+The Awards tab has two views: **All-Star Voting** and **Season Awards** (MVP, ROY, DPOY, All-NBA and the rest).
+
+- **My Ballot / Live Model Projection**, with East and West tabs. Each conference has 5 starters on a court
+  (2 backcourt + 3 frontcourt, the NBA ballot rule), 7 reserves and 3 honorable mentions.
+- **One-tap voting:** "+" fills the next open matching starter slot, then a reserve slot, then an honorable mention.
+  Tapping an empty slot targets it, filters the pool and focuses search. Tapping a filled slot offers
+  Swap, Make captain, Remove and Player card.
+- **The pool is never empty.** `buildPool()` merges sources by ESPN id: league-wide season stats, then all 30 live
+  rosters, then the bundled `data.js` snapshot. ESPN's `leaders` endpoints currently return 500/404, so they aren't used.
+  Conference comes from a fixed map, so a standings outage can't empty the list.
+- **View & Share Ballot** draws a 1080×1700 PNG with the Hooptrax watermark. The ballot is saved in
+  `localStorage` (`awards:ballot:v2`), and v1 ballots are migrated automatically.

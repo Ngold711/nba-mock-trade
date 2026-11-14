@@ -97,33 +97,157 @@ h3.sec .grow { flex: 1; }
   main:not([data-mtab="east"]):not([data-mtab="west"]):not([data-mtab="cuts"]) .as-only { display: none; }
   main[data-mtab="east"] .aw-only, main[data-mtab="west"] .aw-only, main[data-mtab="cuts"] .aw-only { display: none; }
 }
+
+/* ---------- All-Star Voting ---------- */
+.views { --n: 2; width: min(100%, 34rem); margin: 0.25rem 0 1rem; }
+.views button { font-size: 0.875rem; padding: 0.55rem 0.4rem; min-height: 44px; font-weight: 700; }
+.views .vsub { font-weight: 500; color: var(--label-3); font-size: 0.75rem; }
+.as-bar { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
+.as-bar .mode { --n: 2; width: min(100%, 22rem); }
+.as-bar .confs { --n: 2; width: min(100%, 24rem); }
+.as-bar .seg button { font-size: 0.8125rem; padding: 0.45rem 0.3rem; min-height: 40px; font-weight: 650; }
+.model-note { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; justify-content: space-between; padding: 0.65rem 0.9rem; margin-bottom: 0.75rem;
+  border: 1px solid var(--sep); border-radius: var(--r-lg); background: var(--accent-soft); color: var(--label); font-size: 0.875rem; }
+.court { position: relative; border-radius: var(--r-lg); border: 1px solid var(--sep); overflow: hidden; margin-bottom: 1rem;
+  background:
+    radial-gradient(circle at 50% 100%, transparent 0 7.5rem, rgba(245,158,11,.22) 7.5rem calc(7.5rem + 2px), transparent calc(7.5rem + 3px)),
+    radial-gradient(circle at 50% 0%, transparent 0 4rem, rgba(148,163,184,.14) 4rem calc(4rem + 2px), transparent calc(4rem + 3px)),
+    linear-gradient(180deg, #172033, #121927); }
+.court::before { content: ""; position: absolute; left: 50%; bottom: 0; width: 9rem; height: 6.5rem; transform: translateX(-50%); border: 2px solid rgba(148,163,184,.12); border-bottom: 0; }
+.court-head { position: relative; display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; padding: 0.85rem 1rem 0; }
+.court-head h4 { margin: 0; font-size: 1.0625rem; letter-spacing: -0.015em; }
+.court-head span { font-size: 0.75rem; color: var(--label-3); }
+.court-floor { position: relative; display: grid; gap: 0.75rem; padding: 0.85rem 1rem 1.1rem; }
+.court-row { display: grid; gap: 0.75rem; justify-content: center; }
+.court-row.two { grid-template-columns: repeat(2, minmax(0, 12rem)); }
+.court-row.three { grid-template-columns: repeat(3, minmax(0, 12rem)); }
+.slot { position: relative; display: flex; flex-direction: column; align-items: center; gap: 0.2rem; text-align: center; min-height: 9.4rem; padding: 0.75rem 0.5rem 0.65rem;
+  border-radius: var(--r-lg); border: 1px solid var(--sep); background: var(--surface); color: var(--label); cursor: pointer; font: inherit; min-width: 0; width: 100%;
+  transition: border-color .15s ease, transform .1s ease-out; }
+.slot:active { transform: scale(0.97); }
+.slot.filled { border-top: 3px solid var(--c, var(--sep)); }
+.slot.filled:hover { border-color: #34405A; }
+.slot.empty { border: 1.5px dashed #34405A; background: rgba(21,27,38,.55); justify-content: center; color: var(--label-3); }
+.slot.empty:hover { border-color: var(--accent); color: var(--accent); }
+.slot.empty.ro { cursor: default; }
+.slot.target { border-color: var(--accent) !important; box-shadow: 0 0 0 3px var(--ring); color: var(--accent); }
+.slot-tag { position: absolute; top: 0.4rem; left: 0.5rem; font: 700 0.5625rem/1 var(--font-mono); letter-spacing: 0.08em; color: var(--label-3); }
+.slot-cap { position: absolute; top: 0.3rem; right: 0.5rem; color: var(--accent); font-size: 0.875rem; }
+.slot-plus { font-size: 1.75rem; line-height: 1; font-weight: 300; }
+.slot-cta { font-size: 0.75rem; font-weight: 650; }
+.slot-name { font-weight: 750; font-size: 0.875rem; letter-spacing: -0.01em; line-height: 1.2; margin-top: 0.25rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slot-team { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.6875rem; color: var(--label-2); }
+.slot-stats { font-size: 0.75rem; color: var(--label); }
+.bench { margin-bottom: 1rem; padding-bottom: 0.9rem; }
+.slot-grid { display: grid; gap: 0.6rem; margin-top: 0.4rem; }
+.slot-grid.seven { grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); }
+.slot-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.slot-grid .slot { min-height: 8.6rem; }
+.pool { padding: 0.9rem 1rem 0.6rem; }
+.pool[hidden] { display: none; }
+.pool-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+.pool-head h4 { margin: 0; font-size: 1.0625rem; }
+.muted { color: var(--label-3); } .small { font-size: 0.75rem; }
+.pool-tools { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin: 0.7rem 0 0.4rem; }
+.pool-tools .search { flex: 1 1 14rem; margin: 0; font-size: 16px; min-height: 44px; background-color: var(--surface-2); }
+.pool-filters { display: flex; gap: 0.35rem; }
+.pool-filters button { border: 1px solid var(--sep); background: var(--surface-2); color: var(--label-2); border-radius: 999px; padding: 0.45rem 0.85rem; font-size: 0.8125rem; font-weight: 650; cursor: pointer; min-height: 40px; }
+.pool-filters button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.pool-target { display: flex; gap: 0.5rem; align-items: center; min-height: 0; }
+.pool-target:empty { display: none; }
+.pool-list { list-style: none; margin: 0.3rem 0 0; padding: 0; max-height: 34rem; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.prow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 0.7rem; align-items: center; padding: 0.5rem 0.1rem; border-top: 1px solid var(--sep); }
+.prow:first-child { border-top: 0; }
+.prow.sel { background: linear-gradient(90deg, rgba(245,158,11,.07), transparent 60%); }
+.pface { border: 0; background: none; padding: 0; cursor: pointer; }
+.pmeta { min-width: 0; display: flex; flex-direction: column; }
+.pmeta b { font-size: 0.9375rem; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pmeta > span { font-size: 0.75rem; color: var(--label-2); display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+.pstats { text-align: right; font-size: 0.6875rem; color: var(--label-3); white-space: nowrap; }
+.pstats b { display: block; font-size: 0.875rem; color: var(--label); font-weight: 600; }
+.vote { min-width: 2.75rem; min-height: 2.75rem; border-radius: 999px; border: 1.5px solid var(--accent); background: transparent; color: var(--accent); font-size: 1.375rem; font-weight: 500; line-height: 1; cursor: pointer; padding: 0 0.6rem; }
+.vote:hover { background: var(--accent-soft); }
+.vote.on { background: var(--accent); color: var(--on-accent); font-size: 0.75rem; font-weight: 750; padding: 0 0.75rem; }
+.vote-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--tabbar-h, 0px) + 0.75rem + env(safe-area-inset-bottom)); z-index: 28;
+  width: min(calc(100% - 1.5rem), 36rem); display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.5rem 0.5rem 1rem; border-radius: 999px;
+  background: var(--chrome); -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%); border: 1px solid var(--sep); box-shadow: var(--shadow-lg); }
+.vote-bar[hidden] { display: none; }
+.vote-bar .vp { flex: 1; min-width: 0; font: 600 0.8125rem/1.2 var(--font-mono); color: var(--label-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vote-bar .vp b { color: var(--label); font-weight: 700; }
+.vote-bar .btn { min-height: 44px; white-space: nowrap; }
+body.has-votebar main { padding-bottom: 6rem; }
+.slot-sheet { display: flex; gap: 1rem; align-items: center; padding-bottom: 0.75rem; }
+.ss-name { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em; }
+.ss-sub { color: var(--label-2); font-size: 0.875rem; display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.15rem; }
+.ss-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.75rem 0 0.5rem; }
+.ss-actions .btn { min-height: 44px; display: inline-flex; align-items: center; text-decoration: none; }
+.btn.danger { color: var(--bad); }
+.ballot-img { width: 100%; height: auto; border-radius: var(--r-lg); border: 1px solid var(--sep); display: block; }
+@media (max-width: 767px) {
+  .views { width: 100%; }
+  .views .vsub { display: none; }
+  .as-bar .mode, .as-bar .confs { width: 100%; }
+  .court-row.two { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0 12%; }
+  .court-row.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .court-floor { gap: 0.5rem; padding: 0.7rem 0.6rem 0.9rem; }
+  .court-row { gap: 0.45rem; }
+  .slot { min-height: 8rem; padding: 0.6rem 0.3rem 0.5rem; }
+  .slot .avatar { --s: 2.6rem !important; }
+  .slot-name { font-size: 0.75rem; }
+  .slot-stats { font-size: 0.625rem; }
+  .slot-team { font-size: 0.625rem; }
+  .slot-grid.seven { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .slot-grid .slot { min-height: 7.4rem; }
+  .prow { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .prow .pstats { grid-column: 2; grid-row: 2; text-align: left; margin-top: -0.35rem; }
+  .prow .pstats b { display: inline; font-size: 0.75rem; margin-right: 0.3rem; }
+  .prow .vote { grid-column: 3; grid-row: 1 / span 2; }
+  .vote-bar { border-radius: 1.1rem; bottom: calc(var(--tabbar-h) + 0.5rem); }
+  .vote-bar .hm { display: none; }
+  .pool-list { max-height: none; }
+}
 </style>
 </head>
 <body>
 <header class="bar" id="bar"></header>
 
 <main>
-  <div class="toolbar"><h2>2026–27 Awards Race</h2></div>
+  <div class="toolbar"><h2>All-Star &amp; Awards</h2></div>
   <p class="lede" id="lede">Live model built on ESPN season stats and standings. Switch any section to your own ballot; it’s saved in this browser.</p>
   <div id="banner"></div>
-  <nav class="mtabs" id="mtabs" aria-label="Sections">
-    <button type="button" data-mtab="east" aria-pressed="true">East</button><button type="button" data-mtab="west" aria-pressed="false">West</button><button type="button" data-mtab="cuts" aria-pressed="false">First Cuts</button><button type="button" data-mtab="mvp" aria-pressed="false">MVP</button><button type="button" data-mtab="roy" aria-pressed="false">ROY</button><button type="button" data-mtab="dpoy" aria-pressed="false">DPOY</button><button type="button" data-mtab="smoy" aria-pressed="false">6MOY</button><button type="button" data-mtab="mip" aria-pressed="false">MIP</button><button type="button" data-mtab="coy" aria-pressed="false">COY</button><button type="button" data-mtab="allNba" aria-pressed="false">All-NBA</button></nav>
+  <div class="seg views" id="views" role="group" aria-label="Awards view"><span class="thumb"></span>
+    <button type="button" data-view="allstar" aria-pressed="true">All-Star Voting</button><button type="button" data-view="awards" aria-pressed="false">Season Awards <span class="vsub">MVP, ROY, DPOY, All-NBA</span></button></div>
 
-  <h3 class="sec as-only"><span class="grow">All-Star predictor</span>
-    <span class="ballot-actions" id="ballotActions" hidden>
-      <button class="btn press" type="button" id="resetBallot">Reset ballot</button>
-      <button class="btn primary press" type="button" id="exportBallot">Export card</button>
-    </span>
-    <span class="seg mode" role="group" aria-label="All-Star mode" id="asMode"><span class="thumb"></span>
-      <button type="button" data-mode="model" aria-pressed="true">Live model</button><button type="button" data-mode="ballot" aria-pressed="false">My ballot</button></span>
-  </h3>
-  <div class="conf-grid" id="allstar"><div class="skel"></div><div class="skel"></div></div>
+  <section id="view-allstar" aria-label="All-Star Voting">
+    <div class="as-bar">
+      <span class="seg mode" role="group" aria-label="Ballot mode" id="asMode"><span class="thumb"></span>
+        <button type="button" data-mode="ballot" aria-pressed="true">My Ballot</button><button type="button" data-mode="model" aria-pressed="false">Live Model Projection</button></span>
+      <span class="seg confs" role="group" aria-label="Conference" id="confTabs"><span class="thumb"></span>
+        <button type="button" data-conf="East" aria-pressed="true">Eastern Conference</button><button type="button" data-conf="West" aria-pressed="false">Western Conference</button></span>
+    </div>
+    <div id="lineup"><div class="skel"></div></div>
+    <section class="card pool" id="poolCard" aria-label="Player pool">
+      <div class="pool-head"><h4>Vote for players</h4><span class="muted small" id="poolSource">Loading players…</span></div>
+      <div class="pool-tools">
+        <input class="search" id="poolSearch" type="search" placeholder="Search players or teams" autocomplete="off" aria-label="Search players" />
+        <div class="pool-filters" id="poolFilters" role="group" aria-label="Position filter">
+          <button type="button" data-filter="all" aria-pressed="true">All</button><button type="button" data-filter="guards" aria-pressed="false">Guards</button><button type="button" data-filter="frontcourt" aria-pressed="false">Frontcourt</button>
+        </div>
+      </div>
+      <div class="pool-target" id="poolTarget"></div>
+      <ul class="pool-list" id="poolList"><li class="empty">Loading players…</li></ul>
+      <button class="add" type="button" id="poolMore" hidden>Show more</button>
+    </section>
+  </section>
 
-  <h3 class="sec aw-only">Season awards</h3>
-  <div class="awards-grid" id="awards"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
+  <section id="view-awards" aria-label="Season awards" hidden>
+    <nav class="mtabs" id="mtabs" aria-label="Awards"><button type="button" data-mtab="mvp" aria-pressed="true">MVP</button><button type="button" data-mtab="roy" aria-pressed="false">ROY</button><button type="button" data-mtab="dpoy" aria-pressed="false">DPOY</button><button type="button" data-mtab="smoy" aria-pressed="false">6MOY</button><button type="button" data-mtab="mip" aria-pressed="false">MIP</button><button type="button" data-mtab="coy" aria-pressed="false">COY</button><button type="button" data-mtab="allNba" aria-pressed="false">All-NBA</button></nav>
+    <div class="awards-grid" id="awards"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
+  </section><div class="skel"></div><div class="skel"></div></div>
 
   <p class="fine">AwardScore = a Game Score–style production blend (points, shooting efficiency, rebounds, assists, steals, blocks, turnovers) × team win % × availability. Projected games = games played ÷ team games × 82; players under 65 carry a “65-game risk” badge and are left off MVP, DPOY, Sixth Man, Most Improved and All-NBA ladders (All-Star and Rookie of the Year are exempt here). Games started come from ESPN box scores; rookies are inferred (no 2025–26 stats, age 24 or under). ESPN doesn’t publish All-Star selection counts, so career honors from ESPN are shown instead. A statistical model, not a prediction of votes. Not affiliated with the NBA or ESPN.</p>
 </main>
+<div class="vote-bar" id="voteBar" hidden><span class="vp" id="voteProgress"></span><button class="btn primary press" type="button" id="viewBallot">View &amp; Share Ballot</button></div>
 
 <script src="data.js"></script>
 <script type="module">
@@ -131,21 +255,19 @@ import { createClient } from "./ui/client.js";
 import { avatar, teamLogo, esc } from "./ui/avatar.js";
 import { Spring, createSheet, createToast, scrollEdge, springIn } from "./ui/motion.js";
 import { computeAwards, RULE_GAMES } from "./service/awards.js";
+import { buildPool, migrateBallot, addToBallot, removeFromBallot, slotOf, filled, allIds, modelConf, STARTER_SLOTS } from "./service/allstar.js";
 import { mountShell } from "./ui/shell.js";
 const shell = mountShell({ active: "awards" });
 
-/* Phone: one section at a time via swipeable pill tabs. Desktop shows everything. */
-let mtab = "east";
+/* Phone: Season Awards shows one ladder at a time via swipeable pill tabs. Desktop shows all. */
+let mtab = "mvp";
 const mobileQ = matchMedia("(max-width: 767px)");
 function applyTab() {
   const main = document.querySelector("main");
-  if (!mobileQ.matches) { main.removeAttribute("data-mtab"); document.querySelectorAll("[data-tab]").forEach((el) => el.classList.remove("mhide")); return; }
+  const cards = document.querySelectorAll("#awards [data-tab]");
+  if (!mobileQ.matches) { main.removeAttribute("data-mtab"); cards.forEach((el) => el.classList.remove("mhide")); return; }
   main.dataset.mtab = mtab;
-  document.querySelectorAll("[data-tab]").forEach((el) => {
-    const t = el.dataset.tab;
-    const show = mtab === "cuts" ? (t === "east" || t === "west") : t === mtab;
-    el.classList.toggle("mhide", !show);
-  });
+  cards.forEach((el) => el.classList.toggle("mhide", el.dataset.tab !== mtab));
 }
 document.getElementById("mtabs").addEventListener("click", (e) => {
   const b = e.target.closest("[data-mtab]"); if (!b) return;
@@ -167,8 +289,6 @@ const store = {
 
 let client = null, model = null, byId = {};
 const honors = {};          // athleteId -> [{name,count}]
-let asMode = store.get("awards:asMode", "model");
-let ballot = store.get("awards:ballot", null);      // { East: {starters, reserves, captain}, West: {...} }
 const awardMode = store.get("awards:modes", {});    // award -> "model" | "picks"
 const picks = store.get("awards:picks", {});        // award -> [ids]
 
@@ -185,146 +305,267 @@ const who = (p, extra = "") => `<span data-player="${esc(p.id)}" class="tap">${a
   <div class="who tap" data-player="${esc(p.id)}"><div class="nm"><span>${esc(p.name)}</span>${extra}</div>
   <div class="sub"><span class="team-tap" data-team-hub="${esc(p.team.abbr)}">${teamLogo(p.team, { size: "1rem" })}${esc(p.team.abbr)}</span> · ${esc(p.position || "—")} ${riskPill(p)}</div>${honorsLine(p)}</div>`;
 
-/* ---------------- All-Star ---------------- */
-function modelBallot() {
-  const out = {};
-  for (const c of ["East", "West"]) {
-    const m = model.allStar[c];
-    out[c] = { starters: m.starters.map((p) => p.id), reserves: m.reserves.map((p) => p.id), captain: m.starters[0]?.id || null };
+/* ---------------- All-Star Voting ---------------- */
+let pool = [], poolById = {}, poolSource = "loading", poolCounts = {};
+let view = store.get("awards:view", "allstar");
+let asMode = store.get("awards:asMode2", "ballot");                   // My Ballot is the default
+let conf = store.get("awards:conf", "East");
+let ballot = migrateBallot(store.get("awards:ballot:v2", null) || store.get("awards:ballot", null));
+let target = null;                                                     // { kind, i } chosen by tapping an empty slot
+let poolFilter = "all", poolQuery = "", poolLimit = 60;
+let modelCache = null;
+const saveBallot = () => store.set("awards:ballot:v2", ballot);
+const P = (id) => poolById[id] || null;
+const sline = (p) => (p?.stats ? `${f1(p.stats.pts)} / ${f1(p.stats.reb)} / ${f1(p.stats.ast)}` : "— / — / —");
+const modelBallot = () => (modelCache ||= { East: modelConf("East", pool, model?.allStar), West: modelConf("West", pool, model?.allStar) });
+const SLOT_LABEL = { starters: (i) => (STARTER_SLOTS[i] === "G" ? "Add Guard" : "Add Frontcourt"), reserves: () => "Add Reserve", hm: () => "Add Mention" };
+const KIND_NAME = { starters: "Starter", reserves: "Reserve", hm: "Honorable Mention" };
+
+function slotHTML(kind, i, id, src, editable) {
+  const p = P(id);
+  const isTarget = editable && target && target.kind === kind && target.i === i;
+  const tag = kind === "starters" ? (STARTER_SLOTS[i] === "G" ? "G" : "FC") : kind === "reserves" ? `R${i + 1}` : `HM`;
+  if (!p) {
+    if (!editable) return `<div class="slot empty ro"><span class="slot-tag">${tag}</span><span class="slot-plus">—</span><span class="slot-cta">Open</span></div>`;
+    return `<button class="slot empty${isTarget ? " target" : ""}" type="button" data-slot="${kind}:${i}" aria-label="${SLOT_LABEL[kind](i)}">
+      <span class="slot-tag">${tag}</span><span class="slot-plus" aria-hidden="true">+</span><span class="slot-cta">${SLOT_LABEL[kind](i)}</span></button>`;
   }
-  return out;
+  const cap = src.captain === id;
+  const attrs = editable ? `data-slot="${kind}:${i}"` : `data-player="${esc(p.id)}"`;
+  return `<button class="slot filled${isTarget ? " target" : ""}" type="button" ${attrs} style="--c:${p.team.color}" aria-label="${esc(p.name)}, ${KIND_NAME[kind]}${editable ? ". Tap to swap or remove" : ""}">
+    <span class="slot-tag">${tag}</span>${cap ? `<span class="slot-cap" title="Captain">★</span>` : ""}
+    ${avatar(p, { size: "3.1rem", color: p.team.color })}
+    <span class="slot-name">${esc(p.name)}</span>
+    <span class="slot-team">${teamLogo(p.team, { size: "0.95rem" })}${esc(p.teamAbbr)} · ${esc(p.position || "—")}</span>
+    <span class="slot-stats num">${sline(p)}</span></button>`;
 }
-function cutsFor(conf, roster) {
-  const inRoster = new Set([...roster.starters, ...roster.reserves]);
-  return model.players.filter((p) => p.conference === conf && p.stats.min >= 15 && !inRoster.has(p.id)).sort((a, b) => b.score - a.score).slice(0, 6);
-}
-function renderAllStar() {
-  const ballotMode = asMode === "ballot";
-  if (ballotMode && !ballot) ballot = modelBallot();
-  $("#ballotActions").hidden = !ballotMode;
-  const source = ballotMode ? ballot : modelBallot();
-  $("#allstar").innerHTML = ["East", "West"].map((c) => {
-    const r = source[c];
-    const starters = r.starters.map((id) => byId[id]).filter(Boolean);
-    const reserves = r.reserves.map((id) => byId[id]).filter(Boolean);
-    const cuts = cutsFor(c, r);
-    const row = (p, i, kind) => `<li data-pid="${p.id}"><span class="rk">${kind === "cut" ? 13 + i : i + 1}</span>${who(p, kind === "starter" && r.captain === p.id ? `<span class="pill cap">Captain</span>` : "")}
-      <div class="val"><b>${line(p)}</b>PTS / REB / AST</div>
-      ${ballotMode ? `<div class="ctrl">${kind === "starter" ? `<button class="star" type="button" data-cap="${c}:${p.id}" aria-pressed="${r.captain === p.id}" aria-label="Make ${esc(p.name)} captain">★</button><button class="mini" type="button" data-bench="${c}:${p.id}">Bench</button>`
-        : kind === "reserve" ? `<button class="mini" type="button" data-start="${c}:${p.id}">Start</button><button class="mini" type="button" data-cut="${c}:${p.id}">Cut</button>`
-        : `<button class="mini accent" type="button" data-promote="${c}:${p.id}">Promote to roster</button>`}</div>`
-        : kind === "cut" ? `<div class="ctrl"><button class="mini accent" type="button" data-promote="${c}:${p.id}">Promote to roster</button></div>` : ""}
-    </li>`;
-    return `<section class="card" data-tab="${c.toLowerCase()}"><h4>${c === "East" ? "Eastern" : "Western"} Conference</h4>
-      <p class="note">${ballotMode ? "Your ballot" : "Live model: 2 guards + 3 frontcourt starters; 7 reserves incl. 2 wildcards"}</p>
-      <div class="grp core"><span>Starters</span><span>${starters.length}/5</span></div><ul class="plist core">${starters.map((p, i) => row(p, i, "starter")).join("")}</ul>
-      <div class="grp core"><span>Reserves</span><span>${reserves.length}/7</span></div><ul class="plist core">${reserves.map((p, i) => row(p, i, "reserve")).join("")}</ul>
-      <div class="grp"><span>First cuts · honorable mentions</span><span>#13–18</span></div><div class="cuts"><ul class="plist">${cuts.map((p, i) => row(p, i, "cut")).join("")}</ul></div>
+
+function renderLineup() {
+  const editable = asMode === "ballot";
+  const src = editable ? ballot[conf] : modelBallot()[conf];
+  const s = (kind, i) => slotHTML(kind, i, src[kind][i], src, editable);
+  const count = (arr) => arr.filter(Boolean).length;
+  $("#lineup").innerHTML = `
+    ${editable ? "" : `<div class="model-note"><span>Live model projection for the ${conf}${model ? "" : " (from roster stats while the full model loads)"}.</span><button class="btn press" type="button" id="useModel">Use as My Ballot</button></div>`}
+    <section class="court" aria-label="${conf} starting lineup">
+      <div class="court-head"><h4>Starting Lineup</h4><span class="num">${count(src.starters)}/5 · 2 backcourt + 3 frontcourt</span></div>
+      <div class="court-floor">
+        <div class="court-row two">${s("starters", 0)}${s("starters", 1)}</div>
+        <div class="court-row three">${s("starters", 2)}${s("starters", 3)}${s("starters", 4)}</div>
+      </div>
+    </section>
+    <section class="bench card">
+      <div class="grp"><span>Reserves</span><span class="num">${count(src.reserves)}/7</span></div>
+      <div class="slot-grid seven">${src.reserves.map((_, i) => s("reserves", i)).join("")}</div>
+      <div class="grp"><span>Honorable Mentions · First Cuts</span><span class="num">${count(src.hm)}/3</span></div>
+      <div class="slot-grid three">${src.hm.map((_, i) => s("hm", i)).join("")}</div>
     </section>`;
-  }).join("");
-  applyTab();
-}
-function mutateBallot(fn) {
-  if (!ballot) ballot = modelBallot();
-  if (asMode !== "ballot") setAsMode("ballot");
-  fn(); store.set("awards:ballot", ballot); renderAllStar();
-}
-$("#allstar").addEventListener("click", (e) => {
-  const b = e.target.closest("button"); if (!b) return;
-  const [key, val] = Object.entries(b.dataset)[0] || [];
-  if (!val) return;
-  const [c, id] = val.split(":");
-  const scoreOf = (x) => byId[x]?.score ?? 0;
-  mutateBallot(() => {
-    const r = ballot[c];
-    if (key === "cap") r.captain = id;
-    if (key === "bench") { r.starters = r.starters.filter((x) => x !== id); r.reserves.unshift(id); if (r.captain === id) r.captain = r.starters[0] || null; }
-    if (key === "cut") r.reserves = r.reserves.filter((x) => x !== id);
-    if (key === "start") {
-      r.reserves = r.reserves.filter((x) => x !== id);
-      if (r.starters.length >= 5) {
-        const weakest = [...r.starters].sort((a, b2) => scoreOf(a) - scoreOf(b2))[0];
-        r.starters = r.starters.map((x) => (x === weakest ? id : x)); r.reserves.unshift(weakest);
-        if (r.captain === weakest) r.captain = id;
-      } else r.starters.push(id);
-    }
-    if (key === "promote") {
-      if (r.reserves.length >= 7) {
-        const weakest = [...r.reserves].sort((a, b2) => scoreOf(a) - scoreOf(b2))[0];
-        r.reserves = r.reserves.filter((x) => x !== weakest);
-        toast(`${byId[id]?.name} in · ${byId[weakest]?.name} to first cuts`);
-      }
-      r.reserves.push(id);
-    }
-    while (r.reserves.length > 7) r.reserves.pop();
+  $("#useModel")?.addEventListener("click", () => {
+    const prev = JSON.parse(JSON.stringify(ballot));
+    ballot[conf] = JSON.parse(JSON.stringify(modelBallot()[conf])); saveBallot();
+    setMode("ballot");
+    toast(`${conf} ballot filled from the model`, { label: "Undo", run: () => { ballot = prev; saveBallot(); renderAllStar(); } });
   });
-  const li = document.querySelector(`#allstar li[data-pid="${id}"]`); li && springIn(li);
-});
-const asSeg = $("#asMode");
-const asThumb = new Spring(asMode === "ballot" ? 1 : 0, (x) => { asSeg.querySelector(".thumb").style.transform = `translateX(${x * 100}%)`; }, 0.001);
-asThumb.onUpdate(asThumb.x);
-function setAsMode(m) {
-  asMode = m; store.set("awards:asMode", m);
-  asSeg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === m)));
-  asThumb.to(m === "ballot" ? 1 : 0, { damping: 1, response: 0.3 });
 }
-asSeg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === asMode)));   // reflect the saved mode
-asSeg.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { setAsMode(b.dataset.mode); renderAllStar(); } });
-$("#resetBallot").addEventListener("click", () => {
-  const prev = ballot; ballot = modelBallot(); store.set("awards:ballot", ballot); renderAllStar();
-  toast("Ballot reset to the model", { label: "Undo", run: () => { ballot = prev; store.set("awards:ballot", ballot); renderAllStar(); } });
+
+function poolMatches() {
+  const q = poolQuery.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  return pool.filter((p) => p.conf === conf
+    && (poolFilter === "all" || (poolFilter === "guards" ? p.group === "G" : p.group === "FC"))
+    && (!q || `${p.name} ${p.teamAbbr} ${p.team.name}`.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").includes(q)));
+}
+function renderPool() {
+  const card = $("#poolCard");
+  card.hidden = asMode !== "ballot";
+  if (card.hidden) return;
+  const list = poolMatches();
+  const mine = new Set(allIds(ballot[conf]));
+  const srcNote = { stats: `Live ESPN season stats · ${poolCounts.withStats} with stats, ${poolCounts.total} players`, rosters: `Live ESPN rosters · ${poolCounts.total} players (season averages unavailable right now)`, snapshot: "Offline roster snapshot (live data unavailable)", loading: "Loading players…" }[poolSource];
+  $("#poolSource").textContent = srcNote;
+  $("#poolTarget").innerHTML = target ? `<span class="pill cap">Filling: ${KIND_NAME[target.kind]}${target.kind === "starters" ? ` (${STARTER_SLOTS[target.i] === "G" ? "guard" : "frontcourt"})` : ""}</span><button class="mini" type="button" id="clearTarget">Cancel</button>` : "";
+  $("#clearTarget")?.addEventListener("click", () => { target = null; renderAllStar(); });
+  if (!list.length) {
+    $("#poolList").innerHTML = `<li class="empty">${poolSource === "loading" ? "Loading players…" : "No players match."}</li>`;
+    $("#poolMore").hidden = true; return;
+  }
+  $("#poolList").innerHTML = list.slice(0, poolLimit).map((p) => {
+    const sel = mine.has(p.id);
+    return `<li class="prow${sel ? " sel" : ""}">
+      <button class="pface" type="button" data-player="${esc(p.id)}" aria-label="${esc(p.name)} player card">${avatar(p, { size: "2.6rem", color: p.team.color })}</button>
+      <div class="pmeta"><b>${esc(p.name)}</b><span><span class="team-tap" data-team-hub="${esc(p.teamAbbr)}">${teamLogo(p.team, { size: "1rem" })}${esc(p.teamAbbr)}</span> · ${esc(p.position || "—")}${p.injury ? ` · <span class="pill out">${esc(p.injury.status)}</span>` : ""}</span></div>
+      <div class="pstats num"><b>${sline(p)}</b><span>PPG / RPG / APG</span></div>
+      <button class="vote${sel ? " on" : ""}" type="button" data-vote="${esc(p.id)}" aria-pressed="${sel}" aria-label="${sel ? `Remove ${esc(p.name)} from` : `Vote ${esc(p.name)} onto`} your ${conf} ballot">${sel ? "✓ Selected" : "+"}</button>
+    </li>`;
+  }).join("");
+  $("#poolMore").hidden = list.length <= poolLimit;
+  $("#poolMore").textContent = `Show more (${list.length - poolLimit} more)`;
+}
+function renderBar() {
+  const show = view === "allstar" && asMode === "ballot";
+  $("#voteBar").hidden = !show;
+  document.body.classList.toggle("has-votebar", show);
+  if (!show) return;
+  const hm = ballot.East.hm.filter(Boolean).length + ballot.West.hm.filter(Boolean).length;
+  $("#voteProgress").innerHTML = `<b>East: ${filled(ballot.East)}/12</b> • <b>West: ${filled(ballot.West)}/12</b><span class="hm"> · HM ${hm}/6</span>`;
+}
+function renderAllStar() { renderLineup(); renderPool(); renderBar(); }
+
+/* segments: view, mode, conference */
+function segSpring(el, idx) { const sp = new Spring(idx, (x) => { el.querySelector(".thumb").style.transform = `translateX(${x * 100}%)`; }, 0.001); sp.onUpdate(sp.x); return sp; }
+const viewsSeg = $("#views"), modeSeg = $("#asMode"), confSeg = $("#confTabs");
+const viewSp = segSpring(viewsSeg, view === "allstar" ? 0 : 1), modeSp = segSpring(modeSeg, asMode === "ballot" ? 0 : 1), confSp = segSpring(confSeg, conf === "East" ? 0 : 1);
+const press = (seg, attr, val) => seg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset[attr] === val)));
+function setView(v) {
+  view = v; store.set("awards:view", v); press(viewsSeg, "view", v); viewSp.to(v === "allstar" ? 0 : 1, { damping: 1, response: 0.3 });
+  $("#view-allstar").hidden = v !== "allstar"; $("#view-awards").hidden = v !== "awards";
+  renderBar(); applyTab();
+}
+function setMode(m) { asMode = m; store.set("awards:asMode2", m); press(modeSeg, "mode", m); modeSp.to(m === "ballot" ? 0 : 1, { damping: 1, response: 0.3 }); target = null; renderAllStar(); }
+function setConf(c) { conf = c; store.set("awards:conf", c); press(confSeg, "conf", c); confSp.to(c === "East" ? 0 : 1, { damping: 1, response: 0.3 }); target = null; poolLimit = 60; renderAllStar(); }
+press(viewsSeg, "view", view); press(modeSeg, "mode", asMode); press(confSeg, "conf", conf);
+$("#view-allstar").hidden = view !== "allstar"; $("#view-awards").hidden = view !== "awards";
+viewsSeg.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setView(b.dataset.view); });
+modeSeg.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setMode(b.dataset.mode); });
+confSeg.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setConf(b.dataset.conf); });
+
+/* pool interactions */
+$("#poolSearch").addEventListener("input", (e) => { poolQuery = e.target.value; poolLimit = 60; renderPool(); });
+$("#poolFilters").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-filter]"); if (!b) return;
+  poolFilter = b.dataset.filter; poolLimit = 60;
+  $("#poolFilters").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  renderPool();
+});
+const setFilter = (f) => { poolFilter = f; $("#poolFilters").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.filter === f))); };
+$("#poolMore").addEventListener("click", () => { poolLimit += 60; renderPool(); });
+$("#poolList").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-vote]"); if (!b) return;
+  const p = P(b.dataset.vote); if (!p) return;
+  const c = ballot[conf];
+  if (slotOf(c, p.id)) { removeFromBallot(c, p.id); saveBallot(); renderAllStar(); return; }
+  const res = addToBallot(c, p, target);
+  if (!res.ok) { toast(res.reason); return; }
+  saveBallot();
+  try { navigator.vibrate?.(8); } catch {}
+  const wasTarget = !!target; target = null;
+  if (res.replaced) toast(`${p.name} replaced ${P(res.replaced)?.name || "a player"}`);
+  if (wasTarget) setFilter("all");
+  renderAllStar();
+  const slot = document.querySelector(`#lineup [data-slot="${res.where.kind}:${res.where.i}"]`); slot && springIn(slot);
 });
 
-/* Export: draw the ballot to a 1080×1350 card (ESPN's CDN allows cross-origin images). */
+/* lineup interactions (My Ballot) */
+function focusPicker() {
+  const card = $("#poolCard");
+  card.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  setTimeout(() => $("#poolSearch").focus({ preventScroll: true }), 350);
+}
+$("#lineup").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-slot]"); if (!b) return;
+  const [kind, iStr] = b.dataset.slot.split(":"); const i = +iStr;
+  const c = ballot[conf]; const id = c[kind][i];
+  if (!id) {
+    target = { kind, i };
+    if (kind === "starters") setFilter(STARTER_SLOTS[i] === "G" ? "guards" : "frontcourt"); else setFilter("all");
+    renderAllStar(); focusPicker(); return;
+  }
+  const p = P(id);
+  sheet.open({
+    title: `${KIND_NAME[kind]} · ${conf}`,
+    render(body) {
+      body.innerHTML = `<div class="slot-sheet">${avatar(p || { name: "?" }, { size: "4rem", color: p?.team.color, full: true })}
+          <div><div class="ss-name">${esc(p?.name || "Player")}</div><div class="ss-sub">${p ? `${teamLogo(p.team, { size: "1.1rem" })}${esc(p.team.displayName)} · ${esc(p.position || "—")}` : ""}</div>
+          <div class="ss-sub num">${sline(p)} <span class="muted">PPG / RPG / APG</span></div></div></div>
+        <div class="ss-actions">
+          <button class="btn primary press" type="button" data-act="swap">Swap player</button>
+          ${kind === "starters" ? `<button class="btn press" type="button" data-act="captain">${c.captain === id ? "★ Captain" : "Make captain"}</button>` : ""}
+          <button class="btn press danger" type="button" data-act="remove">Remove</button>
+          <button class="btn press" type="button" data-player="${esc(id)}">Player card</button>
+        </div>`;
+      body.querySelectorAll("[data-act]").forEach((btn) => btn.addEventListener("click", () => {
+        const act = btn.dataset.act;
+        if (act === "remove") { removeFromBallot(c, id); saveBallot(); sheet.close(); renderAllStar(); toast(`${p?.name || "Player"} removed`, { label: "Undo", run: () => { c[kind][i] = id; saveBallot(); renderAllStar(); } }); }
+        if (act === "captain") { c.captain = c.captain === id ? null : id; saveBallot(); sheet.close(); renderAllStar(); }
+        if (act === "swap") { target = { kind, i }; if (kind === "starters") setFilter(STARTER_SLOTS[i] === "G" ? "guards" : "frontcourt"); sheet.close(); renderAllStar(); focusPicker(); }
+      }));
+    },
+  });
+});
+
+/* ---------------- View & Share: the Hooptrax All-Star Ballot graphic ---------------- */
 const loadImg = (src) => new Promise((res) => { if (!src) return res(null); const i = new Image(); i.crossOrigin = "anonymous"; i.onload = () => res(i); i.onerror = () => res(null); i.src = src; });
-$("#exportBallot").addEventListener("click", async () => {
-  const W = 1080, H = 1420, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+async function ballotCanvas() {
+  const W = 1080, ROW = 70, H = 1700;
+  const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
   const g = cv.getContext("2d");
   const font = (w, s) => `${w} ${s}px "Plus Jakarta Sans", Inter, -apple-system, system-ui, sans-serif`;
   const mono = (w, s) => `${w} ${s}px "JetBrains Mono", ui-monospace, Menlo, monospace`;
   await document.fonts?.ready;
   g.fillStyle = "#0B0E14"; g.fillRect(0, 0, W, H);
-  g.fillStyle = "#151B26"; g.fillRect(40, 196, W - 80, H - 300);
-  g.strokeStyle = "#232C3D"; g.lineWidth = 2; g.strokeRect(40, 196, W - 80, H - 300);
-  g.fillStyle = "#FFFFFF"; g.font = font(800, 56); g.fillText("My 2027 All-Star Ballot", 64, 110);
-  g.fillStyle = "#F59E0B"; g.font = mono(600, 22); g.fillText(`AWARDS RACE · ${new Date().toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" })}`, 64, 152);
-  const cols = [["East", 64], ["West", 576]];
-  for (const [c, x0] of cols) {
-    const r = ballot[c];
-    g.fillStyle = "#FFFFFF"; g.font = font(800, 32); g.fillText(c === "East" ? "Eastern Conference" : "Western Conference", x0, 230);
-    let y = 270;
-    const section = async (title, ids) => {
-      g.fillStyle = "#F59E0B"; g.font = mono(700, 18); g.fillText(title.toUpperCase(), x0, y + 20); y += 40;
-      for (const id of ids) {
-        const p = byId[id]; if (!p) continue;
-        const img = await loadImg(p.headshotSmall);
-        g.save(); g.beginPath(); g.arc(x0 + 30, y + 30, 30, 0, Math.PI * 2); g.closePath(); g.fillStyle = p.team.color || "#333"; g.fill(); g.clip();
-        if (img) g.drawImage(img, x0 - 12, y - 2, 84, 62);
-        else { g.fillStyle = "#fff"; g.font = font(700, 22); g.textAlign = "center"; g.fillText(p.initials, x0 + 30, y + 38); g.textAlign = "left"; }
+  const grad = g.createRadialGradient(W * 0.8, -80, 10, W * 0.8, -80, 700); grad.addColorStop(0, "rgba(245,158,11,.16)"); grad.addColorStop(1, "rgba(245,158,11,0)");
+  g.fillStyle = grad; g.fillRect(0, 0, W, 600);
+  g.fillStyle = "#FFFFFF"; g.font = font(800, 54); g.fillText("My 2027 All-Star Ballot", 56, 104);
+  g.fillStyle = "#F59E0B"; g.font = mono(600, 20); g.fillText(`ALL-STAR VOTING · ${new Date().toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }).toUpperCase()}`, 56, 144);
+  const imgs = new Map();
+  await Promise.all(["East", "West"].flatMap((c) => allIds(ballot[c])).map(async (id) => { imgs.set(id, await loadImg(P(id)?.headshotSmall)); }));
+  for (const [c, x0] of [["East", 40], ["West", 552]]) {
+    const r = ballot[c]; const cw = 488;
+    g.fillStyle = "#151B26"; g.beginPath(); g.roundRect ? g.roundRect(x0, 180, cw, H - 320, 18) : g.rect(x0, 180, cw, H - 320); g.fill();
+    g.strokeStyle = "#232C3D"; g.lineWidth = 2; g.stroke();
+    g.fillStyle = "#FFFFFF"; g.font = font(800, 28); g.fillText(c === "East" ? "Eastern Conference" : "Western Conference", x0 + 22, 226);
+    let y = 250;
+    const section = (title, ids) => {
+      g.fillStyle = "#F59E0B"; g.font = mono(700, 16); g.fillText(title, x0 + 22, y + 22); y += 36;
+      ids.forEach((id, k) => {
+        const p = P(id);
+        g.save(); g.beginPath(); g.arc(x0 + 50, y + 30, 26, 0, Math.PI * 2); g.closePath();
+        g.fillStyle = p ? p.team.color : "#1A2130"; g.fill(); g.clip();
+        const img = id && imgs.get(id);
+        if (img) g.drawImage(img, x0 + 14, y + 4, 72, 52);
+        else if (p) { g.fillStyle = "#fff"; g.font = font(700, 18); g.textAlign = "center"; g.fillText(p.initials, x0 + 50, y + 37); g.textAlign = "left"; }
         g.restore();
-        g.fillStyle = "#E8ECF3"; g.font = font(700, 26); g.fillText(p.name + (r.captain === id ? "  ★" : ""), x0 + 76, y + 28);
-        g.fillStyle = "#94A3B8"; g.font = mono(500, 18); g.fillText(`${p.team.abbr} · ${line(p)}`, x0 + 76, y + 56);
-        y += 76;
-      }
-      y += 10;
+        if (!p) { g.strokeStyle = "#34405A"; g.setLineDash([6, 6]); g.beginPath(); g.arc(x0 + 50, y + 30, 26, 0, Math.PI * 2); g.stroke(); g.setLineDash([]); }
+        g.fillStyle = p ? "#E8ECF3" : "#64748B"; g.font = font(700, 22);
+        g.fillText(p ? p.name + (r.captain === id ? "  ★" : "") : "Open slot", x0 + 92, y + 26);
+        g.fillStyle = "#94A3B8"; g.font = mono(500, 15);
+        if (p) g.fillText(`${p.teamAbbr} · ${p.position || "—"} · ${sline(p)}`, x0 + 92, y + 50);
+        y += ROW;
+      });
+      y += 8;
     };
-    await section("Starters", r.starters);
-    await section("Reserves", r.reserves);
+    section("STARTERS", r.starters);
+    section("RESERVES", r.reserves);
+    section("HONORABLE MENTIONS", r.hm);
   }
-  // Hooptrax watermark: logo + wordmark + domain
   const logo = await loadImg("public/logo.svg");
-  if (logo) g.drawImage(logo, 64, H - 92, 52, 52);
-  g.font = font(800, 34); g.fillStyle = "#FFFFFF"; g.fillText("Hoop", 126, H - 54);
-  const hw = g.measureText("Hoop").width; g.fillStyle = "#F59E0B"; g.fillText("trax", 126 + hw - 1, H - 54);
-  g.fillStyle = "#94A3B8"; g.font = mono(500, 20); g.textAlign = "right"; g.fillText("Hooptrax.com · stats: ESPN", W - 64, H - 58); g.textAlign = "left";
-  const blob = await new Promise((res) => cv.toBlob(res, "image/png"));
-  const file = new File([blob], "my-all-star-ballot.png", { type: "image/png" });
-  try {
-    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: "My All-Star ballot" }); return; }
-  } catch (err) { if (err.name === "AbortError") return; }
-  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = file.name; a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  toast("Ballot card saved");
+  if (logo) g.drawImage(logo, 56, H - 112, 56, 56);
+  g.font = font(800, 36); g.fillStyle = "#FFFFFF"; g.fillText("Hoop", 124, H - 70);
+  const hw = g.measureText("Hoop").width; g.fillStyle = "#F59E0B"; g.fillText("trax", 124 + hw - 1, H - 70);
+  g.fillStyle = "#94A3B8"; g.font = mono(500, 20); g.textAlign = "right"; g.fillText("Hooptrax.com · stats: ESPN", W - 56, H - 74); g.textAlign = "left";
+  return cv;
+}
+$("#viewBallot").addEventListener("click", async () => {
+  let url = null, blob = null;
+  sheet.open({
+    title: "Your All-Star Ballot",
+    render(body) {
+      body.innerHTML = url
+        ? `<img class="ballot-img" src="${url}" alt="Your Hooptrax All-Star ballot: East and West starters, reserves and honorable mentions">
+           <div class="ss-actions"><a class="btn primary press" href="${url}" download="hooptrax-all-star-ballot.png">Download PNG</a>
+           ${navigator.canShare ? `<button class="btn press" type="button" id="shareBallot">Share</button>` : ""}</div>
+           <p class="muted small">Tip: long-press the image to save it on iPhone.</p>`
+        : `<div class="skel" style="height:24rem"></div>`;
+      body.querySelector("#shareBallot")?.addEventListener("click", async () => {
+        const file = new File([blob], "hooptrax-all-star-ballot.png", { type: "image/png" });
+        try { if (navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: "My All-Star ballot · Hooptrax" }); else toast("Sharing files isn't supported here; use Download."); }
+        catch (err) { if (err.name !== "AbortError") toast("Couldn't share; use Download."); }
+      });
+    },
+  });
+  const cv = await ballotCanvas();
+  blob = await new Promise((res) => cv.toBlob(res, "image/png"));
+  url = URL.createObjectURL(blob);
+  if (sheet.isOpen) sheet.refresh();
 });
 
 /* ---------------- Awards ---------------- */
@@ -347,6 +588,7 @@ function entryFor(a, id) {
   return a.team ? pool.find((e) => e.team.id === id) : pool.find((e) => e.player.id === id) || (byId[id] ? { player: byId[id], value: byId[id].score } : null);
 }
 function renderAwards() {
+  if (!model) { $("#awards").innerHTML = `<div class="empty">Season award ladders need ESPN’s season stats and standings, which didn’t load. Retrying every minute; All-Star voting still works from live rosters.</div>`; return; }
   let html = AWARDS.map((a) => {
     const lad = model.awards[a.key];
     const mode = awardMode[a.key] || "model";
@@ -424,41 +666,45 @@ function pickSheet(key) {
 
 /* ---------------- data ---------------- */
 async function loadHonors() {
-  if (client.mode !== "service") return;          // ~36 extra requests; only through the caching service
-  const ids = new Set();
-  for (const c of ["East", "West"]) { const m = model.allStar[c]; [...m.starters, ...m.reserves, ...m.mentions].forEach((p) => ids.add(p.id)); }
-  [...model.awards.mvp.leaders].forEach((e) => ids.add(e.player.id));
-  const list = [...ids].filter((id) => !honors[id]);
+  if (!model || client.mode !== "service") return;          // extra requests; only through the caching service
+  const ids = new Set(model.awards.mvp.leaders.map((e) => e.player.id));
+  [...model.awards.allNba.first, ...model.awards.allNba.second, ...model.awards.allNba.third].forEach((p) => ids.add(p.id));
+  const list = [...ids].filter((id) => !(id in honors));
   let i = 0;
   const worker = async () => { while (i < list.length) { const id = list[i++]; try { honors[id] = (await client.get("honors", { id })).data; } catch { honors[id] = null; } } };
   await Promise.all([worker(), worker(), worker(), worker()]);
-  renderAllStar(); renderAwards();
+  renderAwards();
 }
+let retry = 0;
 async function load() {
-  const names = [["players", {}], ["players", { season: 2026 }], ["standings", {}], ["standings", { season: 2026 }], ["starts", {}], ["coaches", {}]];
+  const names = [["players", {}], ["league", {}], ["standings", {}], ["players", { season: 2026 }], ["standings", { season: 2026 }], ["starts", {}], ["coaches", {}]];
   const res = await Promise.allSettled(names.map(([n, p]) => client.get(n, p)));
-  const [players, prevPlayers, standings, prevStandings, starts, coaches] = res.map((r) => (r.status === "fulfilled" ? r.value.data : null));
-  if (!players || !standings) throw new Error(res.find((r) => r.status === "rejected")?.reason?.message || "No data");
-  model = computeAwards({ players, prevPlayers, standings, prevStandings, starts, coaches });
-  byId = Object.fromEntries(model.players.map((p) => [p.id, p]));
-  const missing = ["last season's stats", "last season's standings", "games started", "coaches"].filter((_, i) => !res[[1, 3, 4, 5][i]].value);
-  $("#banner").innerHTML = missing.length ? `<div class="banner">Some inputs didn’t load (${missing.join(", ")}); related awards may be incomplete.</div>` : "";
-  $("#lede").textContent = `Live model built on ESPN season stats and standings, ${model.teamGamesMax} team games in. Early-season ladders move fast. Switch any section to your own ballot; it’s saved in this browser.`;
-  $("#pulse").className = "pulse on";
-  $("#sync").innerHTML = `Updated ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}<span class="long"> · ${client.mode === "service" ? "local service" : "ESPN direct"}</span>`;
-  renderAllStar(); renderAwards();
+  const [players, league, standings, prevPlayers, prevStandings, starts, coaches] = res.map((r) => (r.status === "fulfilled" ? r.value.data : null));
+  model = null;
+  try { if (players && standings) model = computeAwards({ players, prevPlayers, standings, prevStandings, starts, coaches }); } catch (e) { console.warn("awards model", e); }
+  byId = model ? Object.fromEntries(model.players.map((p) => [p.id, p])) : {};
+  // All-Star pool: stats + live rosters, falling back to the bundled snapshot so it is never empty.
+  const scores = model ? Object.fromEntries(model.players.map((p) => [p.id, p.score])) : {};
+  const built = buildPool({ players, league, snapshot: window.NBA_DATA?.teams, scores });
+  pool = built.pool; poolSource = built.source; poolCounts = built.counts;
+  poolById = Object.fromEntries(pool.map((p) => [p.id, p]));
+  modelCache = null;
+  const missing = [["season stats", players], ["live rosters", league], ["standings", standings], ["last season's stats", prevPlayers], ["games started", starts]].filter(([, v]) => !v).map(([k]) => k);
+  $("#banner").innerHTML = missing.length ? `<div class="banner">Some ESPN data didn’t load (${missing.join(", ")}). Everything that depends on it will fill in automatically.</div>` : "";
+  $("#lede").textContent = model
+    ? `Vote your All-Star ballot or compare it with the live model, built on ESPN season stats, ${model.teamGamesMax} team games in. Your picks are saved in this browser.`
+    : "Vote your All-Star ballot from live ESPN rosters. Your picks are saved in this browser.";
+  shell.setStatus(players ? "on" : "err", players ? "Live Sync" : "Partial data");
+  renderAllStar(); renderAwards(); applyTab();
   loadHonors();
+  if (!players || !standings || !league) setTimeout(() => load().catch(() => {}), Math.min(60_000 * ++retry, 300_000));
 }
 
 (async () => {
   client = await createClient();
-  try { await load(); }
-  catch (e) {
-    $("#pulse").className = "pulse err"; $("#sync").textContent = "Couldn’t load stats";
-    $("#allstar").innerHTML = $("#awards").innerHTML = `<div class="empty">Couldn’t load live stats from ESPN: ${esc(e.message)}. Retrying in a minute.</div>`;
-    setTimeout(() => location.reload(), 60_000);
-  }
-  // "Auto-updates": stats are cached ~30 min server-side; re-run the model every 30 min while open.
+  renderAllStar();                       // empty ballot + "loading" pool right away
+  await load().catch((e) => { console.warn(e); });
+  // stats are cached ~30 min server-side; re-run the model every 30 min while open
   setInterval(() => { if (!document.hidden) load().catch(() => {}); }, 30 * 60_000);
 })();
 </script>
