@@ -21,6 +21,7 @@ export const TTL = {
   roster: 60 * MIN,
   teams: 24 * 60 * MIN,
   historical: 10 * MIN,
+  college: 30 * MIN,       // NCAA prospect stats
 };
 const MAX_BACKOFF = 5 * MIN;
 
@@ -58,6 +59,7 @@ export const POLICIES = {
   standings: () => TTL.standings,
   transactions: () => TTL.transactions,
   teams: () => TTL.teams,
+  college: () => TTL.college,
 };
 
 const keyOf = (resource, params = {}) =>

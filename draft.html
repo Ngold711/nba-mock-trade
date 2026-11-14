@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>NBA Mock Draft</title>
+<meta name="description" content="NBA draft lottery simulator and mock draft for 2027–2029 with traded-pick protections, swaps, and live college stats." />
+<link rel="stylesheet" href="ui/base.css" />
+<style>
+main { max-width: 60rem; margin: 0 auto; padding: 0 max(1rem, env(safe-area-inset-right)) 3rem max(1rem, env(safe-area-inset-left)); }
+.toolbar { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; padding: 1.25rem 0 0.75rem; }
+.toolbar h2 { margin: 0; font-size: clamp(1.75rem, 4vw, 2.5rem); line-height: 1.05; letter-spacing: -0.026em; font-weight: 750; flex: 1; min-width: 10rem; }
+.years { --n: 3; width: min(100%, 18rem); }
+.years button { font-size: 0.875rem; padding: 0.4rem; }
+.actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+.source { font-size: 0.8125rem; color: var(--label-2); margin: 0 0 1rem; }
+.warn-line { font-size: 0.8125rem; color: var(--warn); background: var(--warn-soft); padding: 0.5rem 0.75rem; border-radius: var(--r-md); margin: 0 0 1rem; }
+
+.board { background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); overflow: hidden; }
+.section-head { font-size: 0.6875rem; font-weight: 650; text-transform: uppercase; letter-spacing: 0.06em; color: var(--label-3); padding: 0.7rem 1rem 0.35rem; background: var(--surface-2); }
+.pick { display: grid; grid-template-columns: 2.1rem minmax(0, 1fr) minmax(0, 1.25fr); align-items: center; gap: 0.75rem; padding: 0.6rem 1rem; border-top: 0.5px solid var(--sep); }
+.pick .no { font-size: 1.0625rem; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; text-align: right; }
+.pick .no small { display: block; font-size: 0.625rem; font-weight: 650; color: var(--good); letter-spacing: 0; }
+.pick .no small.down { color: var(--bad); }
+.own { display: flex; align-items: center; gap: 0.4rem; min-width: 0; }
+.own .arrow { color: var(--label-3); font-size: 0.75rem; flex: none; }
+.own .txt { min-width: 0; display: flex; flex-direction: column; }
+.own .nm { font-weight: 650; font-size: 0.9375rem; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.own .via { font-size: 0.6875rem; color: var(--label-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.faded { opacity: .45; }
+.badge-row { display: flex; gap: 0.3rem; align-items: center; flex-wrap: wrap; margin-top: 0.15rem; }
+.pill.prot { background: var(--good-soft); color: var(--good); }
+.pill.swap { background: var(--accent-soft); color: var(--accent); }
+.pill.conv { background: var(--fill); color: var(--label-2); }
+.info { width: 1.35rem; height: 1.35rem; border-radius: 999px; border: 0; background: var(--fill); color: var(--label-2); font-size: 0.6875rem; font-weight: 750; font-style: italic; font-family: Georgia, serif; cursor: pointer; flex: none; display: inline-grid; place-items: center; }
+.info:hover, .info[aria-expanded="true"] { background: var(--accent); color: #fff; }
+.sel { display: flex; align-items: center; gap: 0.6rem; min-width: 0; background: none; border: 0; padding: 0.3rem; margin: -0.3rem; border-radius: 0.7rem; cursor: pointer; text-align: left; width: 100%; }
+.sel:hover { background: var(--fill); }
+.sel .nm { font-weight: 650; font-size: 0.9375rem; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.sel .sub { font-size: 0.75rem; color: var(--label-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.sel .meta { min-width: 0; }
+.make { border: 1.5px dashed var(--sep); border-radius: 0.7rem; padding: 0.5rem 0.7rem; color: var(--accent); font-weight: 600; font-size: 0.875rem; background: none; cursor: pointer; width: 100%; text-align: left; }
+.make:hover { background: var(--accent-soft); }
+.make.next { border-style: solid; border-color: var(--accent); background: var(--accent-soft); }
+
+/* Tooltip popover */
+.tip { position: absolute; z-index: 35; max-width: min(22rem, calc(100vw - 2rem)); background: var(--surface); color: var(--label); border-radius: 0.9rem; box-shadow: var(--shadow-lg), 0 0 0 0.5px var(--sep); padding: 0.75rem 0.9rem; font-size: 0.8125rem; line-height: 1.45; opacity: 0; pointer-events: none; }
+.tip.on { pointer-events: auto; }
+.tip b { display: block; font-size: 0.875rem; margin-bottom: 0.2rem; letter-spacing: -0.008em; }
+.tip .deal { color: var(--label-2); margin-top: 0.35rem; }
+.tip .unv { color: var(--warn); margin-top: 0.35rem; font-weight: 550; }
+
+/* Scouting drawer */
+.scout-head { display: flex; gap: 1rem; align-items: center; padding-bottom: 0.75rem; }
+.scout-head .t { min-width: 0; }
+.scout-head h5 { margin: 0; font-size: 1.375rem; letter-spacing: -0.02em; line-height: 1.15; }
+.scout-head .sub { color: var(--label-2); font-size: 0.875rem; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.measure { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-bottom: 0.25rem; }
+.measure > div, .stats > div { background: var(--surface-2); border-radius: 0.7rem; padding: 0.5rem 0.6rem; box-shadow: inset 0 0 0 0.5px var(--sep); min-width: 0; }
+.measure .k, .stats .k { font-size: 0.625rem; color: var(--label-3); font-weight: 650; text-transform: uppercase; letter-spacing: 0.06em; }
+.measure .v { font-weight: 650; font-size: 0.9375rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; }
+.stats .v { font-weight: 750; font-size: 1.25rem; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.stat-note { font-size: 0.75rem; color: var(--label-3); margin-top: 0.4rem; }
+.games td:first-child { padding-left: 0; } .games td:last-child { padding-right: 0; }
+.games .opp { display: flex; align-items: center; gap: 0.45rem; }
+.games .w { color: var(--good); font-weight: 650; } .games .l { color: var(--bad); font-weight: 650; }
+.notes p { margin: 0.25rem 0 0.5rem; font-size: 0.9375rem; line-height: 1.5; }
+.notes .comp { font-weight: 650; }
+.editorial { font-size: 0.6875rem; color: var(--label-3); }
+.skel { height: 4.5rem; border-radius: 0.7rem; background: var(--fill); }
+table { border-collapse: collapse; width: 100%; font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
+th { text-align: right; font-weight: 600; font-size: 0.6875rem; color: var(--label-3); letter-spacing: 0.04em; text-transform: uppercase; padding: 0.4rem 0.4rem; }
+td { text-align: right; padding: 0.45rem 0.4rem; border-top: 0.5px solid var(--sep); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+.fine { color: var(--label-3); font-size: 0.75rem; margin-top: 1.5rem; line-height: 1.5; }
+@media (max-width: 34rem) {
+  .pick { grid-template-columns: 1.8rem minmax(0, 1fr); row-gap: 0.45rem; }
+  .pick .slot { grid-column: 2; }
+  .measure { grid-template-columns: repeat(2, 1fr); }
+  .stats { grid-template-columns: repeat(3, 1fr); }
+  .brand p .long { display: none; }
+}
+</style>
+</head>
+<body>
+<header class="bar" id="bar">
+  <div class="bar-inner">
+    <div class="brand">
+      <h1>Mock Draft</h1>
+      <p><span class="pulse" id="pulse"></span><span id="sync">Loading standings…</span></p>
+    </div>
+    <nav class="nav" aria-label="Sections"><a href="index.html">Trade</a><a href="live.html">Live</a><a href="draft.html" aria-current="page">Draft</a></nav>
+  </div>
+</header>
+
+<main>
+  <div class="toolbar">
+    <h2 id="title">2027 Draft</h2>
+    <div class="seg years" role="group" aria-label="Draft year" id="years">
+      <span class="thumb"></span>
+      <button type="button" data-year="2027" aria-pressed="true">2027</button>
+      <button type="button" data-year="2028" aria-pressed="false">2028</button>
+      <button type="button" data-year="2029" aria-pressed="false">2029</button>
+    </div>
+  </div>
+  <div class="actions">
+    <button class="btn primary press" type="button" id="simBtn">Simulate lottery</button>
+    <button class="btn press" type="button" id="projBtn">Projected order</button>
+    <button class="btn press" type="button" id="autoBtn">Auto-draft</button>
+    <button class="btn press" type="button" id="clearBtn">Clear picks</button>
+  </div>
+  <p class="source" id="source"></p>
+  <div id="warnings"></div>
+  <div class="board" id="board"></div>
+  <p class="fine">Lottery uses the 2019 odds (14% for each of the three worst records, four drawings). Pick obligations come from draft_picks_2027_2029.json and are applied after every simulation and standings refresh; terms marked unconfirmed should be checked against an official source. College stats and headshots come live from ESPN. 2028 and 2029 orders are projections from today’s standings. Not affiliated with the NBA, NCAA or ESPN.</p>
+</main>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script src="data.js"></script>
+<script type="module">
+import { createClient } from "./ui/client.js";
+import { avatar, teamLogo, esc } from "./ui/avatar.js";
+import { Spring, createSheet, createToast, scrollEdge, springIn } from "./ui/motion.js";
+import { projectOrder, simulateLottery, resolvePickOwnership, lotteryOdds, LOTTERY_TEAMS } from "./service/draft.js";
+import { collegeHeadshot } from "./service/normalize.js";
+
+const $ = (s, r = document) => r.querySelector(s);
+const TEAMS = window.NBA_DATA.teams;
+const ESPN_SLUG = { GSW: "gs", NOP: "no", NYK: "ny", SAS: "sa", UTA: "utah", WAS: "wsh" };
+const teamOf = (code) => ({
+  abbr: code, color: TEAMS[code]?.color || "#8e8e93",
+  logo: `https://a.espncdn.com/i/teamlogos/nba/500/${ESPN_SLUG[code] || code.toLowerCase()}.png`,
+  name: TEAMS[code] ? TEAMS[code].name : code, city: TEAMS[code]?.city || "",
+});
+const ODDS = lotteryOdds();
+const pct = (x) => (x * 100).toFixed(1).replace(/\.0$/, "") + "%";
+const sheet = createSheet();
+const toast = createToast();
+scrollEdge($("#bar"));
+
+/* ---------- state ---------- */
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+let client = null, config = null, prospects = null, standings = null;
+let year = "2027";
+let projected = null;                 // order from standings
+const perYear = {};                   // year -> { order, lottery, picks: {pickNo: prospectId} }
+const yearState = () => (perYear[year] ||= store.get(`draft:${year}`) || { order: null, lottery: null, picks: {} });
+const save = () => store.set(`draft:${year}`, yearState());
+
+/* ---------- data ---------- */
+async function loadJson(path) { const r = await fetch(path, { cache: "no-cache" }); if (!r.ok) throw new Error(`${path}: ${r.status}`); return r.json(); }
+
+function currentOrder() {
+  const s = yearState();
+  return s.order && s.order.length === 30 ? s.order : projected;
+}
+function board() {
+  return [...(prospects?.[year] || [])].sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999)).map((p) => {
+    const hs = p.type === "college" ? collegeHeadshot(p.espnCollegeAthleteId) : { url: p.headshot || null, small: p.headshot || null };
+    return { ...p, headshot: hs.url, headshotSmall: hs.small };
+  });
+}
+
+/* ---------- render ---------- */
+function render() {
+  $("#title").textContent = `${year} Draft`;
+  const order = currentOrder();
+  const s = yearState();
+  if (!order) { $("#board").innerHTML = `<div class="empty" style="margin:1rem">Loading draft order…</div>`; return; }
+  const { picks, warnings } = resolvePickOwnership(order, year, config);
+  const prosById = Object.fromEntries(board().map((p) => [p.id, p]));
+  const moved = Object.fromEntries((s.lottery || []).map((l) => [l.pick, l.moved]));
+  const nextOpen = picks.find((p) => !s.picks[p.pick])?.pick;
+  const simmed = !!s.order;
+
+  $("#warnings").innerHTML = warnings.length ? `<p class="warn-line">${warnings.map(esc).join("<br>")}</p>` : "";
+  const rows = picks.map((p) => {
+    const orig = teamOf(p.originalTeam), own = teamOf(p.owner);
+    const traded = p.owner !== p.originalTeam;
+    const badge = p.status === "protected_retained" ? `<span class="pill prot">Protected – Retained</span>`
+      : p.status === "swapped" ? `<span class="pill swap">Swap</span>`
+      : p.status === "swap_kept" ? `<span class="pill swap">Swap · kept</span>`
+      : p.status === "conveyed" ? `<span class="pill conv">Traded</span>` : "";
+    const mv = moved[p.pick];
+    const mvTxt = simmed && mv ? `<small class="${mv < 0 ? "down" : ""}">${mv > 0 ? "▲" : "▼"}${Math.abs(mv)}</small>` : "";
+    const seedIdx = p.pick - 1;
+    const odds = !simmed && p.pick <= LOTTERY_TEAMS ? `#1 odds ${pct(ODDS[seedIdx][0])}` : "";
+    const pr = prosById[s.picks[p.pick]];
+    const slot = pr
+      ? `<button class="sel" type="button" data-scout="${esc(pr.id)}">${avatar(pr, { size: "2.5rem", color: own.color })}
+          <span class="meta"><span class="nm">${esc(pr.name)}</span><span class="sub">${esc([pr.position, pr.school || pr.type].filter(Boolean).join(" · "))}</span></span></button>`
+      : `<button class="make press${p.pick === nextOpen ? " next" : ""}" type="button" data-make="${p.pick}">${p.pick === nextOpen ? "On the clock · Make pick" : "Make pick"}</button>`;
+    return `${p.pick === 1 ? `<div class="section-head">Lottery</div>` : p.pick === 15 ? `<div class="section-head">Picks 15–30</div>` : ""}
+      <div class="pick" data-row="${p.pick}">
+        <div class="no">${p.pick}${mvTxt}</div>
+        <div class="own">
+          ${traded ? `<span class="faded">${teamLogo(orig, { size: "1.6rem" })}</span><span class="arrow" aria-hidden="true">→</span>` : ""}
+          ${teamLogo(own, { size: "2rem" })}
+          <span class="txt"><span class="nm">${esc(own.name)}</span>
+            <span class="via">${traded ? `via ${esc(orig.city || orig.abbr)}` : odds || esc(own.city)}</span>
+            ${badge || p.ruleId ? `<span class="badge-row">${badge}${p.ruleId ? `<button class="info" type="button" data-tip="${p.pick}" aria-label="Explain pick ${p.pick}" aria-expanded="false" title="${esc(p.explanation + (p.tradeNote ? " " + p.tradeNote : ""))}">i</button>` : ""}</span>` : ""}
+          </span>
+        </div>
+        <div class="slot">${slot}</div>
+      </div>`;
+  }).join("");
+  $("#board").innerHTML = rows;
+  $("#board").dataset.picks = JSON.stringify(picks.map(({ pick, explanation, tradeNote, verified, originalTeam, owner }) => ({ pick, explanation, tradeNote, verified, originalTeam, owner })));
+  const empty = !board().length;
+  $("#autoBtn").disabled = empty;
+  $("#source").textContent = (simmed ? "Simulated lottery. " : "Projected order (no lottery yet). ")
+    + (standings ? `Based on live 2026–27 standings${year !== "2027" ? " — a projection for " + year : ""}.` : "Standings unavailable; using a placeholder order.")
+    + (empty ? ` No prospects on the ${year} board yet — add them to prospects.json.` : "");
+}
+
+/* ---------- tooltip (hover on desktop, tap on touch) ---------- */
+const tip = $("#tip");
+const tipSpring = new Spring(0, (p) => { tip.style.opacity = String(Math.max(0, Math.min(1, p))); tip.style.transform = `translateY(${(1 - p) * 4}px) scale(${0.97 + 0.03 * p})`; }, 0.001);
+let tipFor = null;
+function showTip(btn) {
+  const data = JSON.parse($("#board").dataset.picks || "[]").find((x) => x.pick === +btn.dataset.tip);
+  if (!data) return;
+  document.querySelectorAll(".info[aria-expanded=true]").forEach((b) => b.setAttribute("aria-expanded", "false"));
+  btn.setAttribute("aria-expanded", "true"); btn.removeAttribute("title");
+  tip.innerHTML = `<b>Pick ${data.pick}: ${esc(data.originalTeam)}${data.owner !== data.originalTeam ? ` → ${esc(data.owner)}` : ""}</b>${esc(data.explanation)}`
+    + (data.tradeNote ? `<div class="deal">${esc(data.tradeNote)}</div>` : "")
+    + (data.verified ? "" : `<div class="unv">Terms unconfirmed — verify before relying on this.</div>`);
+  const r = btn.getBoundingClientRect();
+  tip.classList.add("on"); tip.style.left = "0px"; tip.style.top = "0px";
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  const left = Math.min(Math.max(12, r.left + scrollX + r.width / 2 - w / 2), scrollX + innerWidth - w - 12);
+  const below = r.bottom + h + 12 < innerHeight;
+  tip.style.left = `${left}px`; tip.style.top = `${(below ? r.bottom + 8 : r.top - h - 8) + scrollY}px`;
+  tip.style.transformOrigin = `${r.left + scrollX + r.width / 2 - left}px ${below ? "0" : "100%"}`;   // grow from the button
+  tipFor = btn; tipSpring.to(1, { damping: 1, response: 0.25 });
+}
+function hideTip() { if (!tipFor) return; tipFor.setAttribute("aria-expanded", "false"); tipFor = null; tip.classList.remove("on"); tipSpring.to(0, { damping: 1, response: 0.2 }); }
+$("#board").addEventListener("mouseover", (e) => { const b = e.target.closest(".info"); if (b && matchMedia("(hover: hover)").matches) showTip(b); });
+$("#board").addEventListener("mouseout", (e) => { const b = e.target.closest(".info"); if (b && matchMedia("(hover: hover)").matches && !b.contains(e.relatedTarget)) hideTip(); });
+document.addEventListener("click", (e) => {
+  const b = e.target.closest(".info");
+  if (b) { e.stopPropagation(); tipFor === b ? hideTip() : showTip(b); return; }
+  if (!e.target.closest("#tip")) hideTip();
+});
+addEventListener("scroll", hideTip, { passive: true });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideTip(); });
+
+/* ---------- actions ---------- */
+$("#board").addEventListener("click", (e) => {
+  const make = e.target.closest("[data-make]"); if (make) return pickSheet(+make.dataset.make);
+  const sc = e.target.closest("[data-scout]"); if (sc) return scout(sc.dataset.scout, +sc.closest("[data-row]").dataset.row);
+});
+$("#simBtn").addEventListener("click", () => {
+  if (!projected) return;
+  const s = yearState();
+  const sim = simulateLottery(projected);
+  s.order = sim.order; s.lottery = sim.lottery; save(); render();
+  document.querySelectorAll("#board .pick").forEach((row, i) => { if (i < LOTTERY_TEAMS) springIn(row); });
+  const jump = sim.lottery.filter((l) => l.moved > 0).sort((a, b) => b.moved - a.moved)[0];
+  toast(jump ? `${teamOf(jump.team).name} jump ${jump.moved} spot${jump.moved > 1 ? "s" : ""} to #${jump.pick}` : "Lottery held to form");
+});
+$("#projBtn").addEventListener("click", () => { const s = yearState(); s.order = null; s.lottery = null; save(); render(); });
+$("#clearBtn").addEventListener("click", () => {
+  const s = yearState(); const prev = { ...s.picks };
+  s.picks = {}; save(); render();
+  toast("Picks cleared", { label: "Undo", run: () => { s.picks = prev; save(); render(); } });
+});
+$("#autoBtn").addEventListener("click", () => {
+  const s = yearState(); const taken = new Set(Object.values(s.picks));
+  const avail = board().filter((p) => !taken.has(p.id));
+  for (let n = 1; n <= 30 && avail.length; n++) if (!s.picks[n]) s.picks[n] = avail.shift().id;
+  save(); render();
+});
+const yearsSeg = $("#years");
+const yearThumb = new Spring(0, (x) => { yearsSeg.querySelector(".thumb").style.transform = `translateX(${x * 100}%)`; }, 0.001);
+yearsSeg.addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  year = b.dataset.year;
+  const btns = [...yearsSeg.querySelectorAll("button")];
+  btns.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  yearThumb.to(btns.indexOf(b), { damping: 1, response: 0.3 });
+  hideTip(); render();
+});
+
+/* ---------- pick sheet ---------- */
+function pickSheet(pickNo) {
+  const s = yearState();
+  const order = currentOrder();
+  const owner = resolvePickOwnership(order, year, config).picks[pickNo - 1].owner;
+  sheet.open({
+    title: `Pick ${pickNo} · ${teamOf(owner).name}`, searchable: true, placeholder: "Search prospects",
+    render(body, q) {
+      const taken = new Set(Object.values(s.picks));
+      const list = board().filter((p) => !taken.has(p.id) && (!q || `${p.name} ${p.school || ""} ${p.position || ""}`.toLowerCase().includes(q)));
+      if (!board().length) { body.innerHTML = `<div class="empty">No prospects on the ${year} board yet. Add them to prospects.json.</div>`; return; }
+      body.innerHTML = list.length ? `<ul class="list">${list.map((p) => `<li style="display:flex;align-items:center;gap:.25rem">
+          <button class="row" type="button" data-choose="${esc(p.id)}">${avatar(p, { size: "2.75rem", color: teamOf(owner).color })}
+            <span class="meta"><span class="nm">${p.rank ? `${p.rank}. ` : ""}${esc(p.name)}</span><span class="sub">${esc([p.position, p.school || p.type, p.height].filter(Boolean).join(" · "))}</span></span></button>
+          <button class="info" type="button" data-scout-only="${esc(p.id)}" aria-label="Scouting report for ${esc(p.name)}">i</button></li>`).join("")}</ul>`
+        : `<div class="empty">Everyone on the board is drafted.</div>`;
+      body.querySelectorAll("[data-choose]").forEach((b) => b.addEventListener("click", () => {
+        s.picks[pickNo] = b.dataset.choose; save(); sheet.close(); render();
+        const row = document.querySelector(`[data-row="${pickNo}"]`); row && springIn(row);
+      }));
+      body.querySelectorAll("[data-scout-only]").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); scout(b.dataset.scoutOnly, pickNo); }));
+    },
+  });
+}
+
+/* ---------- scouting drawer ---------- */
+const fmt = (x, d = 1) => (x == null ? "—" : Number(x).toFixed(d));
+function scout(id, pickNo) {
+  const p = board().find((x) => x.id === id); if (!p) return;
+  let live = null, err = null, loading = p.type === "college" && !!client;
+  const s = yearState();
+  sheet.open({
+    title: "Scouting report",
+    render(body) {
+      const bio = live?.bio || {};
+      const a = live?.averages;
+      const measure = [["Height", bio.height || p.height], ["Weight", bio.weight || p.weight], ["Class", bio.class || p.class], ["From", bio.hometown || p.hometown]];
+      let statsHtml;
+      if (p.type !== "college") statsHtml = `<div class="empty">No college stats: ${esc(p.type === "international" ? "international" : "high school")} prospect.</div>`;
+      else if (loading) statsHtml = `<div class="skel"></div>`;
+      else if (!a) statsHtml = `<div class="empty">${err ? `Couldn’t load live stats (${esc(err)}).` : "No games played yet this season."}</div>`;
+      else statsHtml = `<div class="stats">${[["PPG", fmt(a.ppg)], ["RPG", fmt(a.rpg)], ["APG", fmt(a.apg)], ["FG%", fmt(a.fgPct)], ["3P%", fmt(a.threePct)]]
+          .map(([k, v]) => `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join("")}</div>
+        <p class="stat-note">${esc(a.season)} · ${a.gp ?? 0} games · ${fmt(a.min)} min · FT ${fmt(a.ftPct)}% · updates every 30 min</p>`;
+      const games = (live?.games || []).slice(0, 6);
+      body.innerHTML = `<div class="scout-head">${avatar(p, { size: "5rem", color: bio.team?.color || "#8e8e93", full: true })}
+          <div class="t"><h5>${esc(p.name)}</h5>
+            <div class="sub">${bio.team?.logo ? teamLogo({ abbr: bio.team.abbr, logo: bio.team.logo, color: bio.team.color }, { size: "1.25rem" }) : ""}${esc([p.school || p.type, p.position].filter(Boolean).join(" · "))}${p.rank ? ` · #${p.rank} on board` : ""}</div></div></div>
+        <div class="sheet-sub">Measurables</div>
+        <div class="measure">${measure.map(([k, v]) => `<div><div class="k">${k}</div><div class="v">${esc(v || "—")}</div></div>`).join("")}</div>
+        <div class="sheet-sub">2026–27 season${p.type === "college" ? " · live" : ""}</div>
+        ${statsHtml}
+        ${games.length ? `<div class="sheet-sub">Recent games</div><table class="games"><thead><tr><th>Opponent</th><th>Result</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th></tr></thead><tbody>
+          ${games.map((g) => `<tr><td><span class="opp">${teamLogo({ abbr: g.opponent.abbr, logo: g.opponent.logo, color: "#8e8e93" }, { size: "1.25rem" })}${esc(g.atVs === "@" ? "@ " : "")}${esc(g.opponent.abbr)}</span></td>
+            <td><span class="${g.result === "W" ? "w" : g.result === "L" ? "l" : ""}">${esc(g.result)}</span> ${esc(g.score)}</td><td>${esc(g.min)}</td><td><b>${esc(g.pts)}</b></td><td>${esc(g.reb)}</td><td>${esc(g.ast)}</td></tr>`).join("")}</tbody></table>` : ""}
+        <div class="sheet-sub">Scouting summary</div>
+        <div class="notes"><p>${esc(p.summary || "No notes yet.")}</p>${p.comp ? `<p><span class="comp">NBA comp:</span> ${esc(p.comp)}</p>` : ""}<div class="editorial">Draft notes are editorial — edit them in prospects.json.</div></div>
+        ${pickNo && s.picks[pickNo] !== p.id ? `<div style="margin-top:1rem"><button class="btn primary press" type="button" data-draft style="width:100%">Draft at #${pickNo}</button></div>` : ""}`;
+      body.querySelector("[data-draft]")?.addEventListener("click", () => { s.picks[pickNo] = p.id; save(); sheet.close(); render(); });
+    },
+  });
+  if (loading) {
+    client.get("college", { id: p.espnCollegeAthleteId, team: p.collegeTeamId })
+      .then(({ data, meta }) => { live = data; err = meta?.error || null; })
+      .catch((e) => { err = e.message; })
+      .finally(() => { loading = false; if (sheet.isOpen) sheet.refresh(); });
+  }
+}
+
+/* ---------- boot ---------- */
+(async () => {
+  [config, prospects] = await Promise.all([loadJson("draft_picks_2027_2029.json"), loadJson("prospects.json")]).catch((e) => { toast(`Couldn’t load draft data: ${e.message}`); return [{ years: {} }, {}]; });
+  projected = Object.keys(TEAMS).sort();   // placeholder until standings arrive
+  render();
+  client = await createClient();
+  // Standings refresh → re-project the order and re-run the ownership engine automatically.
+  client.watch("standings", {}, (st, meta) => {
+    standings = st;
+    projected = projectOrder(st, () => 0.5);
+    $("#pulse").className = "pulse " + (meta?.error ? "err" : "on");
+    $("#sync").innerHTML = `Live standings<span class="long"> · ${client.mode === "service" ? "local service" : "ESPN direct"}</span>`;
+    render();
+  }, (e) => {
+    $("#pulse").className = "pulse err";
+    $("#sync").textContent = "Standings unavailable";
+    render();
+  });
+})();
+</script>
+</body>
+</html>

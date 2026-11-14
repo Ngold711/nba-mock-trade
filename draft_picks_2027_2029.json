@@ -1,0 +1,136 @@
+{
+  "version": 1,
+  "about": "First-round pick obligations applied by resolvePickOwnership() after every lottery simulation or standings refresh. Team codes match data.js (NYK, NOP, SAS, UTA, GSW, WAS). Rules run in listed order; each rule addresses picks by their ORIGINAL team. 'verified: false' marks terms that should be confirmed against an official source before relying on them.",
+  "ruleTypes": {
+    "unprotected": "Pick conveys to recipientTeam wherever it lands.",
+    "protected": "If the pick lands inside protectedRange, originalTeam keeps it; otherwise it conveys to recipientTeam.",
+    "split_conveyance": "Pick goes to the route whose range contains the slot.",
+    "swap_pool": "Pool picks are sorted by slot; 'assign' hands out most_favorable / least_favorable / numeric ranks. 'overrides' replace 'assign' when their condition holds. 'exclude' drops a protected pick from the pool. Unassigned pool picks stay with their current owner."
+  },
+  "years": {
+    "2027": {
+      "rules": [
+        {
+          "id": "2027-dal-cha",
+          "type": "protected",
+          "originalTeam": "DAL",
+          "recipientTeam": "CHA",
+          "protectedRange": [1, 2],
+          "description": "Dallas owes Charlotte its 2027 first, top-2 protected."
+        },
+        {
+          "id": "2027-mia-cha",
+          "type": "protected",
+          "originalTeam": "MIA",
+          "recipientTeam": "CHA",
+          "protectedRange": [1, 14],
+          "description": "Miami owes Charlotte its 2027 first, lottery (top-14) protected."
+        },
+        {
+          "id": "2027-lal-mem",
+          "type": "protected",
+          "originalTeam": "LAL",
+          "recipientTeam": "MEM",
+          "protectedRange": [1, 4],
+          "description": "The Lakers owe Memphis their 2027 first, top-4 protected.",
+          "verified": false
+        },
+        {
+          "id": "2027-nyk-bkn",
+          "type": "unprotected",
+          "originalTeam": "NYK",
+          "recipientTeam": "BKN",
+          "description": "New York's 2027 first goes to Brooklyn, unprotected (Mikal Bridges trade)."
+        },
+        {
+          "id": "2027-atl-sas",
+          "type": "unprotected",
+          "originalTeam": "ATL",
+          "recipientTeam": "SAS",
+          "description": "Atlanta's 2027 first goes to San Antonio, unprotected (Dejounte Murray trade)."
+        },
+        {
+          "id": "2027-sas-split",
+          "type": "split_conveyance",
+          "originalTeam": "SAS",
+          "routes": [
+            { "range": [1, 16], "team": "SAC" },
+            { "range": [17, 30], "team": "OKC" }
+          ],
+          "description": "San Antonio's 2027 first goes to Sacramento if it lands 1–16, otherwise to Oklahoma City.",
+          "verified": false
+        },
+        {
+          "id": "2027-hou-bkn-swap",
+          "type": "swap_pool",
+          "pool": ["HOU", "BKN"],
+          "assign": [
+            { "rank": "most_favorable", "team": "HOU" },
+            { "rank": "least_favorable", "team": "BKN" }
+          ],
+          "description": "Houston may swap 2027 firsts with Brooklyn and takes the more favorable pick (James Harden trade)."
+        },
+        {
+          "id": "2027-nop-mil-atl",
+          "type": "swap_pool",
+          "pool": ["NOP", "MIL"],
+          "assign": [
+            { "rank": "most_favorable", "team": "NOP" },
+            { "rank": "least_favorable", "team": "ATL" }
+          ],
+          "overrides": [
+            {
+              "if": { "allWithin": [1, 4] },
+              "assign": [{ "rank": "all", "team": "NOP" }],
+              "description": "Both picks landed in the top 4, so New Orleans keeps both."
+            }
+          ],
+          "description": "New Orleans gets the more favorable of the NOP and MIL firsts; Atlanta gets the less favorable, unless both land in the top 4, in which case New Orleans keeps both.",
+          "verified": false
+        },
+        {
+          "id": "2027-mem-cle-uta-min",
+          "type": "swap_pool",
+          "pool": ["CLE", "UTA", "MIN"],
+          "assign": [{ "rank": "most_favorable", "team": "MEM" }],
+          "description": "Memphis receives the most favorable of the Cleveland, Utah and Minnesota firsts; the other two stay with their teams.",
+          "verified": false
+        },
+        {
+          "id": "2027-okc-lac-den-tor",
+          "type": "swap_pool",
+          "pool": ["OKC", "LAC", "DEN", "TOR"],
+          "exclude": [
+            { "team": "DEN", "protectedRange": [1, 5], "description": "Denver's pick is top-5 protected from this swap." }
+          ],
+          "assign": [{ "rank": "most_favorable", "team": "OKC" }],
+          "description": "Oklahoma City holds swap rights over the LAC, DEN (top-5 protected) and TOR firsts and takes the most favorable pick in the group. Terms simplified: confirm how the remaining picks are distributed.",
+          "verified": false
+        }
+      ]
+    },
+    "2028": {
+      "rules": []
+    },
+    "2029": {
+      "rules": [
+        {
+          "id": "2029-nyk-bkn",
+          "type": "unprotected",
+          "originalTeam": "NYK",
+          "recipientTeam": "BKN",
+          "description": "New York's 2029 first goes to Brooklyn, unprotected (Mikal Bridges trade).",
+          "verified": false
+        },
+        {
+          "id": "2029-lal-dal",
+          "type": "unprotected",
+          "originalTeam": "LAL",
+          "recipientTeam": "DAL",
+          "description": "The Lakers' 2029 first goes to Dallas (Luka Dončić trade).",
+          "verified": false
+        }
+      ]
+    }
+  }
+}

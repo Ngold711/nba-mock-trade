@@ -64,6 +64,11 @@ const routes = [
     } catch (err) { json(res, 502, { error: `Couldn't reach ESPN: ${err.message}` }); }
   }],
   [/^\/api\/standings$/, (req, res) => serve(res, "standings", {})],
+  [/^\/api\/college\/(\d{3,12})$/, (req, res, m, q) => {
+    const team = q.get("team");
+    if (team && !/^\d{1,6}$/.test(team)) return json(res, 400, { error: "team must be an ESPN college team id" });
+    return serve(res, "college", team ? { id: m[1], team } : { id: m[1] });
+  }],
   [/^\/api\/transactions$/, (req, res) => serve(res, "transactions", {})],
 ];
 

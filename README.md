@@ -98,3 +98,19 @@ fallback, with the abbreviation on the team color.
 - ESPN's feeds are undocumented and can change. The normalizers fall back field by field, and
   `npm test` includes malformed-payload cases.
 - Salary matching is a simplified version of the CBA; see the note on the trade page.
+
+## Mock Draft (`draft.html`)
+
+Lottery simulator and mock draft for 2027–2029.
+
+- **Order:** projected from live standings (non-playoff teams first, worst record first), then
+  `simulateLottery()` runs the 2019 lottery: four weighted drawings, 14% for each of the three worst teams.
+- **Pick ownership:** `resolvePickOwnership(simulatedOrder, draftYear, config)` in `service/draft.js`
+  applies `draft_picks_2027_2029.json` after every simulation and standings refresh. Rule types:
+  `unprotected`, `protected` (`protectedRange`), `split_conveyance` (`routes`), and `swap_pool`
+  (`assign` by `most_favorable` / `least_favorable` / numeric rank, conditional `overrides`, protected `exclude`).
+  Rules marked `"verified": false` show "Terms unconfirmed" in the UI.
+- **Prospects:** `prospects.json` per year. College prospects carry `espnCollegeAthleteId` and
+  `collegeTeamId`. `GET /api/college/{athleteId}?team={collegeTeamId}` returns live season averages,
+  recent games and roster measurables, cached for 30 minutes. Headshots come from
+  `https://a.espncdn.com/i/headshots/mens-college-basketball/players/full/{id}.png`, with the initials fallback.

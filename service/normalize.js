@@ -314,3 +314,66 @@ export function normalizeTransactions(json) {
     team: team(get(t, "team", {})),
   })).filter((t) => t.description);
 }
+
+/* ---------------------------------------------------------- college (NCAA) */
+export const NCAA_HEADSHOT_BASE = "https://a.espncdn.com/i/headshots/mens-college-basketball/players/full";
+
+export function collegeHeadshot(id) {
+  if (!id || !/^\d+$/.test(String(id))) return { url: null, small: null };
+  const path = `/i/headshots/mens-college-basketball/players/full/${id}.png`;
+  return { url: `https://a.espncdn.com${path}`, small: `https://a.espncdn.com/combiner/i?img=${path}&w=96&h=70&scale=crop&cquality=80&location=origin` };
+}
+
+/** Season averages + recent games from ESPN's college athlete overview. */
+export function normalizeCollegeOverview(json, { season } = {}) {
+  const st = get(json, "statistics", {});
+  const names = arr(get(st, "names")).map((n) => str(n));
+  const splits = arr(get(st, "splits"));
+  const split = (season && splits.find((s) => get(s, "displayName") === season)) || splits[0] || null;
+  const pick = (values, name) => { const i = names.indexOf(name); return i < 0 ? null : num(arr(values)[i], null); };
+  const v = get(split, "stats", []);
+  const averages = split ? {
+    season: str(get(split, "displayName"), ""),
+    gp: pick(v, "gamesPlayed"), min: pick(v, "avgMinutes"),
+    ppg: pick(v, "avgPoints"), rpg: pick(v, "avgRebounds"), apg: pick(v, "avgAssists"),
+    spg: pick(v, "avgSteals"), bpg: pick(v, "avgBlocks"), tov: pick(v, "avgTurnovers"),
+    fgPct: pick(v, "fieldGoalPct"), threePct: pick(v, "threePointFieldGoalPct"), ftPct: pick(v, "freeThrowPct"),
+  } : null;
+  const seasons = splits.map((s) => ({ season: str(get(s, "displayName"), ""), ppg: pick(get(s, "stats"), "avgPoints"), gp: pick(get(s, "stats"), "gamesPlayed") }));
+
+  const log = get(json, "gameLog.statistics.0", {});
+  const glNames = arr(get(log, "names")).map((n) => str(n));
+  const events = get(json, "gameLog.events", {}) || {};
+  const gl = (vals, name) => { const i = glNames.indexOf(name); return i < 0 ? null : str(arr(vals)[i], ""); };
+  const games = arr(get(log, "events")).map((row) => {
+    const ev = events[str(get(row, "eventId"))] || {};
+    const s = get(row, "stats", []);
+    return {
+      id: str(get(row, "eventId"), ""),
+      date: str(get(ev, "gameDate"), ""),
+      atVs: str(get(ev, "atVs"), ""),
+      opponent: { abbr: str(get(ev, "opponent.abbreviation"), "—"), name: str(get(ev, "opponent.displayName"), ""), logo: get(ev, "opponent.logo", null) },
+      result: str(get(ev, "gameResult"), ""),
+      score: str(get(ev, "score"), ""),
+      min: gl(s, "minutes"), pts: gl(s, "points"), reb: gl(s, "totalRebounds") ?? gl(s, "rebounds"), ast: gl(s, "assists"),
+      fgPct: gl(s, "fieldGoalPct"), threePct: gl(s, "threePointFieldGoalPct"),
+    };
+  });
+  return { averages, seasons, games };
+}
+
+/** Bio/measurables for one athlete out of an ESPN college roster. */
+export function collegeBioFromRoster(json, athleteIdWanted) {
+  const a = arr(get(json, "athletes")).find((x) => str(get(x, "id")) === String(athleteIdWanted));
+  if (!a) return null;
+  return {
+    name: str(get(a, "displayName"), ""),
+    position: str(get(a, "position.abbreviation"), ""),
+    height: str(get(a, "displayHeight"), ""),
+    weight: str(get(a, "displayWeight"), ""),
+    class: str(get(a, "experience.displayValue"), ""),
+    jersey: str(get(a, "jersey"), ""),
+    hometown: [get(a, "birthPlace.city"), get(a, "birthPlace.state") || get(a, "birthPlace.country")].filter(Boolean).join(", "),
+    team: team(get(json, "team", {})),
+  };
+}

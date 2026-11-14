@@ -11,6 +11,7 @@ const ROUTES = {
   standings: () => "/api/standings",
   transactions: () => "/api/transactions",
   teams: () => "/api/teams",
+  college: (p) => `/api/college/${encodeURIComponent(p.id)}${p.team ? `?team=${encodeURIComponent(p.team)}` : ""}`,
 };
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 // AbortSignal.timeout() needs iOS 16; build the same thing by hand.

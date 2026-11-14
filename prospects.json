@@ -1,0 +1,56 @@
+{
+  "about": "Big boards for the Mock Draft Maker. College prospects carry espnCollegeAthleteId + collegeTeamId (verified against ESPN college rosters on 2026-11-14) so the app can pull live stats, measurables and headshots. High school / international prospects use type 'high_school' or 'international' and no ESPN ids; the UI shows an initials badge. 'height'/'weight' are fallbacks used when ESPN can't be reached. 'summary' and 'comp' are editorial notes — edit freely.",
+  "2027": [
+    {
+      "id": "tyran-stokes", "rank": 1, "name": "Tyran Stokes", "type": "college",
+      "school": "Kansas", "collegeTeamId": "2305", "espnCollegeAthleteId": "5142731",
+      "position": "Wing", "class": "Freshman", "height": "6' 8\"", "weight": "230 lbs", "hometown": "Louisville, KY",
+      "summary": "Big, strong wing who plays through contact and can create at multiple levels. Scouts will watch his perimeter shooting consistency and defensive engagement over a full season.",
+      "comp": "Strong-bodied two-way forward"
+    },
+    {
+      "id": "caleb-holt", "rank": 2, "name": "Caleb Holt", "type": "college",
+      "school": "Arizona", "collegeTeamId": "12", "espnCollegeAthleteId": "5142722",
+      "position": "Guard", "class": "Freshman", "height": "6' 5\"", "weight": "215 lbs",
+      "summary": "Powerful downhill guard with the frame to finish through contact and defend multiple spots. Jump-shot volume and decision-making in the half court are the key swing skills.",
+      "comp": "Physical slashing combo guard"
+    },
+    {
+      "id": "bruce-branch-iii", "rank": 3, "name": "Bruce Branch III", "type": "college",
+      "school": "BYU", "collegeTeamId": "252", "espnCollegeAthleteId": "5210917",
+      "position": "Forward", "class": "Freshman", "height": "6' 8\"",
+      "summary": "Long, fluid forward with scoring versatility from the wing. Adding strength and proving his shot against high-major length will shape his range.",
+      "comp": "Smooth scoring forward"
+    },
+    {
+      "id": "braylon-mullins", "rank": 4, "name": "Braylon Mullins", "type": "college",
+      "school": "UConn", "collegeTeamId": "41", "espnCollegeAthleteId": "5196916",
+      "position": "Guard", "class": "Sophomore", "height": "6' 6\"", "weight": "198 lbs",
+      "summary": "Sophomore shooting guard with size for the position and a track record from his freshman season at UConn. Movement shooting is the calling card; on-ball creation is the question.",
+      "comp": "Size-plus movement shooter"
+    },
+    {
+      "id": "nikola-kusturica", "rank": 5, "name": "Nikola Kusturica", "type": "college",
+      "school": "UCLA", "collegeTeamId": "26", "espnCollegeAthleteId": "5369499",
+      "position": "Forward", "class": "Freshman", "height": "6' 9\"", "weight": "205 lbs",
+      "summary": "European-developed forward with feel as a connector: passes, cuts and spaces. Strength against college bigs and defensive range are the areas to track.",
+      "comp": "Skilled connective forward"
+    },
+    {
+      "id": "joaquim-boumtje-boumtje", "rank": 6, "name": "Joaquim Boumtje Boumtje", "type": "college",
+      "school": "Duke", "collegeTeamId": "150", "espnCollegeAthleteId": "5347090",
+      "position": "Center", "class": "Freshman", "height": "7' 2\"", "weight": "250 lbs",
+      "summary": "Towering center with rim-protection upside and a big target in the pick-and-roll. Mobility in space and how much he can stretch his offensive game will set his ceiling.",
+      "comp": "Rim-protecting lob threat"
+    },
+    {
+      "id": "quentin-coleman", "rank": 7, "name": "Quentin Coleman", "type": "college",
+      "school": "Illinois", "collegeTeamId": "356", "espnCollegeAthleteId": "5307569",
+      "position": "Guard", "class": "Freshman", "height": "6' 4\"", "weight": "180 lbs",
+      "summary": "Quick guard who can score in bunches and push the pace. Adding strength and showing he can run an offense against pressure will decide his draft range.",
+      "comp": "Scoring lead guard"
+    }
+  ],
+  "2028": [],
+  "2029": []
+}

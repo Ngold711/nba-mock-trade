@@ -11,6 +11,8 @@ globalThis.fetch = async (url, opts) => {
   const u = String(url);
   if (!u.includes("espn.com")) return realFetch(url, opts);
   espnCalls++;
+  if (u.includes("/athletes/") && u.includes("/overview")) return new Response(fx("college_overview"), { status: 200 });
+  if (u.includes("mens-college-basketball/teams/")) return new Response(fx("college_roster"), { status: 200 });
   const name = u.includes("/scoreboard") ? "scoreboard" : u.includes("/summary") ? "summary" : u.includes("/roster") ? "roster"
     : u.includes("/injuries") ? "injuries" : u.includes("/standings") ? "standings" : u.includes("/transactions") ? "transactions" : "teams";
   return new Response(fx(name), { status: 200, headers: { "content-type": "application/json" } });
@@ -41,6 +43,20 @@ test("api routes return normalized data with cache meta", async () => {
 
   assert.equal((await getJson("/api/standings")).body.data.conferences.length, 2);
   assert.ok((await getJson("/api/transactions")).body.data.length > 0);
+});
+
+test("college prospect stats: averages, game log, bio, headshot", async () => {
+  const { status, body } = await getJson("/api/college/5142731?team=2305");
+  assert.equal(status, 200);
+  assert.equal(body.data.averages.ppg, 15.3);
+  assert.equal(body.data.averages.season, "2026-27");
+  assert.ok(body.data.games.length > 0);
+  assert.equal(body.data.bio.height, `6' 8"`);
+  assert.match(body.data.headshot, /mens-college-basketball\/players\/full\/5142731\.png$/);
+  assert.ok(body.meta.refreshInMs > 25 * 60e3);               // cached ~30 min
+  assert.equal((await getJson("/api/college/abc")).status, 404);
+  assert.equal((await getJson("/api/college/5142731?team=x")).status, 400);
+  assert.equal((await fetch(base + "/prospects.json")).status, 200);
 });
 
 test("repeat requests are served from cache", async () => {
