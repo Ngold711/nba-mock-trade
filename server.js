@@ -39,7 +39,33 @@ async function serve(res, resource, params) {
   }
 }
 
+/* Image proxy for canvas exports (receipt / ballot cards). Same-origin bytes can never taint a canvas,
+   even on browsers that drop ESPN's CORS headers. Locked to ESPN's image CDN so it isn't an open proxy. */
+const IMG_HOSTS = new Set(["a.espncdn.com"]);
+const imgCache = new Map();          // url -> { type, body, at }
+async function proxyImage(req, res, m, q) {
+  let target;
+  try { target = new URL(q.get("url") || ""); } catch { return json(res, 400, { error: "url must be an absolute https URL" }); }
+  if (target.protocol !== "https:" || !IMG_HOSTS.has(target.hostname)) return json(res, 400, { error: "Only ESPN image CDN URLs can be proxied" });
+  const key = target.href;
+  const send = (hit) => { res.writeHead(200, { "content-type": hit.type, "cache-control": "public, max-age=86400", "access-control-allow-origin": "*" }); res.end(hit.body); };
+  const cached = imgCache.get(key);
+  if (cached && Date.now() - cached.at < 24 * 3600e3) return send(cached);
+  try {
+    const r = await fetch(key, { signal: AbortSignal.timeout(8000) });
+    const type = r.headers.get("content-type") || "";
+    if (!r.ok || !type.startsWith("image/")) { res.writeHead(r.status === 404 ? 404 : 502); return res.end(); }
+    const body = Buffer.from(await r.arrayBuffer());
+    if (body.length > 3 * 1024 * 1024) { res.writeHead(413); return res.end(); }
+    const hit = { type, body, at: Date.now() };
+    imgCache.set(key, hit);
+    if (imgCache.size > 400) imgCache.delete(imgCache.keys().next().value);
+    send(hit);
+  } catch { res.writeHead(502); res.end(); }
+}
+
 const routes = [
+  [/^\/api\/proxy-image$/, proxyImage],
   [/^\/api\/health$/, (req, res) => json(res, 200, { ok: true, uptime: process.uptime(), cache: store.status() })],
   [/^\/api\/scoreboard$/, (req, res, m, q) => {
     const date = q.get("date");
@@ -112,10 +138,15 @@ export const server = createServer(async (req, res) => {
   return serveStatic(req, res, url.pathname);
 });
 
-// Keep the league-wide feeds warm in the background on their own cadence.
-// Rosters and game summaries are fetched lazily and cached by TTL.
+// Warm everything the pages need on startup, in parallel, then keep it fresh in the background
+// (league rosters and standings every 30 min), so requests are answered from memory instead of
+// waiting on ESPN. This matters most right after a Render cold start.
 export function startPolling() {
-  const stops = ["scoreboard", "injuries", "standings", "transactions", "teams"].map((r) => store.watch(r, {}, () => {}));
+  const stops = ["scoreboard", "injuries", "standings", "transactions", "teams", "players"].map((r) => store.watch(r, {}, () => {}));
+  stops.push(store.watch("league", {}, (data) => {
+    if (!data?.rosters) return;
+    for (const [teamId, roster] of Object.entries(data.rosters)) store.prime("roster", { team: teamId }, roster);
+  }));
   const sweeper = setInterval(() => store.sweep(), 10 * 60 * 1000);
   sweeper.unref?.();
   return () => { stops.forEach((s) => s()); clearInterval(sweeper); };

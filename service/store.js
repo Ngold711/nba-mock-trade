@@ -28,7 +28,7 @@ export const TTL = {
   starts: 6 * 60 * MIN,
   coaches: 12 * 60 * MIN,
   honors: 24 * 60 * MIN,
-  league: 60 * MIN,
+  league: 30 * MIN,        // all 30 rosters, warmed at startup
 };
 const MAX_BACKOFF = 5 * MIN;
 
@@ -165,6 +165,16 @@ export function createStore({
     };
   }
 
+  /** Seed a cache entry with data fetched elsewhere (e.g. one team's roster out of the league-wide load). */
+  function prime(resource, params, data) {
+    if (!POLICIES[resource] || data === undefined) return;
+    const e = entry(resource, params || {});
+    if (e.inflight) return;
+    const t = now();
+    e.data = data; e.fetchedAt = t; e.error = null; e.failures = 0;
+    e.expiresAt = t + POLICIES[resource](data, t, e.params);
+  }
+
   /** Drop idle cache entries (e.g. old game summaries). */
   function sweep(maxIdleMs = 2 * 60 * MIN) {
     const t = now();
@@ -175,5 +185,5 @@ export function createStore({
     return [...entries.values()].map((e) => ({ ...meta(e), watchers: e.subs.size, failures: e.failures }));
   }
 
-  return { get, watch, sweep, status, _entries: entries };
+  return { get, watch, prime, sweep, status, _entries: entries };
 }

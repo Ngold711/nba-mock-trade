@@ -33,13 +33,16 @@ let instance = null;
 export function mountShell({ active = "live" } = {}) {
   if (instance) return instance;
   const sheet = createSheet();
+  // The LiveWire ticker lives on the Live tab only; elsewhere a quiet dot on that tab says updates are streaming.
+  const hasWire = active === "live";
+  const tabLink = ([k, label, href]) => `<a href="${href}"${k === active ? ' aria-current="page"' : ""}${k === "live" && !hasWire ? ' class="tab-live" aria-label="Live (updates streaming)"' : ""}>${svg(k)}<span>${label}</span></a>`;
   const bar = document.getElementById("bar") || document.body.insertBefore(document.createElement("header"), document.body.firstChild);
   bar.id = "bar"; bar.className = "bar app-bar";
   bar.innerHTML = `<div class="bar-inner">
       <a class="brand-link" href="./" aria-label="Hooptrax home">${logoMark("brand-mark")}${wordmark()}</a>
-      <nav class="topnav" aria-label="Tools">${TABS.map(([k, label, href]) => `<a href="${href}"${k === active ? ' aria-current="page"' : ""}>${svg(k)}<span>${label}</span></a>`).join("")}</nav>
+      <nav class="topnav" aria-label="Tools">${TABS.map(tabLink).join("")}</nav>
       <div class="bar-right">
-        <button class="status-pill" type="button" id="statusPill" aria-label="Live data status. Open LiveWire."><span class="pulse" id="pulse"></span><span id="sync">Live Sync</span></button>
+        <button class="status-pill" type="button" id="statusPill" aria-label="${hasWire ? "Live data status. Open LiveWire." : "Live data status. Go to Live."}"><span class="pulse" id="pulse"></span><span id="sync">Live Sync</span></button>
         <button class="teams-btn" type="button" id="teamsBtn" aria-haspopup="dialog">${svg("teams")}<span>30 Teams</span></button>
       </div>
     </div>`;
@@ -47,7 +50,7 @@ export function mountShell({ active = "live" } = {}) {
 
   const tabbar = document.createElement("nav");
   tabbar.className = "tabbar"; tabbar.setAttribute("aria-label", "Tools");
-  tabbar.innerHTML = TABS.map(([k, label, href]) => `<a href="${href}"${k === active ? ' aria-current="page"' : ""}>${svg(k)}<span>${label}</span></a>`).join("");
+  tabbar.innerHTML = TABS.map(tabLink).join("");
   document.body.append(tabbar);
   // App footer: brand watermark so screenshots carry it
   const footer = document.createElement("footer");
@@ -61,12 +64,12 @@ export function mountShell({ active = "live" } = {}) {
   const drawer = document.createElement("div"); drawer.className = "wire-drawer"; drawer.setAttribute("role", "dialog"); drawer.setAttribute("aria-label", "LiveWire");
   drawer.innerHTML = `<div class="wire-drawer-grab" aria-hidden="true"></div><div class="wire-drawer-body"></div>`;
   const drawerScrim = document.createElement("div"); drawerScrim.className = "scrim";
-  document.body.append(rail, drawerScrim, drawer);
+  if (hasWire) document.body.append(rail, drawerScrim, drawer);
   const wireEl = document.createElement("section");
   const wide = matchMedia("(min-width: 1100px)");
   let wire = null, wireHandler = null, client = null;
   const place = () => { (wide.matches ? rail : drawer.querySelector(".wire-drawer-body")).append(wireEl); document.body.classList.toggle("has-rail", wide.matches); if (wire) requestAnimationFrame(() => wire.remount()); };
-  place(); wide.addEventListener?.("change", () => { closeDrawer(); place(); });
+  if (hasWire) { place(); wide.addEventListener?.("change", () => { closeDrawer(); place(); }); }
 
   const dSpring = new Spring(1, (y) => {
     drawer.style.transform = `translateY(${y * 100}%)`;
@@ -74,6 +77,7 @@ export function mountShell({ active = "live" } = {}) {
   }, 0.001);
   let drawerOpen = false;
   function openDrawer() {
+    if (!hasWire) { location.href = "live.html"; return; }
     if (wide.matches) { rail.querySelector(".wire-toggle")?.focus(); return; }
     drawerOpen = true; drawer.style.visibility = "visible"; drawerScrim.classList.add("on");
     if (reduceMotion.matches) dSpring.set(0); else dSpring.to(0, { damping: 1, response: 0.4 });
@@ -98,7 +102,7 @@ export function mountShell({ active = "live" } = {}) {
 
   createClient().then((c) => {
     client = c;
-    wire = mountLiveWire(wireEl, {
+    if (hasWire) wire = mountLiveWire(wireEl, {
       client,
       onSelect(item) {
         if (wireHandler && wireHandler(item) !== false) return;

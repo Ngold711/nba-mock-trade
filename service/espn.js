@@ -143,17 +143,26 @@ const DIV_OF = Object.fromEntries(Object.entries(DIVISIONS).flatMap(([d, ts]) =>
 const EAST_DIVS = new Set(["Atlantic", "Central", "Southeast"]);
 async function loadLeague(_params, opts) {
   const teams = normalizeTeams(await fetchJson(ENDPOINTS.teams(), opts));
-  const rosters = await mapLimit(teams, 5, (t) => fetchJson(ENDPOINTS.roster({ team: t.id }), opts));
+  // All 30 rosters at once; one slow or failed team never holds up (or sinks) the rest.
+  const settled = await Promise.allSettled(teams.map((t) => fetchJson(ENDPOINTS.roster({ team: t.id }), opts)));
+  if (!settled.some((r) => r.status === "fulfilled")) throw new Error("No team rosters could be loaded");
   const players = [];
   const teamInfo = {};
+  const rosters = {};
+  const failed = [];
   teams.forEach((t, i) => {
     const div = DIV_OF[t.abbr] || "";
     const conf = div ? (EAST_DIVS.has(div) ? "East" : "West") : "";
-    const r = rosters[i] ? normalizeRoster(rosters[i]) : null;
+    const r = settled[i].status === "fulfilled" ? normalizeRoster(settled[i].value) : null;
+    if (r) rosters[t.id] = r; else failed.push(t.abbr);
     teamInfo[t.abbr] = { ...t, division: div, conference: conf, coach: r?.coach || "", record: r?.team?.record || "", standing: r?.team?.standing || "" };
     for (const a of r?.athletes || []) players.push({ ...a, teamAbbr: t.abbr, teamId: t.id, division: div, conference: conf });
   });
-  return { asOf: new Date().toISOString(), teams: teamInfo, players };
+  const out = { asOf: new Date().toISOString(), teams: teamInfo, players, failed };
+  // Per-team rosters ride along (non-enumerable, so /api/league stays small); the server primes
+  // its roster cache from them, so /api/rosters/:team answers without another ESPN call.
+  Object.defineProperty(out, "rosters", { value: rosters, enumerable: false });
+  return out;
 }
 const CUSTOM = { college: loadCollege, starts: loadStarts, coaches: loadCoaches, league: loadLeague };
 
