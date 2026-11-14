@@ -169,10 +169,11 @@ test("projectLottery: 16 lottery teams for 3-2-1, 14 for 2019", () => {
   assert.ok(simulateLottery([...ALL], () => 0.3, { format: "2019" }).lottery.length === 14);
 });
 
-test("prospect boards: 35 / 30 / 30, unique ids, college players linked", () => {
-  assert.equal(PROSPECTS["2027"].length, 35);
-  assert.equal(PROSPECTS["2028"].length, 30);
-  assert.equal(PROSPECTS["2029"].length, 30);
+test("prospect boards: 75 / 65 / 65 (enough for a 60-pick draft), unique ids, college players linked", () => {
+  assert.ok(PROSPECTS["2027"].length >= 75);
+  assert.ok(PROSPECTS["2028"].length >= 65);
+  assert.ok(PROSPECTS["2029"].length >= 65);
+  for (const n of ["Trey McKenney", "Alex Condon", "Cayden Boozer", "Elliot Cadeau", "Silas Demary Jr.", "Malachi Moreno"]) assert.ok(PROSPECTS["2027"].some((p) => p.name === n), n);
   const ids = ["2027", "2028", "2029"].flatMap((y) => PROSPECTS[y].map((p) => p.id));
   assert.equal(new Set(ids).size, ids.length);
   for (const n of ["joaquim-boumtje-boumtje", "nikola-kusturica"]) {
@@ -181,6 +182,6 @@ test("prospect boards: 35 / 30 / 30, unique ids, college players linked", () => 
   }
   for (const n of ["deron-rippey", "jordan-scott", "caleb-gaskins", "stefan-vaaks"]) assert.ok(PROSPECTS["2028"].find((p) => p.id === n)?.espnCollegeAthleteId, n);
   for (const n of ["aziz-olajuwon", "darius-bivins"]) assert.ok(PROSPECTS["2029"].find((p) => p.id === n)?.espnCollegeAthleteId, n);
-  assert.equal(PROSPECTS["2027"].at(-1).name, "Malachi Moreno");
+  assert.equal(PROSPECTS["2027"][34].name, "Malachi Moreno");          // hand-built top 35 kept in order
   for (const y of ["2027", "2028", "2029"]) PROSPECTS[y].forEach((p, i) => assert.equal(p.rank, i + 1));
 });
