@@ -134,7 +134,28 @@ async function loadCoaches(_params, opts) {
   return out;
 }
 const arr = (v) => (Array.isArray(v) ? v : []);
-const CUSTOM = { college: loadCollege, starts: loadStarts, coaches: loadCoaches };
+/* Every active player on all 30 rosters, with team, conference and division (for McConnell + Team Hub). */
+export const DIVISIONS = {
+  Atlantic: ["BOS", "BKN", "NY", "PHI", "TOR"], Central: ["CHI", "CLE", "DET", "IND", "MIL"], Southeast: ["ATL", "CHA", "MIA", "ORL", "WSH"],
+  Northwest: ["DEN", "MIN", "OKC", "POR", "UTAH"], Pacific: ["GS", "LAC", "LAL", "PHX", "SAC"], Southwest: ["DAL", "HOU", "MEM", "NO", "SA"],
+};
+const DIV_OF = Object.fromEntries(Object.entries(DIVISIONS).flatMap(([d, ts]) => ts.map((t) => [t, d])));
+const EAST_DIVS = new Set(["Atlantic", "Central", "Southeast"]);
+async function loadLeague(_params, opts) {
+  const teams = normalizeTeams(await fetchJson(ENDPOINTS.teams(), opts));
+  const rosters = await mapLimit(teams, 5, (t) => fetchJson(ENDPOINTS.roster({ team: t.id }), opts));
+  const players = [];
+  const teamInfo = {};
+  teams.forEach((t, i) => {
+    const div = DIV_OF[t.abbr] || "";
+    const conf = div ? (EAST_DIVS.has(div) ? "East" : "West") : "";
+    const r = rosters[i] ? normalizeRoster(rosters[i]) : null;
+    teamInfo[t.abbr] = { ...t, division: div, conference: conf, coach: r?.coach || "", record: r?.team?.record || "", standing: r?.team?.standing || "" };
+    for (const a of r?.athletes || []) players.push({ ...a, teamAbbr: t.abbr, teamId: t.id, division: div, conference: conf });
+  });
+  return { asOf: new Date().toISOString(), teams: teamInfo, players };
+}
+const CUSTOM = { college: loadCollege, starts: loadStarts, coaches: loadCoaches, league: loadLeague };
 
 /** Fetch + normalize one resource. */
 export async function load(resource, params = {}, opts = {}) {

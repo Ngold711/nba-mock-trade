@@ -76,6 +76,7 @@ const routes = [
   }],
   [/^\/api\/starts$/, (req, res) => serve(res, "starts", {})],
   [/^\/api\/coaches$/, (req, res) => serve(res, "coaches", {})],
+  [/^\/api\/league$/, (req, res) => serve(res, "league", {})],
   [/^\/api\/honors\/(\d{1,12})$/, (req, res, m) => serve(res, "honors", { id: m[1] })],
   [/^\/api\/college\/(\d{3,12})$/, (req, res, m, q) => {
     const team = q.get("team");

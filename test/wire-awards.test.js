@@ -114,3 +114,79 @@ test("award ladders: winners weighted by team record, rookies, sixth men, MIP, C
   assert.equal(a.allNba.first.length + a.allNba.second.length + a.allNba.third.length, 15);
   assert.ok(production(stats({})) > 0);
 });
+
+/* ---------------- McConnell + pick inventory ---------------- */
+import { compare, hybridPosition, dailyMystery, gameNumber, recordResult, emptyStats, shareText, searchPlayers, toGamePlayer, MAX_GUESSES } from "../service/mcconnell.js";
+import { pickInventory } from "../service/draft.js";
+
+const gp = (o) => ({ id: "x", name: "X", team: "BOS", conf: "East", div: "Atlantic", pos: "G", ht: 78, age: 26, num: 9, ...o });
+
+test("McConnell compare: exact, close (±2 with arrow), far, partial position", () => {
+  const m = gp({ id: "m", team: "BOS", pos: "G-F", ht: 80, age: 27, num: 11 });
+  const r = compare(gp({ id: "g", team: "NY", conf: "East", div: "Atlantic", pos: "G", ht: 78, age: 31, num: 11 }), m);
+  assert.equal(r.team.state, "gray");
+  assert.equal(r.conf.state, "green");
+  assert.equal(r.div.state, "green");
+  assert.equal(r.pos.state, "yellow");                       // G vs G-F share a letter
+  assert.deepEqual(r.ht, { state: "yellow", arrow: "↑" });   // 2 inches short, mystery taller
+  assert.deepEqual(r.age, { state: "gray", arrow: "↓" });    // 4 years off, mystery younger
+  assert.deepEqual(r.num, { state: "green", arrow: "" });
+  assert.equal(r.correct, false);
+  assert.equal(compare(gp({ pos: "C" }), gp({ pos: "G-F" })).pos.state, "gray");
+  assert.equal(compare(m, m).correct, true);
+});
+
+test("hybrid positions from snapshot or height", () => {
+  assert.equal(hybridPosition("F", 80, "G/F"), "G-F");
+  assert.equal(hybridPosition("C", 83, "F/C"), "F-C");
+  assert.equal(hybridPosition("G", 79), "G-F");
+  assert.equal(hybridPosition("G", 74), "G");
+  assert.equal(hybridPosition("F", 82), "F-C");
+  assert.equal(hybridPosition("C", 84), "C");
+  const p = toGamePlayer({ id: "1", name: "A B", height: `6' 8"`, jersey: "0", age: 22, position: "F", teamAbbr: "BOS", conference: "East", division: "Atlantic" });
+  assert.equal(p.ht, 80); assert.equal(p.num, 0);
+});
+
+test("daily mystery is deterministic per date and independent of input order", () => {
+  const pool = Array.from({ length: 300 }, (_, i) => ({ id: String(1000 + i) }));
+  const a = dailyMystery(pool, "2026-11-20"), b = dailyMystery([...pool].reverse(), "2026-11-20");
+  assert.equal(a.id, b.id);
+  const days = new Set(Array.from({ length: 20 }, (_, i) => dailyMystery(pool, `2026-12-${String(i + 1).padStart(2, "0")}`).id));
+  assert.ok(days.size > 15);
+  assert.equal(gameNumber("2026-11-14"), 1);
+  assert.equal(gameNumber("2026-12-14"), 31);
+});
+
+test("streaks, distribution and share grid", () => {
+  let s = recordResult(emptyStats(), 1, true, 3);
+  s = recordResult(s, 2, true, 5);
+  assert.equal(s.streak, 2); assert.equal(s.dist[2], 1); assert.equal(s.dist[4], 1);
+  assert.deepEqual(recordResult(s, 2, true, 1), s);          // same game recorded once
+  s = recordResult(s, 4, true, 2);                           // skipped a day
+  assert.equal(s.streak, 1); assert.equal(s.maxStreak, 2);
+  s = recordResult(s, 5, false, MAX_GUESSES);
+  assert.equal(s.streak, 0); assert.equal(s.played, 4); assert.equal(s.wins, 3);
+  const m = gp({ id: "m" });
+  const txt = shareText({ results: [compare(gp({ id: "g", team: "NY", ht: 77 }), m), compare(m, m)], won: true, game: 7 });
+  assert.equal(txt.split("\n")[0], "McConnell #7 2/8");
+  assert.equal(txt.split("\n")[2], "🟩🟩🟩🟩🟩🟩🟩");
+  assert.match(txt.split("\n")[1], /^⬛🟩🟩🟩🟨🟩🟩$/);
+});
+
+test("autocomplete: accent-insensitive prefix search, excludes guessed", () => {
+  const ps = [{ id: "1", name: "Luka Dončić" }, { id: "2", name: "Luke Kennard" }, { id: "3", name: "Nikola Jokić" }];
+  assert.deepEqual(searchPlayers(ps, "lu").map((p) => p.id), ["1", "2"]);       // alphabetical
+  assert.deepEqual(searchPlayers(ps, "doncic").map((p) => p.id), ["1"]);
+  assert.deepEqual(searchPlayers(ps, "luk don").map((p) => p.id), ["1"]);
+  assert.deepEqual(searchPlayers(ps, "lu", new Set(["1"])).map((p) => p.id), ["2"]);
+});
+
+test("Team Hub pick inventory", () => {
+  const cfg = JSON.parse(readFileSync(new URL("../draft_picks_2027_2029.json", import.meta.url)));
+  const cha = pickInventory("CHA", cfg)[0].items.map((i) => i.kind);
+  assert.deepEqual(cha, ["own", "owns", "owns"]);
+  const atl = pickInventory("ATL", cfg)[0].items;
+  assert.ok(atl.some((i) => i.kind === "owes" && /SAS/.test(i.text)));
+  assert.ok(atl.some((i) => i.kind === "swap"));
+  assert.equal(pickInventory("BOS", cfg).every((y) => y.items[0].kind === "own"), true);
+});

@@ -112,27 +112,39 @@ main { max-width: 72rem; margin: 0 auto; padding: 0 max(1rem, env(safe-area-inse
 @media (max-width: 30rem) {
   .brand p .long { display: none; }
   .hero { padding-top: 1.25rem; }
-  #resetBtn { display: none; }
+}
+.hero-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.9rem; }
+.roster-note { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8125rem; color: var(--label-2); flex: 1; min-width: 12rem; }
+.hero-actions .btn { min-height: 40px; }
+.dock { bottom: calc(var(--tabbar-h, 0px) + 0.75rem + env(safe-area-inset-bottom)); }
+.collapse-btn { display: none; }
+@media (max-width: 767px) {
+  .dock { bottom: calc(var(--tabbar-h) + 0.5rem); border-radius: 1.1rem; padding: 0.5rem 0.5rem 0.5rem 0.9rem; }
+  .dock .btn { min-height: 40px; }
+  body { padding-bottom: calc(var(--tabbar-h) + 6rem); }
+}
+@media (max-width: 34rem) {
+  .dock #reviewBtn { display: none; }
+  .collapse-btn { display: grid; }
+  .card.collapsed .cap-seg, .card.collapsed .section-label, .card.collapsed .assets, .card.collapsed .add-btn { display: none; }
+  .card.collapsed .collapse-btn svg { transform: rotate(-90deg); }
+  .roster-note { flex-basis: 100%; }
+  .hero-actions .btn { flex: 1; }
 }
 </style>
 </head>
 <body>
-<header class="bar" id="bar">
-  <div class="bar-inner">
-    <div class="brand">
-      <h1>Mock Trade</h1>
-      <p><span class="pulse" id="rosterPulse"></span><span id="rosterLabel">Loading rosters…</span></p>
-    </div>
-    <nav class="nav" aria-label="Sections"><a href="index.html" aria-current="page">Trade</a><a href="live.html">Live</a><a href="draft.html">Draft</a><a href="awards.html">Awards</a></nav>
-    <button class="btn press" id="resetBtn" type="button">Reset</button>
-    <button class="btn primary press" id="shareBtn" type="button">Share</button>
-  </div>
-</header>
+<header class="bar" id="bar"></header>
 
 <main>
   <section class="hero">
     <h2>Build the deal.</h2>
     <p>Pick two to four teams, move players and picks between them, and see instantly whether the salaries match and who wins the trade.</p>
+    <div class="hero-actions">
+      <span class="roster-note"><span class="pulse" id="rosterPulse"></span><span id="rosterLabel">Loading rosters…</span></span>
+      <button class="btn press" id="resetBtn" type="button">Reset</button>
+      <button class="btn primary press" id="shareBtn" type="button">Share</button>
+    </div>
   </section>
   <section class="board" id="board" aria-label="Teams in trade"></section>
   <section class="summary" id="summary" aria-live="polite"></section>
@@ -143,6 +155,7 @@ main { max-width: 72rem; margin: 0 auto; padding: 0 max(1rem, env(safe-area-inse
   <span class="dot" id="dockDot"></span>
   <span class="msg" id="dockMsg">Add players to start</span>
   <button class="btn press" id="reviewBtn" type="button">Review</button>
+  <button class="btn primary press" id="dockShare" type="button">Share Trade</button>
 </div>
 
 <script src="data.js"></script>
@@ -150,6 +163,8 @@ main { max-width: 72rem; margin: 0 auto; padding: 0 max(1rem, env(safe-area-inse
 import { Spring, project, rubberband, tracker, reduceMotion, createSheet, createToast, scrollEdge, springIn } from "./ui/motion.js";
 import { avatar, esc } from "./ui/avatar.js";
 import { createClient } from "./ui/client.js";
+import { mountShell } from "./ui/shell.js";
+const shell = mountShell({ active: "trade" });
 
 const D = window.NBA_DATA;
 const TEAMS = D.teams;
@@ -220,6 +235,7 @@ function paintRosterStatus() {
   else if (vals.length && vals.every((v) => v === "live")) { p.className = "pulse on"; l.innerHTML = `Live ESPN rosters<span class="long"> · ${season} salaries</span>`; }
   else if (vals.includes("failed") || !client) { p.className = "pulse err"; l.innerHTML = `${D.season} snapshot<span class="long"> · live rosters unavailable</span>`; }
   else { p.className = "pulse on"; l.innerHTML = `NBA<span class="long"> · live ESPN rosters</span>`; }
+  shell.setStatus(p.className.replace("pulse", "").trim(), p.className.includes("err") ? "Snapshot data" : "Live Sync");
 }
 
 /* =====================================================================
@@ -228,6 +244,7 @@ function paintRosterStatus() {
 const fresh = () => ({ teams: [null, null], assets: [], cap: {} });
 let state = fresh();
 const justAdded = new Set();
+const collapsed = new Set();          // phone-only: team cards folded to their header
 
 function pickAsset(abbr, year, round) {
   return { id: `${abbr}:${year}-${round}`, kind: "pick", from: abbr, name: `${year} ${round === 1 ? "1st" : "2nd"}-round pick`, pos: "Pick", salary: 0, salaryKnown: true, v: round === 1 ? 72 - (year - 2027) * 0.5 : 58, year, round };
@@ -349,12 +366,13 @@ function renderBoard() {
     const T = TEAMS[abbr];
     const a = analyze(abbr);
     const mine = state.assets.filter((x) => x.id.startsWith(abbr + ":"));
-    html += `<article class="card" data-team="${abbr}">
+    html += `<article class="card${collapsed.has(abbr) ? " collapsed" : ""}" data-team="${abbr}">
       <div class="card-head">
-        ${badge(abbr)}
+        <span data-team-hub="${abbr}" title="Open ${esc(T.name)} Team Hub">${badge(abbr)}</span>
         <button class="team-btn" data-pick-team="${slot}" type="button" aria-label="Change team, currently ${esc(T.city)} ${esc(T.name)}">
           <span class="city">${esc(T.city)}</span><span class="nm">${esc(T.name)}</span>
         </button>
+        <button class="icon-btn press collapse-btn" type="button" data-collapse="${abbr}" aria-expanded="${!collapsed.has(abbr)}" aria-label="Show or hide ${esc(T.name)} assets"><svg viewBox="0 0 12 12"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         ${state.teams.length > 2 ? `<button class="icon-btn press" data-remove-slot="${slot}" type="button" aria-label="Remove ${esc(T.name)} from trade">${ICON.x}</button>` : ""}
       </div>
       <div class="seg cap-seg" role="group" aria-label="Cap status" data-seg="${abbr}">
@@ -556,6 +574,7 @@ $("#board").addEventListener("click", (e) => {
   if (t.hasAttribute("data-add-slot")) return teamPicker(state.teams.length);
   if (t.dataset.removeSlot !== undefined) return removeSlot(+t.dataset.removeSlot);
   if (t.dataset.add) return assetPicker(t.dataset.add);
+  if (t.dataset.collapse) { const a = t.dataset.collapse; collapsed.has(a) ? collapsed.delete(a) : collapsed.add(a); return renderBoard(); }
   if (t.dataset.remove) return removeAsset(t.dataset.remove);
   if (t.dataset.cap) { state.cap[t.closest("[data-seg]").dataset.seg] = t.dataset.cap; haptic(5); commit(); }
 });
@@ -570,6 +589,7 @@ $("#resetBtn").addEventListener("click", () => {
   state = fresh(); segSprings.clear(); commit();
   toast("Trade cleared", { label: "Undo", run: () => { state = JSON.parse(prev); commit(); } });
 });
+$("#dockShare").addEventListener("click", () => $("#shareBtn").click());
 $("#shareBtn").addEventListener("click", async () => {
   const url = location.href.split("#")[0] + encodeState();
   try {
@@ -603,6 +623,14 @@ function decodeState() {
 $("#fine").textContent = `Rosters, salaries and headshots come live from ESPN when reachable; otherwise a ${D.season} snapshot is used. Salary matching is simplified: over-cap teams use the tiered 200% / +$${D.cba.flatAdd}M / 125% rule, apron teams are limited to 100% of outgoing salary, and second-apron teams can’t aggregate. Not affiliated with the NBA or ESPN.`;
 decodeState();
 commit({ history: false });
+// "Open in Trade Machine" from Team Hub / Player Quick-View while already on this page
+addEventListener("hashchange", () => {
+  if (!location.hash.startsWith("#t=")) return;
+  if (sheet.isOpen) sheet.close();
+  decodeState(); commit({ history: false });
+  activeTeams().forEach(ensureRoster);
+  window.scrollTo(0, 0);
+});
 
 createClient().then((c) => {
   client = c;

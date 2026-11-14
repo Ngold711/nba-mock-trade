@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>McConnell</title>
+<meta name="description" content="Guess the mystery NBA player in eight tries. Daily puzzle and unlimited mode, built on live ESPN rosters." />
+<link rel="stylesheet" href="ui/base.css" />
+<style>
+main { max-width: 60rem; margin: 0 auto; padding: 0 max(1rem, env(safe-area-inset-right)) 3rem max(1rem, env(safe-area-inset-left)); }
+.toolbar { display: flex; align-items: flex-end; gap: 0.75rem; flex-wrap: wrap; padding: 1.25rem 0 0.25rem; }
+.toolbar .t { flex: 1; min-width: 12rem; }
+.toolbar h2 { margin: 0; font-size: clamp(1.9rem, 4vw, 2.6rem); line-height: 1.05; letter-spacing: -0.028em; font-weight: 800; }
+.toolbar p { margin: 0.3rem 0 0; color: var(--label-2); font-size: 0.9375rem; }
+.modes { --n: 2; width: min(100%, 16rem); }
+.modes button { font-size: 0.8125rem; padding: 0.4rem; min-height: 2rem; }
+.game { background: var(--surface); border: var(--card-border); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); padding: 1rem; margin-top: 1rem; }
+.controls { display: flex; gap: 0.5rem; align-items: stretch; }
+.ac { position: relative; flex: 1; min-width: 0; }
+.ac input { width: 100%; margin: 0; min-height: 44px; font-size: 16px; background-color: var(--surface-2); box-shadow: inset 0 0 0 0.5px var(--sep); }
+.ac input:disabled { opacity: .5; }
+.ac-list { position: absolute; top: calc(100% + 0.35rem); left: 0; right: 0; z-index: 25; list-style: none; margin: 0; padding: 0.3rem; background: var(--surface);
+  border: var(--card-border); border-radius: var(--r-md); box-shadow: var(--shadow-lg); max-height: 22rem; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.ac-list[hidden] { display: none; }
+.ac-list li button { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0.5rem; border-radius: 0.6rem; cursor: pointer; min-height: 44px; }
+.ac-list li button[aria-selected="true"], .ac-list li button:hover { background: var(--fill); }
+.ac-list .nm { font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ac-list .tm { display: flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; color: var(--label-2); font-weight: 600; }
+.sil-btn { flex: none; min-height: 44px; }
+.sil-btn[aria-pressed="true"] { background: var(--label); color: var(--bg); }
+.sil { display: grid; place-items: center; margin: 0.75rem 0 0; }
+.sil[hidden] { display: none; }
+.sil img { width: 11rem; height: 8rem; object-fit: cover; object-position: 50% 15%; filter: brightness(0); opacity: .85; }
+.sil .none { color: var(--label-3); font-size: 0.8125rem; padding: 1rem; }
+.status { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.8125rem; color: var(--label-2); margin: 0.85rem 0 0.4rem; }
+.status b { color: var(--label); }
+
+/* guess grid: 8 columns */
+.grid { --cols: minmax(0, 1.9fr) repeat(7, minmax(0, 1fr)); display: grid; gap: 0.3rem; }
+.grid .hdr, .grid .gr { display: grid; grid-template-columns: var(--cols); gap: 0.3rem; }
+.grid .hdr span { font-size: 0.625rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--label-3); text-align: center; padding: 0.2rem 0; }
+.grid .hdr span:first-child { text-align: left; padding-left: 0.3rem; }
+.cell { min-height: 3.1rem; border-radius: 0.6rem; display: grid; place-items: center; text-align: center; font-weight: 750; font-size: 0.875rem; letter-spacing: -0.01em;
+  background: var(--fill); color: var(--label); font-variant-numeric: tabular-nums; padding: 0.2rem; line-height: 1.1; backface-visibility: hidden; }
+.cell.green { background: #1f9d55; color: #fff; } .cell.yellow { background: #e0a816; color: #1c1300; } .cell.gray { background: var(--fill-strong); }
+.cell .ar { display: block; font-size: 0.75rem; line-height: 1; margin-top: 0.1rem; }
+.cell.who { justify-items: start; grid-template-columns: auto minmax(0, 1fr); gap: 0.45rem; background: transparent; padding: 0; font-weight: 650; text-align: left; }
+.cell.who .n { font-size: 0.8125rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cell .ab { display: none; }
+.empty-row .cell { background: transparent; border: 1.5px dashed var(--sep); min-height: 3.1rem; }
+.flip { animation: flip 0.5s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes flip { from { transform: perspective(400px) rotateX(-90deg); opacity: 0.4; } to { transform: perspective(400px) rotateX(0); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .flip { animation: none; } }
+.legend { display: flex; gap: 0.9rem; flex-wrap: wrap; font-size: 0.75rem; color: var(--label-2); margin-top: 0.9rem; }
+.legend i { display: inline-block; width: 0.8rem; height: 0.8rem; border-radius: 0.2rem; vertical-align: -0.1rem; margin-right: 0.3rem; }
+details.help { margin-top: 0.75rem; font-size: 0.875rem; color: var(--label-2); }
+details.help summary { cursor: pointer; font-weight: 600; color: var(--label); }
+details.help p { margin: 0.4rem 0; line-height: 1.5; }
+.after { display: flex; gap: 0.5rem; margin-top: 0.9rem; flex-wrap: wrap; }
+.after .btn { min-height: 44px; }
+
+/* result sheet */
+.res-head { display: flex; gap: 1rem; align-items: center; padding-bottom: 0.75rem; border-bottom: 3px solid var(--c, var(--sep)); }
+.res-head h5 { margin: 0; font-size: 1.5rem; letter-spacing: -0.02em; line-height: 1.1; }
+.res-head .sub { color: var(--label-2); font-size: 0.875rem; display: flex; gap: 0.4rem; align-items: center; margin-top: 0.2rem; flex-wrap: wrap; }
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.4rem; margin-top: 0.4rem; }
+.kpis > div { background: var(--surface-2); border: var(--card-border); border-radius: 0.7rem; padding: 0.5rem; text-align: center; }
+.kpis .v { font-size: 1.375rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.kpis .k { font-size: 0.625rem; font-weight: 650; color: var(--label-3); letter-spacing: 0.06em; text-transform: uppercase; }
+.dist { display: grid; gap: 0.25rem; margin-top: 0.25rem; }
+.dist div { display: grid; grid-template-columns: 1rem 1fr; gap: 0.4rem; align-items: center; font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.dist span.b { background: var(--fill-strong); color: var(--label); border-radius: 0.3rem; padding: 0.15rem 0.4rem; text-align: right; min-width: 1.6rem; font-weight: 700; justify-self: start; }
+.dist span.b.me { background: #1f9d55; color: #fff; }
+.share-row { display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; }
+.share-row .btn { min-height: 44px; flex: 1; justify-content: center; display: inline-flex; align-items: center; }
+.share-fallback { width: 100%; min-height: 8rem; margin-top: 0.5rem; font: 0.875rem/1.3 ui-monospace, Menlo, monospace; border-radius: 0.6rem; border: var(--card-border); padding: 0.5rem; }
+
+@media (max-width: 34rem) {
+  .grid { --cols: 2.5rem repeat(7, minmax(0, 1fr)); gap: 0.22rem; }
+  .grid .hdr, .grid .gr { gap: 0.22rem; }
+  .grid .hdr span { font-size: 0.5625rem; letter-spacing: 0.04em; }
+  .cell { min-height: 2.75rem; font-size: 0.6875rem; border-radius: 0.45rem; padding: 0.1rem; }
+  .cell .ar { font-size: 0.625rem; }
+  .cell.who .n { display: none; }
+  .cell .full { display: none; } .cell .ab { display: inline; }
+  .controls { flex-wrap: wrap; } .sil-btn { flex: 1 1 100%; }
+  .kpis .v { font-size: 1.125rem; }
+}
+</style>
+</head>
+<body>
+<header class="bar" id="bar"></header>
+<main>
+  <div class="toolbar">
+    <div class="t"><h2>McConnell</h2><p>Guess the mystery NBA player in eight tries.</p></div>
+    <div class="seg modes" role="group" aria-label="Game mode" id="modes"><span class="thumb"></span>
+      <button type="button" data-mode="daily" aria-pressed="true">Daily</button><button type="button" data-mode="unlimited" aria-pressed="false">Unlimited</button></div>
+  </div>
+
+  <section class="game" aria-label="McConnell game">
+    <div class="controls">
+      <div class="ac">
+        <input class="search" id="guess" type="search" inputmode="search" autocomplete="off" autocapitalize="words" spellcheck="false"
+          placeholder="Loading players…" disabled role="combobox" aria-expanded="false" aria-controls="acList" aria-autocomplete="list" aria-label="Guess a player" />
+        <ul class="ac-list" id="acList" role="listbox" hidden></ul>
+      </div>
+      <button class="btn press sil-btn" type="button" id="silBtn" aria-pressed="false">Show Silhouette</button>
+    </div>
+    <div class="sil" id="sil" hidden></div>
+    <div class="status"><span id="statusL">Guess 1 of 8</span><span id="statusR"></span></div>
+    <div class="grid" id="grid" role="table" aria-label="Your guesses"></div>
+    <div class="after" id="after"></div>
+    <div class="legend"><span><i style="background:#1f9d55"></i>Match</span><span><i style="background:#e0a816"></i>Close (within 2) or shares a position</span><span><i style="background:var(--fill-strong)"></i>No match</span><span>↑ ↓ the mystery value is higher / lower</span></div>
+    <details class="help"><summary>How to play</summary>
+      <p>Search any active NBA player to make a guess. Each guess shows how it compares with the mystery player: team, conference, division, position, height, age and jersey number.</p>
+      <p>Height, age and number turn yellow when they’re within 2 of the answer, with an arrow pointing toward it. Positions come from ESPN (G, F, C); hybrids like G-F and F-C are derived from our roster data and height, and share a yellow match with either side.</p>
+      <p>Daily mode has one mystery player per calendar day, the same for everyone. Unlimited lets you keep going.</p>
+    </details>
+  </section>
+</main>
+
+<script src="data.js"></script>
+<script type="module">
+import { mountShell } from "./ui/shell.js";
+import { createClient } from "./ui/client.js";
+import { avatar, teamLogo, esc } from "./ui/avatar.js";
+import { Spring, createSheet, createToast } from "./ui/motion.js";
+import { MAX_GUESSES, COLUMNS, DIV_ABBR, toGamePlayer, compare, dailyMystery, dayKey, gameNumber, recordResult, emptyStats, shareText, searchPlayers, fmtHeight } from "./service/mcconnell.js";
+
+const $ = (s, r = document) => r.querySelector(s);
+const shell = mountShell({ active: "mcconnell" });
+const sheet = createSheet();
+const toast = createToast();
+const store = {
+  get(k, d = null) { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+let players = [], byId = {}, pool = [], teams = {}, stats = {};
+let mode = store.get("mc:mode", "daily");
+const today = dayKey(), game = gameNumber(today);
+let state = null;     // { mysteryId, guesses: [id], done, won }
+let silOn = false;
+
+const slugName = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z]/g, "");
+const teamLook = (abbr) => { const t = teams[abbr] || {}; return { abbr, logo: t.logo, color: t.color || "#8e8e93", displayName: t.displayName || abbr, name: t.name || abbr }; };
+
+/* ---------------- state ---------------- */
+function loadState() {
+  if (mode === "daily") {
+    state = store.get(`mc:daily:${game}`, null);
+    if (!state || !byId[state.mysteryId]) {
+      const m = dailyMystery(pool, today);
+      state = { mysteryId: m?.id, guesses: [], done: false, won: false };
+      saveState();
+    }
+  } else {
+    state = store.get("mc:unl", null);
+    if (!state || !byId[state.mysteryId]) newUnlimited(false);
+  }
+  state.guesses = state.guesses.filter((id) => byId[id]);
+}
+function saveState() { store.set(mode === "daily" ? `mc:daily:${game}` : "mc:unl", state); }
+function newUnlimited(render = true) {
+  const m = pool[Math.floor(Math.random() * pool.length)];
+  state = { mysteryId: m?.id, guesses: [], done: false, won: false };
+  saveState();
+  if (render) { silOn = false; renderAll(); $("#guess").focus({ preventScroll: true }); }
+}
+const mystery = () => byId[state?.mysteryId];
+
+/* ---------------- grid ---------------- */
+function cellHTML(k, g, r, i, animate) {
+  const st = r[k].state, ar = r[k].arrow ? `<span class="ar" aria-hidden="true">${r[k].arrow}</span>` : "";
+  let v;
+  if (k === "team") v = `<span>${esc(g.team)}</span>`;
+  else if (k === "conf") v = `<span>${esc(String(g.conf || "—").toUpperCase())}</span>`;
+  else if (k === "div") v = `<span class="full">${esc(g.div || "—")}</span><span class="ab">${esc(DIV_ABBR[g.div] || "—")}</span>`;
+  else if (k === "pos") v = `<span>${esc(g.pos)}</span>`;
+  else if (k === "ht") v = `<span>${fmtHeight(g.ht)}${ar}</span>`;
+  else if (k === "age") v = `<span>${g.age ?? "—"}${ar}</span>`;
+  else v = `<span>${g.num != null ? `#${g.num}` : "—"}${ar}</span>`;
+  const label = { green: "match", yellow: "close", gray: "no match" }[st] + (r[k].arrow ? `, answer is ${r[k].arrow === "↑" ? "higher" : "lower"}` : "");
+  return `<div class="cell ${st}${animate ? " flip" : ""}" role="cell" style="${animate ? `animation-delay:${i * 110}ms` : ""}" aria-label="${k}: ${esc(v.replace(/<[^>]+>/g, ""))}, ${label}">${v}</div>`;
+}
+function renderGrid(animateLast = false) {
+  const m = mystery();
+  const rows = state.guesses.map((id, idx) => {
+    const g = byId[id], r = compare(g, m);
+    const anim = animateLast && idx === state.guesses.length - 1;
+    return `<div class="gr" role="row"><div class="cell who" role="cell">${avatar(g, { size: "2.4rem", color: teamLook(g.team).color })}<span class="n">${esc(g.name)}</span></div>
+      ${COLUMNS.map((k, i) => cellHTML(k, g, r, i + 1, anim)).join("")}</div>`;
+  });
+  const empty = Math.max(0, MAX_GUESSES - state.guesses.length);
+  $("#grid").innerHTML = `<div class="hdr" role="row"><span>Player</span><span>Team</span><span>Conf</span><span>Div</span><span>Pos</span><span>Ht</span><span>Age</span><span>#</span></div>
+    ${rows.join("")}${state.done ? "" : Array.from({ length: Math.min(empty, 2) }, () => `<div class="gr empty-row" aria-hidden="true"><div class="cell" style="border:0"></div>${"<div class=\"cell\"></div>".repeat(7)}</div>`).join("")}`;
+}
+function renderStatus() {
+  const n = state.guesses.length;
+  $("#statusL").innerHTML = state.done ? (state.won ? `<b>Solved in ${n}</b>` : `<b>Out of guesses</b>`) : `Guess <b>${n + 1}</b> of ${MAX_GUESSES}`;
+  $("#statusR").textContent = mode === "daily" ? `Daily #${game}` : "Unlimited";
+  const input = $("#guess");
+  input.disabled = state.done || !players.length;
+  input.placeholder = state.done ? "Game over" : `Guess a player (${players.length} active)`;
+  $("#after").innerHTML = state.done
+    ? `<button class="btn primary press" type="button" id="showRes">View results</button>${mode === "unlimited" ? `<button class="btn press" type="button" id="nextBtn">Next Mystery Player</button>` : ""}`
+    : mode === "unlimited" ? `<button class="btn press" type="button" id="nextBtn">Skip · Next Mystery Player</button>` : "";
+  $("#showRes")?.addEventListener("click", showResults);
+  $("#nextBtn")?.addEventListener("click", () => newUnlimited());
+}
+function renderSil() {
+  const m = mystery();
+  $("#silBtn").setAttribute("aria-pressed", String(silOn));
+  $("#silBtn").textContent = silOn ? "Hide Silhouette" : "Show Silhouette";
+  $("#sil").hidden = !silOn;
+  if (silOn) $("#sil").innerHTML = m?.headshot ? `<img src="${esc(m.headshot)}" alt="Silhouette of the mystery player" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'none',textContent:'No photo on ESPN for this player.'}))">` : `<div class="none">No photo on ESPN for this player.</div>`;
+}
+function renderAll(animateLast = false) { renderGrid(animateLast); renderStatus(); renderSil(); }
+
+/* ---------------- guessing ---------------- */
+function guess(id) {
+  if (!state || state.done || state.guesses.includes(id) || !byId[id]) return;
+  state.guesses.push(id);
+  const won = id === state.mysteryId;
+  if (won || state.guesses.length >= MAX_GUESSES) {
+    state.done = true; state.won = won;
+    if (mode === "daily") { const s = recordResult(store.get("mc:stats", emptyStats()), game, won, state.guesses.length); store.set("mc:stats", s); }
+    else { const u = store.get("mc:unlStats", { played: 0, wins: 0 }); u.played++; if (won) u.wins++; store.set("mc:unlStats", u); }
+  }
+  saveState();
+  renderAll(true);
+  if (state.done) setTimeout(showResults, 7 * 110 + 550);
+}
+
+/* ---------------- autocomplete ---------------- */
+const input = $("#guess"), list = $("#acList");
+let matches = [], sel = -1;
+function drawList() {
+  if (!matches.length) { list.hidden = true; input.setAttribute("aria-expanded", "false"); return; }
+  list.innerHTML = matches.map((p, i) => `<li role="presentation"><button type="button" role="option" id="opt${i}" aria-selected="${i === sel}" data-id="${p.id}">
+    ${avatar(p, { size: "2rem", color: teamLook(p.team).color })}<span class="nm">${esc(p.name)}</span>
+    <span class="tm">${teamLogo(teamLook(p.team), { size: "1.1rem" })}${esc(p.team)}</span></button></li>`).join("");
+  list.hidden = false; input.setAttribute("aria-expanded", "true");
+  input.setAttribute("aria-activedescendant", sel >= 0 ? `opt${sel}` : "");
+}
+input.addEventListener("input", () => { matches = searchPlayers(players, input.value, new Set(state?.guesses || []), 8); sel = matches.length ? 0 : -1; drawList(); });
+input.addEventListener("keydown", (e) => {
+  if (list.hidden) return;
+  if (e.key === "ArrowDown") { e.preventDefault(); sel = Math.min(matches.length - 1, sel + 1); drawList(); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); sel = Math.max(0, sel - 1); drawList(); }
+  else if (e.key === "Enter" && sel >= 0) { e.preventDefault(); choose(matches[sel].id); }
+  else if (e.key === "Escape") { matches = []; drawList(); }
+});
+list.addEventListener("pointerdown", (e) => e.preventDefault());       // keep focus in the input
+list.addEventListener("click", (e) => { const b = e.target.closest("[data-id]"); if (b) choose(b.dataset.id); });
+input.addEventListener("blur", () => setTimeout(() => { matches = []; drawList(); }, 120));
+function choose(id) { input.value = ""; matches = []; drawList(); guess(id); }
+
+$("#silBtn").addEventListener("click", () => { silOn = !silOn; renderSil(); });
+
+/* ---------------- modes ---------------- */
+const modesSeg = $("#modes");
+const modeThumb = new Spring(mode === "daily" ? 0 : 1, (x) => { modesSeg.querySelector(".thumb").style.transform = `translateX(${x * 100}%)`; }, 0.001);
+modeThumb.onUpdate(modeThumb.x);
+modesSeg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === mode)));
+modesSeg.addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b || b.dataset.mode === mode) return;
+  mode = b.dataset.mode; store.set("mc:mode", mode);
+  modesSeg.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  modeThumb.to(mode === "daily" ? 0 : 1, { damping: 1, response: 0.3 });
+  silOn = false; if (players.length) { loadState(); renderAll(); }
+});
+
+/* ---------------- results ---------------- */
+function showResults() {
+  const m = mystery(); if (!m) return;
+  const look = teamLook(m.team);
+  const st = stats[m.id];
+  const results = state.guesses.map((id) => compare(byId[id], m));
+  const text = shareText({ results, won: state.won, game: mode === "daily" ? game : null, url: location.origin + location.pathname });
+  const s = mode === "daily" ? store.get("mc:stats", emptyStats()) : null;
+  const u = mode === "unlimited" ? store.get("mc:unlStats", { played: 0, wins: 0 }) : null;
+  sheet.open({
+    title: state.won ? "You got it" : "Out of guesses",
+    render(body) {
+      const maxD = s ? Math.max(1, ...s.dist) : 1;
+      body.innerHTML = `<div class="res-head" style="--c:${look.color}">${avatar(m, { size: "6rem", color: look.color, full: true })}
+          <div><h5>${esc(m.name)}</h5><div class="sub">${teamLogo(look, { size: "1.25rem" })}${esc(look.displayName)} · ${esc(m.pos)} · #${m.num ?? "—"}</div>
+          <div class="sub num">${st ? `${st.pts.toFixed(1)} PPG · ${st.reb.toFixed(1)} RPG · ${st.ast.toFixed(1)} APG (2026–27)` : "No 2026–27 games yet"}</div></div></div>
+        ${s ? `<div class="sheet-sub">Daily stats</div><div class="kpis"><div><div class="v">${s.played}</div><div class="k">Played</div></div><div><div class="v">${s.played ? Math.round((s.wins / s.played) * 100) : 0}</div><div class="k">Win %</div></div><div><div class="v">${s.streak}</div><div class="k">Streak</div></div><div><div class="v">${s.maxStreak}</div><div class="k">Max</div></div></div>
+          <div class="sheet-sub">Guess distribution</div><div class="dist">${s.dist.map((n, i) => `<div><span>${i + 1}</span><span class="b${state.won && state.guesses.length === i + 1 ? " me" : ""}" style="width:${Math.max(8, (n / maxD) * 100)}%">${n}</span></div>`).join("")}</div>`
+          : `<div class="sheet-sub">Unlimited</div><div class="kpis" style="grid-template-columns:repeat(2,1fr)"><div><div class="v">${u.played}</div><div class="k">Played</div></div><div><div class="v">${u.played ? Math.round((u.wins / u.played) * 100) : 0}</div><div class="k">Win %</div></div></div>`}
+        <div class="share-row"><button class="btn primary press" type="button" id="shareRes">Share McConnell Results</button>
+          ${mode === "unlimited" ? `<button class="btn press" type="button" id="nextRes">Next Mystery Player</button>` : `<button class="btn press" type="button" data-player="${esc(m.id)}">Player card</button>`}</div>
+        <div id="shareOut"></div>`;
+      body.querySelector("#shareRes").addEventListener("click", async () => {
+        try { await navigator.clipboard.writeText(text); toast("Results copied"); }
+        catch { body.querySelector("#shareOut").innerHTML = `<textarea class="share-fallback" readonly>${esc(text)}</textarea>`; body.querySelector(".share-fallback").select(); toast("Copy the text below"); }
+      });
+      body.querySelector("#nextRes")?.addEventListener("click", () => { sheet.close(); newUnlimited(); });
+    },
+  });
+}
+
+/* ---------------- boot ---------------- */
+(async () => {
+  const client = await createClient();
+  try {
+    const [lg, pl] = await Promise.allSettled([client.get("league", {}), client.get("players", {})]);
+    if (lg.status !== "fulfilled") throw lg.reason;
+    const league = lg.value.data;
+    teams = league.teams;
+    // roster snapshot positions (G/F, F/C) by name, for hybrid positions
+    const snap = {};
+    for (const t of Object.values(window.NBA_DATA.teams)) for (const [name, pos] of t.players) snap[slugName(name)] = pos;
+    players = league.players.filter((a) => a.id && a.status !== "inactive").map((a) => toGamePlayer(a, snap[slugName(a.name)]));
+    byId = Object.fromEntries(players.map((p) => [p.id, p]));
+    if (pl.status === "fulfilled") for (const p of pl.value.data.players) stats[p.id] = p.stats;
+    // Mystery pool: recognizable rotation players when season stats are available.
+    pool = players.filter((p) => stats[p.id] && stats[p.id].gp >= 3 && stats[p.id].min >= 15);
+    if (pool.length < 50) pool = players;
+    loadState(); renderAll();
+    shell.setStatus("on", client.mode === "service" ? "Live Sync" : "Live · ESPN");
+    if (state.done) setTimeout(showResults, 300);
+  } catch (e) {
+    $("#grid").innerHTML = `<div class="empty">Couldn’t load NBA rosters from ESPN: ${esc(e.message || e)}. Retrying in a minute.</div>`;
+    shell.setStatus("err", "Offline");
+    setTimeout(() => location.reload(), 60_000);
+  }
+})();
+</script>
+</body>
+</html>

@@ -16,6 +16,7 @@ const ROUTES = {
   honors: (p) => `/api/honors/${encodeURIComponent(p.id)}`,
   transactions: () => "/api/transactions",
   teams: () => "/api/teams",
+  league: () => "/api/league",
   college: (p) => `/api/college/${encodeURIComponent(p.id)}${p.team ? `?team=${encodeURIComponent(p.team)}` : ""}`,
 };
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -33,7 +34,13 @@ async function detectServer(base) {
   } catch { return false; }
 }
 
-export async function createClient({ base = "" } = {}) {
+// One client per page: the app shell (ticker, Team Hub, quick-views) and the active tool share it.
+let shared = null;
+export function createClient(opts = {}) {
+  if (!shared) shared = buildClient(opts);
+  return shared;
+}
+async function buildClient({ base = "" } = {}) {
   const server = await detectServer(base);
   const store = server ? null : createStore();
 

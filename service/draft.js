@@ -293,3 +293,39 @@ export function resolvePickOwnership(simulatedOrder, draftYear, config) {
   }
   return { picks, warnings };
 }
+
+/* ------------------------------------------------------------ pick inventory */
+const rngTxt = (r) => (r[0] === 1 ? `top-${r[1]}` : `${r[0]}–${r[1]}`);
+/**
+ * A team's 2027–2029 first-round picture from the pick config: its own pick (and any obligation on it)
+ * plus picks or swap rights it holds from other teams. Text only; the exact outcome depends on the lottery.
+ * @returns {{year:string, items:{kind:"own"|"owes"|"owns"|"swap", text:string, verified:boolean}[]}[]}
+ */
+export function pickInventory(code, config, years = ["2027", "2028", "2029"]) {
+  return years.map((year) => {
+    const rules = config?.years?.[year]?.rules || [];
+    const items = [];
+    let ownTouched = false;
+    for (const r of rules) {
+      const v = r.verified !== false;
+      if (r.type === "unprotected" || r.type === "protected") {
+        const prot = r.type === "protected" ? `, ${rngTxt(r.protectedRange)} protected` : ", unprotected";
+        if (r.originalTeam === code) { ownTouched = true; items.push({ kind: "owes", text: `Owes own 1st to ${r.recipientTeam}${prot}`, verified: v }); }
+        if (r.recipientTeam === code) items.push({ kind: "owns", text: `Owns ${r.originalTeam}'s 1st${prot}`, verified: v });
+      } else if (r.type === "split_conveyance") {
+        const routes = (r.routes || []).map((x) => `${x.range[0]}–${x.range[1]} → ${x.team}`).join(", ");
+        if (r.originalTeam === code) { ownTouched = true; items.push({ kind: "owes", text: `Own 1st conveys by slot (${routes})`, verified: v }); }
+        else if ((r.routes || []).some((x) => x.team === code)) items.push({ kind: "owns", text: `Conditional rights to ${r.originalTeam}'s 1st (${routes})`, verified: v });
+      } else if (r.type === "swap_pool") {
+        const inPool = (r.pool || []).includes(code);
+        const gets = (r.assign || []).filter((a) => a.team === code).map((a) => String(a.rank).replace("_", " "));
+        if (inPool || gets.length) {
+          if (inPool) ownTouched = true;
+          items.push({ kind: "swap", text: `${inPool ? "Own 1st in swap pool" : "Swap rights"} (${(r.pool || []).join("/")})${gets.length ? `: gets ${gets.join(", ")}` : ""}`, verified: v });
+        }
+      }
+    }
+    if (!ownTouched) items.unshift({ kind: "own", text: "Owns its own 1st", verified: true });
+    return { year, items };
+  });
+}

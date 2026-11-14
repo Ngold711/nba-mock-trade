@@ -69,7 +69,13 @@ export function springIn(el) {
  * mid-flight, flicked closed (momentum projection + velocity handoff), rubber-bands upward.
  * open({ title, searchable, placeholder, render(body, query), onClose })
  */
+let sheetSingleton = null;
 export function createSheet() {
+  if (sheetSingleton) return sheetSingleton;   // one sheet per page, shared by the tool and the app shell
+  sheetSingleton = buildSheet();
+  return sheetSingleton;
+}
+function buildSheet() {
   const scrim = document.createElement("div");
   scrim.className = "scrim";
   const sheet = document.createElement("div");

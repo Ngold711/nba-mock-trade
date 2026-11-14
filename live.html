@@ -7,7 +7,7 @@
 <meta name="description" content="Live NBA scores, box scores, standings, injuries and transactions from ESPN's public feeds." />
 <link rel="stylesheet" href="ui/base.css" />
 <style>
-main { max-width: 84rem; margin: 0 auto; padding: 0 max(1rem, env(safe-area-inset-right)) 3rem max(1rem, env(safe-area-inset-left)); }
+main { max-width: 72rem; margin: 0 auto; padding: 0 max(1rem, env(safe-area-inset-right)) 3rem max(1rem, env(safe-area-inset-left)); }
 .toolbar { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; padding: 1.25rem 0 1rem; }
 .toolbar h2 { margin: 0; font-size: clamp(1.75rem, 4vw, 2.5rem); line-height: 1.05; letter-spacing: -0.026em; font-weight: 750; flex: 1; min-width: 10rem; }
 .tabs { --n: 4; width: min(100%, 26rem); }
@@ -107,18 +107,9 @@ tr.cut td { border-top: 1.5px dashed var(--fill-strong); }
 </style>
 </head>
 <body>
-<header class="bar" id="bar">
-  <div class="bar-inner">
-    <div class="brand">
-      <h1>NBA Live</h1>
-      <p><span class="pulse" id="pulse"></span><span id="sync">Connecting…</span></p>
-    </div>
-    <nav class="nav" aria-label="Sections"><a href="index.html">Trade</a><a href="live.html" aria-current="page">Live</a><a href="draft.html">Draft</a><a href="awards.html">Awards</a></nav>
-  </div>
-</header>
+<header class="bar" id="bar"></header>
 
-<main class="dash">
-<div class="dash-main">
+<main>
   <div class="toolbar">
     <h2 id="viewTitle">Games</h2>
     <div class="seg tabs" role="tablist" aria-label="View" id="tabs">
@@ -157,15 +148,14 @@ tr.cut td { border-top: 1.5px dashed var(--fill-strong); }
   <section class="view" id="view-moves" hidden><div class="panel moves"><ul class="list" id="moves" style="padding:0 1rem"></ul></div></section>
 
   <p class="fine">Data from ESPN’s public feeds, refreshed every 20 seconds while games are live and every 15–60 minutes for standings, injuries and rosters. Player photos are served by ESPN’s image CDN; players without one show their initials. Not affiliated with the NBA or ESPN.</p>
-</div>
-<aside class="dash-rail"><section id="wire"></section></aside>
 </main>
 
 <script type="module">
 import { createClient } from "./ui/client.js";
 import { avatar, teamLogo, esc } from "./ui/avatar.js";
 import { Spring, createSheet, scrollEdge, springIn } from "./ui/motion.js";
-import { mountLiveWire } from "./ui/ticker.js";
+import { mountShell } from "./ui/shell.js";
+const shell = mountShell({ active: "live" });
 
 const $ = (s, r = document) => r.querySelector(s);
 let client = { mode: "direct" };   // replaced once detection finishes (no top-level await: iOS 14 lacks it)
@@ -325,7 +315,7 @@ function boxScore(d, side) {
   const cols = ["MIN", "PTS", "REB", "AST", "FG", "3PT", "FT", "STL", "BLK", "TO", "+/-"].filter((c) => tm.labels.includes(c));
   const played = tm.players.filter((p) => !p.didNotPlay);
   const dnp = tm.players.filter((p) => p.didNotPlay);
-  const rowFor = (p, i) => `<tr${i === 5 ? ' class="cut"' : ""}><td><div class="who">${avatar(p, { size: "2rem", color: tm.team.color })}
+  const rowFor = (p, i) => `<tr${i === 5 ? ' class="cut"' : ""}><td><div class="who" data-player="${esc(p.id || "")}" role="button" tabindex="0">${avatar(p, { size: "2rem", color: tm.team.color })}
       <div><div class="nm">${esc(p.shortName)}${p.starter ? '<span class="starter-tag">S</span>' : ""}</div><div class="sub">${esc(p.position)}${p.jersey ? ` · #${esc(p.jersey)}` : ""}</div></div></div></td>
       ${cols.map((c) => { const v = p.stats[c] ?? ""; const cls = c === "+/-" ? (v.startsWith("+") && v !== "+0" ? "pos" : v.startsWith("-") ? "neg" : "") : ""; return `<td class="${cls}">${esc(v)}</td>`; }).join("")}</tr>`;
   html += `<div class="panel"><div class="scroll-x"><table><thead><tr><th>Player</th>${cols.map((c) => `<th>${c}</th>`).join("")}</tr></thead><tbody>
@@ -368,7 +358,7 @@ function startStandings() {
       <p class="note">Seeds 1–6 make the playoffs; 7–10 go to the play-in.</p>
       <div class="scroll-x"><table><thead><tr><th>Team</th><th>W</th><th>L</th><th>Pct</th><th>GB</th><th>L10</th><th>Strk</th><th>Home</th><th>Away</th><th>Diff</th></tr></thead><tbody>
       ${c.teams.map((t, i) => `<tr${i === 6 || i === 10 ? ' class="cut"' : ""}>
-        <td><div class="who"><span class="seed">${t.seed ?? i + 1}</span>${teamLogo(t.team, { size: "1.6rem" })}<span class="nm">${esc(t.team.name || t.team.displayName)}</span></div></td>
+        <td><div class="who" data-team-hub="${esc(t.team.abbr)}" role="button" tabindex="0"><span class="seed">${t.seed ?? i + 1}</span>${teamLogo(t.team, { size: "1.6rem" })}<span class="nm">${esc(t.team.name || t.team.displayName)}</span></div></td>
         <td>${t.wins}</td><td>${t.losses}</td><td>${esc(t.pctText)}</td><td>${esc(t.gb)}</td><td>${esc(t.lastTen)}</td><td>${esc(t.streak)}</td><td>${esc(t.home)}</td><td>${esc(t.road)}</td>
         <td class="${(t.diff ?? 0) > 0 ? "pos" : (t.diff ?? 0) < 0 ? "neg" : ""}">${t.diff == null ? "" : (t.diff > 0 ? "+" : "") + t.diff.toFixed(1)}</td></tr>`).join("")}
       </tbody></table></div></section>`).join("");
@@ -389,7 +379,7 @@ function renderInjuries() {
   const byTeam = new Map();
   list.forEach((i) => { const k = i.team.id || i.team.displayName; if (!byTeam.has(k)) byTeam.set(k, { team: i.team, items: [] }); byTeam.get(k).items.push(i); });
   el.innerHTML = [...byTeam.values()].sort((a, b) => a.team.displayName.localeCompare(b.team.displayName)).map(({ team, items }) => `
-    <section class="group"><div class="group-head">${teamLogo(team, { size: "1.75rem" })}${esc(team.displayName)}<span class="count">${items.length}</span></div>
+    <section class="group"><div class="group-head" data-team-hub="${esc(team.abbr)}" role="button" tabindex="0">${teamLogo(team, { size: "1.75rem" })}${esc(team.displayName)}<span class="count">${items.length}</span></div>
     <ul class="list">${items.map((i) => `<li class="row inj">${avatar(i.athlete, { size: "2.75rem", color: team.color })}
       <span class="meta"><span class="nm">${esc(i.athlete.name)}</span>
         <span class="sub">${[i.athlete.position, i.injury, i.returnDate ? `est. return ${fmtDay(i.returnDate + "T12:00")}` : ""].filter(Boolean).map(esc).join(" · ")}</span>
@@ -425,7 +415,14 @@ function startMoves() {
 createClient().then((c) => {
   client = c;
   show(location.hash.slice(1) || "games", false);
-  window.liveWire = mountLiveWire($("#wire"), { client, onSelect: openWireItem });
+  // LiveWire lives in the app shell; on this page, scores open the box score in place.
+  shell.setWireHandler((it) => {
+    if (it.kind === "game" && it.gameId) { shell.closeDrawer(); openBox(it.gameId); return true; }
+    if (it.kind === "transaction") { shell.closeDrawer(); openWireItem(it); return true; }
+    return false;                       // injuries → Player Quick-View (shell default)
+  });
+  const deep = new URLSearchParams(location.search).get("game");
+  if (deep && /^\d+$/.test(deep)) openBox(deep);
   paintSync();
 });
 </script>

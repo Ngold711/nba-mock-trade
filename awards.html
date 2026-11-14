@@ -61,25 +61,34 @@ h3.sec .grow { flex: 1; }
   .val b { display: inline; margin-right: 0.35rem; }
   .brand p .long { display: none; }
 }
+.tap { cursor: pointer; }
+.team-tap { display: inline-flex; align-items: center; gap: 0.35rem; }
+.mtabs { display: none; }
+@media (max-width: 767px) {
+  .mtabs { display: flex; gap: 0.4rem; overflow-x: auto; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    position: sticky; top: calc(env(safe-area-inset-top) + 3.6rem); z-index: 12; padding: 0.5rem 0; margin: 0 -1rem 0.25rem; padding-left: 1rem; padding-right: 1rem;
+    background: var(--bg); }
+  .mtabs::-webkit-scrollbar { display: none; }
+  .mtabs button { flex: none; scroll-snap-align: start; border: 0; border-radius: 999px; padding: 0.5rem 0.9rem; min-height: 40px; background: var(--fill); font-size: 0.875rem; font-weight: 600; color: var(--label-2); cursor: pointer; }
+  .mtabs button[aria-pressed="true"] { background: var(--label); color: var(--bg); }
+  main[data-mtab] [data-tab].mhide { display: none; }
+  main[data-mtab="cuts"] .core { display: none; }
+  main:not([data-mtab="east"]):not([data-mtab="west"]):not([data-mtab="cuts"]) .as-only { display: none; }
+  main[data-mtab="east"] .aw-only, main[data-mtab="west"] .aw-only, main[data-mtab="cuts"] .aw-only { display: none; }
+}
 </style>
 </head>
 <body>
-<header class="bar" id="bar">
-  <div class="bar-inner">
-    <div class="brand">
-      <h1>Awards</h1>
-      <p><span class="pulse" id="pulse"></span><span id="sync">Loading live stats…</span></p>
-    </div>
-    <nav class="nav" aria-label="Sections"><a href="index.html">Trade</a><a href="live.html">Live</a><a href="draft.html">Draft</a><a href="awards.html" aria-current="page">Awards</a></nav>
-  </div>
-</header>
+<header class="bar" id="bar"></header>
 
 <main>
   <div class="toolbar"><h2>2026–27 Awards Race</h2></div>
   <p class="lede" id="lede">Live model built on ESPN season stats and standings. Switch any section to your own ballot; it’s saved in this browser.</p>
   <div id="banner"></div>
+  <nav class="mtabs" id="mtabs" aria-label="Sections">
+    <button type="button" data-mtab="east" aria-pressed="true">East</button><button type="button" data-mtab="west" aria-pressed="false">West</button><button type="button" data-mtab="cuts" aria-pressed="false">First Cuts</button><button type="button" data-mtab="mvp" aria-pressed="false">MVP</button><button type="button" data-mtab="roy" aria-pressed="false">ROY</button><button type="button" data-mtab="dpoy" aria-pressed="false">DPOY</button><button type="button" data-mtab="smoy" aria-pressed="false">6MOY</button><button type="button" data-mtab="mip" aria-pressed="false">MIP</button><button type="button" data-mtab="coy" aria-pressed="false">COY</button><button type="button" data-mtab="allNba" aria-pressed="false">All-NBA</button></nav>
 
-  <h3 class="sec"><span class="grow">All-Star predictor</span>
+  <h3 class="sec as-only"><span class="grow">All-Star predictor</span>
     <span class="ballot-actions" id="ballotActions" hidden>
       <button class="btn press" type="button" id="resetBallot">Reset ballot</button>
       <button class="btn primary press" type="button" id="exportBallot">Export card</button>
@@ -89,7 +98,7 @@ h3.sec .grow { flex: 1; }
   </h3>
   <div class="conf-grid" id="allstar"><div class="skel"></div><div class="skel"></div></div>
 
-  <h3 class="sec">Season awards</h3>
+  <h3 class="sec aw-only">Season awards</h3>
   <div class="awards-grid" id="awards"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
 
   <p class="fine">AwardScore = a Game Score–style production blend (points, shooting efficiency, rebounds, assists, steals, blocks, turnovers) × team win % × availability. Projected games = games played ÷ team games × 82; players under 65 carry a “65-game risk” badge and are left off MVP, DPOY, Sixth Man, Most Improved and All-NBA ladders (All-Star and Rookie of the Year are exempt here). Games started come from ESPN box scores; rookies are inferred (no 2025–26 stats, age 24 or under). ESPN doesn’t publish All-Star selection counts, so career honors from ESPN are shown instead. A statistical model, not a prediction of votes. Not affiliated with the NBA or ESPN.</p>
@@ -101,6 +110,30 @@ import { createClient } from "./ui/client.js";
 import { avatar, teamLogo, esc } from "./ui/avatar.js";
 import { Spring, createSheet, createToast, scrollEdge, springIn } from "./ui/motion.js";
 import { computeAwards, RULE_GAMES } from "./service/awards.js";
+import { mountShell } from "./ui/shell.js";
+const shell = mountShell({ active: "awards" });
+
+/* Phone: one section at a time via swipeable pill tabs. Desktop shows everything. */
+let mtab = "east";
+const mobileQ = matchMedia("(max-width: 767px)");
+function applyTab() {
+  const main = document.querySelector("main");
+  if (!mobileQ.matches) { main.removeAttribute("data-mtab"); document.querySelectorAll("[data-tab]").forEach((el) => el.classList.remove("mhide")); return; }
+  main.dataset.mtab = mtab;
+  document.querySelectorAll("[data-tab]").forEach((el) => {
+    const t = el.dataset.tab;
+    const show = mtab === "cuts" ? (t === "east" || t === "west") : t === mtab;
+    el.classList.toggle("mhide", !show);
+  });
+}
+document.getElementById("mtabs").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-mtab]"); if (!b) return;
+  mtab = b.dataset.mtab;
+  document.querySelectorAll("#mtabs button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  b.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  applyTab();
+});
+mobileQ.addEventListener?.("change", applyTab);
 
 const $ = (s, r = document) => r.querySelector(s);
 const sheet = createSheet();
@@ -127,9 +160,9 @@ const honorsLine = (p) => {
   if (!h.length) return `<span class="hon">No major honors yet</span>`;
   return `<span class="hon">${h.slice(0, 3).map((x) => `${x.count}× ${esc(x.name.replace(" Team", "").replace("Defensive Player of the Year", "DPOY"))}`).join(" · ")}</span>`;
 };
-const who = (p, extra = "") => `${avatar(p, { size: "2.5rem", color: p.team?.color })}
-  <div class="who"><div class="nm"><span>${esc(p.name)}</span>${extra}</div>
-  <div class="sub">${teamLogo(p.team, { size: "1rem" })}${esc(p.team.abbr)} · ${esc(p.position || "—")} ${riskPill(p)}</div>${honorsLine(p)}</div>`;
+const who = (p, extra = "") => `<span data-player="${esc(p.id)}" class="tap">${avatar(p, { size: "2.5rem", color: p.team?.color })}</span>
+  <div class="who tap" data-player="${esc(p.id)}"><div class="nm"><span>${esc(p.name)}</span>${extra}</div>
+  <div class="sub"><span class="team-tap" data-team-hub="${esc(p.team.abbr)}">${teamLogo(p.team, { size: "1rem" })}${esc(p.team.abbr)}</span> · ${esc(p.position || "—")} ${riskPill(p)}</div>${honorsLine(p)}</div>`;
 
 /* ---------------- All-Star ---------------- */
 function modelBallot() {
@@ -161,13 +194,14 @@ function renderAllStar() {
         : `<button class="mini accent" type="button" data-promote="${c}:${p.id}">Promote to roster</button>`}</div>`
         : kind === "cut" ? `<div class="ctrl"><button class="mini accent" type="button" data-promote="${c}:${p.id}">Promote to roster</button></div>` : ""}
     </li>`;
-    return `<section class="card"><h4>${c === "East" ? "Eastern" : "Western"} Conference</h4>
+    return `<section class="card" data-tab="${c.toLowerCase()}"><h4>${c === "East" ? "Eastern" : "Western"} Conference</h4>
       <p class="note">${ballotMode ? "Your ballot" : "Live model: 2 guards + 3 frontcourt starters; 7 reserves incl. 2 wildcards"}</p>
-      <div class="grp"><span>Starters</span><span>${starters.length}/5</span></div><ul class="plist">${starters.map((p, i) => row(p, i, "starter")).join("")}</ul>
-      <div class="grp"><span>Reserves</span><span>${reserves.length}/7</span></div><ul class="plist">${reserves.map((p, i) => row(p, i, "reserve")).join("")}</ul>
+      <div class="grp core"><span>Starters</span><span>${starters.length}/5</span></div><ul class="plist core">${starters.map((p, i) => row(p, i, "starter")).join("")}</ul>
+      <div class="grp core"><span>Reserves</span><span>${reserves.length}/7</span></div><ul class="plist core">${reserves.map((p, i) => row(p, i, "reserve")).join("")}</ul>
       <div class="grp"><span>First cuts · honorable mentions</span><span>#13–18</span></div><div class="cuts"><ul class="plist">${cuts.map((p, i) => row(p, i, "cut")).join("")}</ul></div>
     </section>`;
   }).join("");
+  applyTab();
 }
 function mutateBallot(fn) {
   if (!ballot) ballot = modelBallot();
@@ -275,7 +309,7 @@ const AWARDS = [
 const awardRow = (a, e, i, { picksMode = false, idx = 0, total = 0 } = {}) => {
   const [v, sub] = a.val(e);
   const ctrl = picksMode ? `<div class="ctrl"><button class="mini" type="button" data-up="${a.key}:${idx}" ${idx === 0 ? "disabled" : ""} aria-label="Move up">↑</button><button class="mini" type="button" data-down="${a.key}:${idx}" ${idx === total - 1 ? "disabled" : ""} aria-label="Move down">↓</button><button class="mini" type="button" data-remove="${a.key}:${idx}">Remove</button></div>` : "";
-  if (a.team) return `<li><span class="rk">${i}</span>${teamLogo(e.team, { size: "2.5rem" })}<div class="who"><div class="nm"><span>${esc(e.coach || "Head coach")}</span></div><div class="sub">${esc(e.team.displayName)} · ${e.team.wins}-${e.team.losses}</div></div><div class="val"><b>${v}</b>${sub}</div>${ctrl}</li>`;
+  if (a.team) return `<li><span class="rk">${i}</span><span data-team-hub="${esc(e.team.abbr)}" class="tap">${teamLogo(e.team, { size: "2.5rem" })}</span><div class="who"><div class="nm"><span>${esc(e.coach || "Head coach")}</span></div><div class="sub">${esc(e.team.displayName)} · ${e.team.wins}-${e.team.losses}</div></div><div class="val"><b>${v}</b>${sub}</div>${ctrl}</li>`;
   return `<li><span class="rk">${i}</span>${who(e.player)}<div class="val"><b>${v}</b>${esc(sub)}</div>${ctrl}</li>`;
 };
 function entryFor(a, id) {
@@ -297,7 +331,7 @@ function renderAwards() {
       body = `${mine.length ? `<ul class="plist">${mine.map((e, i) => awardRow(a, e, i + 1, { picksMode: true, idx: i, total: mine.length })).join("")}</ul>` : `<p class="empty-picks">No picks yet. Add up to 5.</p>`}
         ${mine.length < 5 ? `<button class="add press" type="button" data-addpick="${a.key}">Add pick</button>` : ""}`;
     }
-    return `<section class="card" data-award="${a.key}"><div class="head"><div class="t"><h4>${a.title}</h4>${lad.note ? `<p class="note">${esc(lad.note)}</p>` : ""}${lad.ruleApplies ? `<p class="note">65-game rule applied</p>` : ""}</div>${toggle}</div>${body}</section>`;
+    return `<section class="card" data-award="${a.key}" data-tab="${a.key}"><div class="head"><div class="t"><h4>${a.title}</h4>${lad.note ? `<p class="note">${esc(lad.note)}</p>` : ""}${lad.ruleApplies ? `<p class="note">65-game rule applied</p>` : ""}</div>${toggle}</div>${body}</section>`;
   }).join("");
 
   const mode = awardMode.allNba || "model";
@@ -306,12 +340,13 @@ function renderAwards() {
   const myList = (picks.allNba || []).map((id) => byId[id]).filter(Boolean);
   const list = mode === "model" ? modelList : myList;
   const anRow = (p, i) => `<li><span class="rk">${i + 1}</span>${who(p)}<div class="val"><b>${line(p)}</b>Score ${f1(p.score)}</div>${mode === "picks" ? `<div class="ctrl"><button class="mini" type="button" data-up="allNba:${i}" ${i === 0 ? "disabled" : ""}>↑</button><button class="mini" type="button" data-down="allNba:${i}" ${i === myList.length - 1 ? "disabled" : ""}>↓</button><button class="mini" type="button" data-remove="allNba:${i}">Remove</button></div>` : ""}</li>`;
-  html += `<section class="card allnba" data-award="allNba"><div class="head"><div class="t"><h4>All-NBA Teams</h4><p class="note">Positionless top 15 by AwardScore · 65-game rule applied</p></div>
+  html += `<section class="card allnba" data-award="allNba" data-tab="allNba"><div class="head"><div class="t"><h4>All-NBA Teams</h4><p class="note">Positionless top 15 by AwardScore · 65-game rule applied</p></div>
     <span class="seg toggle" role="group" aria-label="All-NBA view"><span class="thumb" style="transform:translateX(${mode === "picks" ? 100 : 0}%)"></span>
       <button type="button" data-amode="allNba:model" aria-pressed="${mode === "model"}">Model</button><button type="button" data-amode="allNba:picks" aria-pressed="${mode === "picks"}">My picks</button></span></div>
     <div class="teams">${teamsOf(list).map(([t, ps], k) => `<div><div class="grp"><span>${t}</span><span>${ps.length}/5</span></div><ul class="plist">${ps.map((p, i) => anRow(p, k * 5 + i)).join("") || `<li class="empty-picks">${mode === "picks" ? "Empty" : "—"}</li>`}</ul></div>`).join("")}</div>
     ${mode === "picks" && myList.length < 15 ? `<button class="add press" type="button" data-addpick="allNba">Add pick (${myList.length}/15)</button>` : ""}</section>`;
   $("#awards").innerHTML = html;
+  applyTab();
 }
 function savePicks() { store.set("awards:picks", picks); store.set("awards:modes", awardMode); }
 $("#awards").addEventListener("click", (e) => {

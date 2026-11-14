@@ -28,6 +28,7 @@ export const TTL = {
   starts: 6 * 60 * MIN,
   coaches: 12 * 60 * MIN,
   honors: 24 * 60 * MIN,
+  league: 60 * MIN,
 };
 const MAX_BACKOFF = 5 * MIN;
 
@@ -71,6 +72,7 @@ export const POLICIES = {
   starts: () => TTL.starts,
   coaches: () => TTL.coaches,
   honors: () => TTL.honors,
+  league: () => TTL.league,
 };
 
 const keyOf = (resource, params = {}) =>

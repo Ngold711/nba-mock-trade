@@ -151,3 +151,34 @@ open a detail sheet; news links to ESPN.
 - **Inferred fields:** rookies are inferred (ESPN leaves `debutYear` blank for most players). ESPN doesn't
   publish All-Star selection counts, so ESPN career honors are shown instead.
 - **Saved data:** My Ballot, My Picks and the exported card are stored in `localStorage`.
+
+## App shell (`ui/shell.js`)
+
+Every page calls `mountShell({ active })`, which provides:
+- **Header:** brand, five-tab nav (Live, Trade, Draft, Awards, McConnell), the ● Live Sync pill and a 30 Teams switcher.
+- **Mobile (under 768px):** a bottom tab bar with safe-area padding, and 16px inputs so iOS doesn't zoom.
+- **LiveWire placement:** a fixed 300px right rail at 1100px and wider; below that, a slide-up drawer opened from the status pill.
+- **Team Hub:** opened from the switcher or any `[data-team-hub]` badge. Shows record, seed, coach, the full roster with
+  injury badges, and 2027–2029 pick inventory (`pickInventory()` in `service/draft.js`).
+- **Player Quick-View:** opened from any `[data-player]`. Shows headshot, live season stats and *Open in Trade Machine*
+  (`index.html#t=TEAM,_&a=TEAM:player>_`).
+
+Each tool keeps its own `localStorage` keys (`draft:*`, `awards:*`, `mc:*`, the trade's URL hash); the shell never writes them.
+
+## LiveWire behavior
+
+The ticker scrolls with a CSS `@keyframes` animation (`translate3d(0,-50%,0)` over two copies of at most 25 items).
+Duration is list height ÷ 45 seconds. Hover pauses it only under `(hover: hover) and (pointer: fine)`; the
+⏸ Pause / ▶ Live button works everywhere, and the list scrolls by hand while paused. Polls never re-mount the running
+list: new items wait behind "↑ N New Updates" and are applied on click or resume, while live scores update in place.
+
+## McConnell (`mcconnell.html`, `service/mcconnell.js`)
+
+Guess the mystery NBA player in 8 tries. All 30 rosters come from `/api/league`. Columns: Team, Conf, Div, Pos, Ht,
+Age and #. Green means an exact match. Yellow means within 2 (with an arrow toward the answer) or a shared position.
+Gray means no match.
+- **Positions:** ESPN only reports G, F and C, so G-F and F-C come from the roster snapshot or from height.
+- **Daily:** one mystery per calendar date, the same for everyone (a hash of the date over the pool sorted by ESPN id).
+  Stats, streaks and the 1–8 distribution are stored locally.
+- **Unlimited:** random mystery players, one after another.
+- **Share:** copies the emoji grid.
