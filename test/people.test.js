@@ -82,7 +82,11 @@ test("directory: every current coach (live ESPN), president/GM and owner gets a 
   assert.equal(d.people.find((p) => p.id === "rick-carlisle").coach.current, "IND");
   assert.equal(d.people.find((p) => p.id === "doc-rivers").coach.current, null, "current job re-derived from ESPN");
   assert.equal(searchPeople("coach atl", d.people, { role: "coach" })[0].team, "ATL");
-  assert.ok(searchPeople("bobby webster", d.people, { role: "exec" })[0].unverified);
+  assert.equal(searchPeople("bobby webster", d.people, { role: "exec" })[0].team, "TOR");
+  const austin = personProfile(d.people.find((p) => p.id === "austin-ainge"), { league });
+  assert.deepEqual([austin.jobs[0].code, austin.jobs[0].title, austin.jobs[0].since], ["UTA", "President of Basketball Operations", 2025]);
+  const maz = personProfile(d.people.find((p) => p.id === "joe-mazzulla"), { league });
+  assert.equal(maz.jobs[0].since, 2022); assert.ok(maz.highlights.some((h) => /2024/.test(h)));
   const fo = frontOffices(P, league);
   assert.ok(fo.every((t) => t.coach.person && t.owner.person && (t.president || t.gm).person));
 });
@@ -91,4 +95,12 @@ test("archive covers 75+ notable all-time coaches, executives and owners", () =>
   assert.ok(notable.length >= 100, `${notable.length}`);
   for (const id of ["phil-jackson", "red-auerbach", "gregg-popovich", "pat-riley", "jerry-west", "bob-myers", "sam-presti", "masai-ujiri", "daryl-morey", "rc-buford", "danny-ainge", "don-nelson", "lenny-wilkens", "george-karl", "jerry-sloan", "rick-carlisle", "doc-rivers", "mike-dantoni", "rudy-tomjanovich", "chuck-daly", "hubie-brown", "jerry-buss", "mark-cuban", "steve-ballmer", "joe-lacob", "micky-arison", "peter-holt", "wyc-grousbeck"])
     assert.ok(P.people.some((p) => p.id === id), id);
+});
+
+test("every front-office and ownership entry is verified, sourced and has a start year where known", () => {
+  for (const [code, t] of Object.entries(P.teams)) for (const r of ["president", "gm", "owner"]) {
+    const x = t[r]; if (!x) continue;
+    assert.equal(x.verified, true, `${code} ${r}`); assert.ok(x.source, `${code} ${r} source`);
+  }
+  for (const c of CODES) { assert.ok(P.teams[c].owner?.since, `${c} owner since`); assert.ok((P.teams[c].president || P.teams[c].gm)?.since, `${c} exec since`); }
 });

@@ -144,16 +144,16 @@ async function renderDir() {
   const rows = [];
   for (const tm of d.teams) {
     const rec = tm.record ? `${tm.record.w}–${tm.record.l}` : "";
-    if (r === "coach" && tm.coach) rows.push({ tm, x: tm.coach, title: "Head Coach", right: rec, rightSub: rec ? "this season" : "" });
+    if (r === "coach" && tm.coach) rows.push({ tm, x: tm.coach, title: tm.coach.since ? `Head Coach since ${tm.coach.since}` : "Head Coach", right: rec, rightSub: rec ? "this season" : "" });
     if (r === "exec") for (const x of [tm.president, tm.gm]) if (x) rows.push({ tm, x, title: x.title || "Basketball Operations", right: x.since ? `${x.since}` : "", rightSub: x.since ? "since" : "" });
-    if (r === "owner" && tm.owner) rows.push({ tm, x: tm.owner, title: tm.owner.note || "Owner / Governor", right: tm.owner.since ? `${tm.owner.since}` : "", rightSub: tm.owner.since ? "since" : "" });
+    if (r === "owner" && tm.owner) rows.push({ tm, x: tm.owner, title: "Owner / Governor", right: tm.owner.since ? `${tm.owner.since}` : "", rightSub: tm.owner.since ? "since" : "" });
   }
   dir.innerHTML = `<h2 class="group-h">${TITLE[r]} · all 30 teams</h2>
     <ul class="dir-list">${rows.map(({ tm, x, title, right, rightSub }) => `<li><button class="dir-row press" type="button" ${x.person ? `data-person="${esc(x.person)}" data-role-pref="${r}"` : "disabled"}>
       <img class="dir-logo" src="${esc(tm.logo || logo(tm.team))}" alt="" width="36" height="36" loading="lazy" referrerpolicy="no-referrer">
-      <span class="dir-who"><b>${esc(x.name)}${x.verified ? "" : ' <span class="unv" title="Not confirmed for 2026–27">?</span>'}</b><small>${esc(title)} · ${esc(tm.name)}</small></span>
+      <span class="dir-who"><b>${esc(x.name)}</b><small>${esc(title)} · ${esc(tm.name)}</small></span>
       ${right ? `<span class="dir-stat"><b>${esc(right)}</b><small>${esc(rightSub)}</small></span>` : ""}<span class="chev" aria-hidden="true">›</span></button></li>`).join("")}</ul>
-    <p class="enc-note">${r === "coach" ? "Head coaches and records are live from ESPN." : `Names marked <span class="unv">?</span> weren't confirmed against 2026–27 reporting.`}</p>`;
+    <p class="enc-note">${r === "coach" ? "Head coaches and team records are live from ESPN." : `Checked against current reporting, ${esc(d.asOf ? new Date(d.asOf + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "this season")}. Tap anyone for their profile.`}</p>`;
 }
 
 /* ---------- taps ---------- */

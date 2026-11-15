@@ -30,7 +30,7 @@ export function resultRow(p) {
   const sub = isPerson ? (p.team ? `${esc(p.team)} · ` : "") + p.roles.map((r) => ROLE_LABEL[r].replace(" Career", "")).join(", ") : p.active ? `${esc(p.team)}${p.position ? ` · ${esc(p.position)}` : ""}` : p.years ? esc(p.years) : esc(p.team || "NBA");
   return `<li><button class="row press" type="button" ${isPerson ? `data-person="${esc(p.id)}"` : `data-enc="${esc(p.id)}"`}>
     ${avatar({ name: p.name, headshot: p.headshot || (p.playerId ? `https://a.espncdn.com/i/headshots/nba/players/full/${p.playerId}.png` : null) }, { size: "2.6rem", color: "#475569" })}
-    <span class="meta"><span class="nm">${esc(p.name)}${p.unverified ? ' <span class="unv" title="Not confirmed for 2026–27">?</span>' : ""}</span><span class="sub">${sub}</span></span>
+    <span class="meta"><span class="nm">${esc(p.name)}</span><span class="sub">${sub}</span></span>
     <span class="enc-tag ${isPerson || p.roles ? "role" : p.active ? "act" : "leg"}">${tag}</span></button></li>`;
 }
 const yearsTxt = (ys) => (ys.length > 6 ? `${ys.slice(0, 3).join(", ")} … ${ys.slice(-2).join(", ")}` : ys.join(", "));
@@ -234,9 +234,11 @@ export function mountEncyclopedia({ sheet, openCompare = () => {}, toast = () =>
       const p = S.p;
       if (!p) { body.innerHTML = `<div class="enc-hero"><div class="sk c" style="width:5.5rem;height:5.5rem;border-radius:99px"></div><div style="flex:1;display:grid;gap:.4rem"><div class="sk" style="height:1.4rem;width:70%"></div></div></div>`; return; }
       body.innerHTML = `<div class="enc-hero"><div class="enc-face">${avatar({ name: p.name, headshot: p.headshot }, { size: "5rem", color: "#475569", full: true })}</div>
-          <div class="enc-id"><h3>${esc(p.name)}</h3><div class="enc-sub">${p.roles.map((r) => `<span class="enc-team role">${ROLE_TAG[r]}</span>`).join("")}</div></div></div>
+          <div class="enc-id"><h3>${esc(p.name)}</h3><div class="enc-sub">${p.roles.map((r) => `<span class="enc-team role">${ROLE_TAG[r]}</span>`).join("")}</div>
+          ${(p.jobs || []).map((j) => `<div class="pp-job"><img src="${esc(j.logo)}" alt="" width="20" height="20" loading="lazy" referrerpolicy="no-referrer"><span><b>${esc(j.title)}</b> · ${esc(j.name)}${j.since ? ` <small>since ${j.since}</small>` : ""}</span></div>`).join("")}</div></div>
+        ${(p.highlights || []).length ? `<div class="pp-hl"><h4 class="pp-h">Career highlights</h4><ul>${p.highlights.map((h) => `<li>${esc(h)}</li>`).join("")}</ul></div>` : ""}
         ${rolesBar(p.roles, S.role)}${personSection(p, S.role)}
-        ${p.meta?.generated ? `<p class="enc-note">${p.meta.verified ? "Directory entry" : 'Directory entry, <span class="unv">?</span> not confirmed against 2026–27 reporting'}${p.meta.source ? ` · Source: ${esc(p.meta.source)}` : ""}${p.meta.note ? ` · ${esc(p.meta.note)}` : ""}. Full career history isn't in the archive yet.</p>` : ""}
+        ${p.meta?.source ? `<p class="enc-note">Source: ${esc(p.meta.source)}.</p>` : ""}
         <p class="enc-note">Coaching, front-office and ownership details are editorial (nba_people.json); current head coaches and records come live from ESPN.</p>`;
     }
   }

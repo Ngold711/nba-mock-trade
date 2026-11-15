@@ -42,8 +42,8 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
   const loadFrontOffices = () => (foP ||= fetch("/api/front-offices").then((r) => r.json()).then((j) => Object.fromEntries((j.data?.teams || []).map((t) => [t.team, t]))));
   const leadership = (fo, liveCoach) => {
     const row = (label, x) => {
-      if (!x?.name) return `<div class="ld-cell"><small>${label}</small><b class="muted">Not confirmed</b></div>`;
-      const inner = `<small>${label}${x.title && label !== "Head Coach" ? ` · ${esc(x.title)}` : ""}</small><b>${esc(x.name)}${x.verified ? "" : ' <span class="unv" title="Not confirmed for 2026–27">?</span>'}</b>`;
+      if (!x?.name) return `<div class="ld-cell"><small>${label}</small><b class="muted">—</b></div>`;
+      const inner = `<small>${label}${x.title && label !== "Head Coach" ? ` · ${esc(x.title)}` : ""}</small><b>${esc(x.name)}</b>`;
       return x.person ? `<button class="ld-cell press" type="button" data-person-open="${esc(x.person)}" data-person-role="${label === "Head Coach" ? "coach" : label === "Owner" ? "owner" : "exec"}">${inner}<span class="chev" aria-hidden="true">›</span></button>` : `<div class="ld-cell">${inner}</div>`;
     };
     const coach = fo?.coach || (liveCoach ? { name: liveCoach, verified: true } : null);

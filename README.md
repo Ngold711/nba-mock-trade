@@ -539,3 +539,20 @@ Built by an offline generator that cross-checks editorial data against ESPN:
   - List, season and surname pages are dropped. Set `HOOPTRAX_WIKI=0` to turn off the server-side lookup.
 - **Arcade:** the four placeholder games are replaced by frosted mystery cards: blurred silhouette bars (`filter: blur(4px)`), a centered `?` and a COMING SOON pill.
 - **Ask Hooptrax clearance:** every main view gets `pb-28`-style bottom padding (7rem, plus the tab bar on phones), so the floating pill never covers the last card or button.
+
+## Round 13: verified front offices, clean Archive profiles
+
+- **Front offices:** all 30 teams' basketball-operations leads and owners were re-checked against current reporting on Nov 15 2026. Every entry in `nba_people.json` `teams` now has `verified:true`, a `source`, a `checked` date and, where known, a tenure start (`since`).
+- **Corrections:**
+  - Utah: Austin Ainge is president of basketball operations, with Justin Zanik as GM and Danny Ainge as CEO.
+  - Denver: Josh Kroenke is president, with Ben Tenzer and Jon Wallace as EVPs. Denver has no GM title.
+  - Detroit: Michael Blackstone is EVP.
+  - Dallas: the Dumont family became controlling owners in November 2026.
+  - Toronto: Bobby Webster is now EVP & GM.
+  - Miami: Andy Elisburg is GM.
+  - Orlando: Anthony Parker is GM.
+  - New Orleans: Troy Weaver is SVP.
+  - Charlotte: Jeff Peterson's title is now EVP & GM.
+- **Head coaches:** still live from ESPN rosters. `coachSince` gives each current coach's start year, and it applies only while ESPN names that coach.
+- **Profiles:** each one shows the person's current team, title and start year under their name, then a *Career highlights* card (titles, awards, signature moves, recent notes), then the role tabs. The source is shown at the bottom.
+- **UI:** the `?` badges are gone from the Archive rows, search results, profiles and the 30 Teams Vault.
