@@ -16,6 +16,9 @@ import { mountAccount, account } from "./account.js";
 import { mountEncyclopedia } from "./encyclopedia.js";
 
 const ICON = {
+  gmlab: '<path d="M9 3h6M10 3v6.2L5.2 17.4A2.4 2.4 0 0 0 7.3 21h9.4a2.4 2.4 0 0 0 2.1-3.6L14 9.2V3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.5 15h9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+  reference: '<path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5v-15zM5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 7.5h6M9 11h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+  arcade: '<rect x="2.5" y="7" width="19" height="11" rx="5.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7.5 10.5v4M5.5 12.5h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="15.5" cy="11.3" r="1.1" fill="currentColor"/><circle cx="17.8" cy="13.7" r="1.1" fill="currentColor"/>',
   live: '<path d="M2 12h3.5l2.5-6 4 12 3-9 2 3H22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
   trade: '<path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
   draft: '<rect x="4" y="3" width="16" height="18" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
@@ -24,10 +27,12 @@ const ICON = {
   teams: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="2"/>',
 };
 const svg = (k, cls = "ic") => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICON[k]}</svg>`;
+// Four sections. Tools live inside a section and show an iOS-style back link to their hub.
 export const TABS = [
-  ["live", "Live", "live.html"], ["trade", "Trade", "index.html"], ["draft", "Draft", "draft.html"],
-  ["awards", "Awards", "awards.html"], ["mcconnell", "McConnell", "mcconnell.html"],
+  ["live", "Live", "live.html"], ["gmlab", "GM Lab", "gmlab.html"], ["reference", "Reference", "reference.html"], ["arcade", "Arcade", "arcade.html"],
 ];
+const SECTION_OF = { trade: "gmlab", draft: "gmlab", awards: "gmlab", mcconnell: "arcade" };
+const BACK_TO = { gmlab: ["GM Lab", "gmlab.html"], arcade: ["Arcade", "arcade.html"] };
 const ESPN_SLUG = { GSW: "gs", NOP: "no", NYK: "ny", SAS: "sa", UTA: "utah", WAS: "wsh" };
 const CODE_TO_ESPN = { GSW: "GS", NOP: "NO", NYK: "NY", SAS: "SA", UTA: "UTAH", WAS: "WSH" };
 const slug = (s) => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -43,15 +48,17 @@ export function mountShell({ active = "live" } = {}) {
   // The LiveWire ticker lives on the Live tab only; elsewhere a quiet dot on that tab says updates are streaming.
   // The LED ticker board (ui/ledboard.js) lives on the Live tab itself; the old vertical rail is retired.
   const hasWire = false;
-  const tabLink = ([k, label, href]) => `<a href="${href}"${k === active ? ' aria-current="page"' : ""}${k === "live" && active !== "live" ? ' class="tab-live" aria-label="Live (updates streaming)"' : ""}>${svg(k)}<span>${label}</span></a>`;
+  const section = SECTION_OF[active] || active;
+  const back = SECTION_OF[active] ? BACK_TO[section] : null;
+  const tabLink = ([k, label, href]) => `<a href="${href}"${k === section ? ' aria-current="page"' : ""}>${svg(k)}<span>${label}</span></a>`;
   const bar = document.getElementById("bar") || document.body.insertBefore(document.createElement("header"), document.body.firstChild);
   bar.id = "bar"; bar.className = "bar app-bar";
   bar.innerHTML = `<div class="bar-inner">
-      <a class="brand-link" href="live.html" aria-label="Hooptrax home">${logoMark("brand-mark")}${wordmark()}</a>
+      ${back ? `<a class="nav-back press" href="${back[1]}" aria-label="Back to ${back[0]}"><svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${back[0]}</span></a>`
+        : `<a class="brand-link" href="live.html" aria-label="Hooptrax home">${logoMark("brand-mark")}${wordmark()}</a>`}
       <nav class="topnav" aria-label="Tools">${TABS.map(tabLink).join("")}</nav>
       <div class="bar-right">
-        <button class="status-pill" type="button" id="statusPill" aria-label="${hasWire ? "Live data status. Open LiveWire." : "Live data status. Go to Live."}"><span class="pulse" id="pulse"></span><span id="sync">Live Sync</span></button>
-        <button class="search-btn" type="button" id="searchBtn" aria-haspopup="dialog" aria-label="Search any NBA player" title="Player search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M15.5 15.5 20 20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
+        <span class="sr-only" id="statusPill" role="status" aria-live="polite"><span class="pulse" id="pulse"></span><span id="sync">Live Sync</span></span>
         <button class="teams-btn" type="button" id="teamsBtn" aria-haspopup="dialog" aria-label="30 Teams">${svg("teams")}<span>30 Teams</span></button>
         <button class="theme-btn" type="button" id="themeBtn" aria-label="Switch to light mode"><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
       </div>
@@ -112,7 +119,7 @@ export function mountShell({ active = "live" } = {}) {
     if (reduceMotion.matches) { dSpring.set(1); done(); } else dSpring.to(1, { damping: 1, response: 0.35, velocity: v, onDone: done });
   }
   dismissOnBackdrop(drawerScrim, () => closeDrawer(), { isOpen: () => drawerOpen });
-  document.getElementById("statusPill").addEventListener("click", () => (drawerOpen ? closeDrawer() : openDrawer()));
+
   // drag the grabber to dismiss (momentum projection + rubber band, like the main sheet)
   (() => {
     const grab = drawer.querySelector(".wire-drawer-grab"); const vt = tracker(); let d = null;
@@ -172,8 +179,11 @@ export function mountShell({ active = "live" } = {}) {
   const vault = mountVault({ sheet, getClient: () => (client ? Promise.resolve(client) : createClient()), teamLook, ensureData, pickConfig, toast: (m) => toastFn(m) });
   const { openTeam, openPlayer, openCompare } = vault;
   const encyclopedia = mountEncyclopedia({ sheet, openCompare, toast: toastFn });
-  document.getElementById("searchBtn").addEventListener("click", () => encyclopedia.openSearch());
   addEventListener("htx:profile", (e) => e.detail?.id && encyclopedia.openProfile(String(e.detail.id)));
+  // ⓘ popovers: Escape closes, and only one open at a time
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") document.querySelectorAll("details.pop[open]").forEach((d) => d.removeAttribute("open")); });
+  document.addEventListener("toggle", (e) => { const d = e.target; if (d.matches?.("details.pop") && d.open) document.querySelectorAll("details.pop[open]").forEach((x) => x !== d && x.removeAttribute("open")); }, true);
+  addEventListener("htx:person", (e) => e.detail?.id && encyclopedia.openPerson(String(e.detail.id), { role: e.detail.role || null }));
   const chat = mountChat({ getClient: () => (client ? Promise.resolve(client) : createClient()) });
 
   // Popovers (<details class="pop">): close on outside tap, Escape, or after choosing an item.

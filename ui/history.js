@@ -9,9 +9,10 @@ const n0 = (x) => (x == null ? "—" : Number(x).toLocaleString("en-US"));
 const hs = (id) => (id ? `https://a.espncdn.com/i/headshots/nba/players/full/${id}.png` : null);
 
 let UI = null;           // UI state lives in memory between renders; tabs/filters are also saved
-export function renderHistory(el, { history }) {
+export function renderHistory(el, { history, tab = null } = {}) {
   if (!history) { el.innerHTML = `<section class="card">${Array.from({ length: 6 }, () => `<div class="sk-row"><div class="sk c"></div><div class="sk-l"><div class="sk t"></div><div class="sk t s"></div></div><div class="sk n"></div></div>`).join("")}</section>`; return; }
   const st = (UI ||= store.get("history:ui", { tab: "leaders", scope: "career", cat: "pts", award: "all", q: "", draftQ: "" }));
+  if (tab) st.tab = tab;                                   // Reference cards open a specific section
   const save = () => store.set("history:ui", { ...st, q: "", draftQ: "" });
   const ids = new Map((history.legends || []).map((l) => [l.name, l.id]));
 

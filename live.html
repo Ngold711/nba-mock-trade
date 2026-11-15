@@ -176,6 +176,24 @@ tr.cut td { border-top: 1.5px dashed var(--fill-strong); }
 .plays .pb-logo { width: 1.3rem; flex: none; }
 .box-seg { --n: 2; }
 
+/* League Leaders Snapshot */
+.snap { margin-top: 1.25rem; padding: 0.9rem 0.9rem 0.75rem; border-radius: var(--r-lg, 1rem); background: var(--surface); box-shadow: inset 0 0 0 0.5px var(--sep); }
+.snap-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.6rem; }
+.snap-head h3 { margin: 0; font-size: 1.0625rem; letter-spacing: -0.01em; }
+.snap-sub { font-size: 0.75rem; color: var(--label-3); }
+.snap-cats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.25rem; padding: 0.2rem; border-radius: 0.7rem; background: var(--fill); margin-bottom: 0.4rem; }
+.snap-cats button { border: 0; background: none; color: var(--label-2); border-radius: 0.55rem; min-height: 34px; font-weight: 650; font-size: 0.8125rem; cursor: pointer; }
+.snap-cats button[aria-selected="true"] { background: var(--surface); color: var(--label); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+.snap-list { list-style: none; margin: 0; padding: 0; }
+.snap-list li + li { border-top: 0.5px solid var(--sep); }
+.snap-row { width: 100%; border: 0; background: none; color: var(--label); display: flex; align-items: center; gap: 0.65rem; padding: 0.55rem 0.15rem; cursor: pointer; text-align: left; font: inherit; min-height: 52px; }
+.snap-rank { width: 1.1rem; text-align: center; color: var(--label-3); font-weight: 750; font-size: 0.875rem; }
+.snap-list li:first-child .snap-rank { color: #F59E0B; }
+.snap-who { flex: 1; min-width: 0; display: grid; } .snap-who b { font-size: 0.9375rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .snap-who small { color: var(--label-3); font-size: 0.75rem; }
+.snap-v { font-size: 1.1rem; font-weight: 800; }
+.snap-all { width: 100%; margin-top: 0.4rem; border: 0; border-radius: 0.8rem; min-height: 44px; background: var(--fill); color: var(--accent); font-weight: 700; font-size: 0.9375rem; cursor: pointer; }
+.snap-all:hover { background: var(--fill-strong); }
+.snap-list .sk-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 0; }
 /* Stat Leaders */
 .leaders { margin-top: 1.75rem; }
 .ld-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
@@ -394,9 +412,38 @@ function leaderValue(p, cat, mode) {
   if (cat === "gmsc") { const g = advanced(s)?.gmsc; if (g == null) return null; return mode === "totals" ? g * s.gp : mode === "per36" ? (s.min ? g * 36 / s.min : null) : g; }
   const m = inMode(s, mode); return m?.[cat] ?? null;
 }
+/* League Leaders Snapshot: top 5 for one stat, per game, whole league; the full table opens in a sheet. */
+const SNAP_CATS = [["pts", "PPG"], ["reb", "RPG"], ["ast", "APG"], ["tpm", "3PM"], ["ts", "TS%"]];
+function leaderRows(cat, mode, conf, n) {
+  const maxGp = Math.max(1, ...leadersData.players.map((p) => p.stats.gp || 0));
+  return leadersData.players.filter((p) => {
+    const s = p.stats; if (!s?.gp) return false;
+    if (conf !== "All" && CONF_OF[p.teamAbbr] !== conf) return false;
+    if (mode === "totals") return true;
+    if (s.gp < Math.max(2, Math.ceil(maxGp * 0.5))) return false;
+    if (mode === "per36" && s.min < 15) return false;
+    if (cat === "ts" && (s.fga || 0) < 6) return false;
+    return true;
+  }).map((p) => ({ p, v: leaderValue(p, cat, mode) })).filter((r) => r.v != null).sort((a, b) => b.v - a.v).slice(0, n);
+}
 function renderLeaders() {
   const el = $("#leaders"); if (!el) return;
-  const head = `<div class="ld-head"><h3>Stat Leaders</h3>
+  const cat = SNAP_CATS.some(([k]) => k === LD.cat) ? LD.cat : "pts";
+  const rows = leadersData ? leaderRows(cat, "pergame", "All", 5) : null;
+  el.innerHTML = `<div class="snap card-group">
+      <div class="snap-head"><h3>League Leaders</h3><span class="snap-sub">Per game · qualified</span></div>
+      <div class="snap-cats" role="tablist">${SNAP_CATS.map(([k, l]) => `<button type="button" role="tab" data-snap="${k}" aria-selected="${cat === k}">${l}</button>`).join("")}</div>
+      <ol class="snap-list">${rows == null ? Array.from({ length: 5 }, () => `<li class="sk-row"><div class="sk c"></div><div class="sk-l"><div class="sk t"></div></div><div class="sk n"></div></li>`).join("")
+        : rows.map(({ p, v }, i) => `<li><button class="snap-row" type="button" data-player="${esc(p.id)}"><span class="snap-rank num">${i + 1}</span>${avatar(p, { size: "2.1rem", color: "#64748B" })}
+          <span class="snap-who"><b>${esc(p.name)}</b><small>${esc(p.teamAbbr)} · ${p.stats.gp} GP</small></span><span class="snap-v num">${v.toFixed(1)}</span></button></li>`).join("") || `<li class="empty">No qualified players yet.</li>`}</ol>
+      <button class="snap-all press" type="button" data-full-board>View Full Leaderboard <span aria-hidden="true">→</span></button>
+    </div>`;
+  el.querySelectorAll("[data-snap]").forEach((b) => b.addEventListener("click", () => { LD.cat = b.dataset.snap; saveLd(); renderLeaders(); }));
+  el.querySelector("[data-full-board]").addEventListener("click", () => sheet.open({ title: "League Leaders", render(body) { renderLeaderboard(body); } }));
+}
+function renderLeaderboard(el) {
+  if (!el) return;
+  const head = `<div class="ld-head">
       <div class="seg ld-modes" style="--n:3"><span class="thumb" style="transform:translateX(${LD_MODES.findIndex(([k]) => k === LD.mode) * 100}%)"></span>${LD_MODES.map(([k, l]) => `<button type="button" data-ldmode="${k}" aria-pressed="${LD.mode === k}">${l}</button>`).join("")}</div></div>
     <div class="pills" data-ldk="cat">${LD_CATS.map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${LD.cat === k}">${l}</button>`).join("")}</div>
     <div class="pills" data-ldk="conf" style="margin-top:.4rem">${["All", "East", "West"].map((c) => `<button type="button" data-v="${c}" aria-pressed="${LD.conf === c}">${c}</button>`).join("")}</div>`;
@@ -421,8 +468,8 @@ function renderLeaders() {
         <span class="ld-v num">${fmtv(v)}<small>${LD.mode === "per36" ? `${cat[2]}/36` : LD.mode === "totals" ? cat[2] : cat[1]}</small></span></button></li>`).join("") || `<li class="empty">No qualified players yet.</li>`}</ol>
       <p class="fine" style="padding:0 1rem .75rem;margin:0">Qualified: half of the max games played${LD.mode === "per36" ? ", 15+ MIN" : ""}${LD.cat === "ts" ? ", 6+ FGA" : ""}. TS% = PTS ÷ (2 × (FGA + 0.44 × FTA)). Game Score is Hollinger's, with total rebounds weighted 0.4 (ESPN's feed has no OREB/DREB split per player).</p></div>`;
   }
-  el.querySelectorAll("[data-ldmode]").forEach((b) => b.addEventListener("click", () => { LD.mode = b.dataset.ldmode; saveLd(); renderLeaders(); }));
-  el.querySelectorAll("[data-ldk] [data-v]").forEach((b) => b.addEventListener("click", () => { LD[b.parentElement.dataset.ldk] = b.dataset.v; saveLd(); renderLeaders(); }));
+  el.querySelectorAll("[data-ldmode]").forEach((b) => b.addEventListener("click", () => { LD.mode = b.dataset.ldmode; saveLd(); renderLeaderboard(el); renderLeaders(); }));
+  el.querySelectorAll("[data-ldk] [data-v]").forEach((b) => b.addEventListener("click", () => { LD[b.parentElement.dataset.ldk] = b.dataset.v; saveLd(); renderLeaderboard(el); renderLeaders(); }));
 }
 const saveLd = () => { try { localStorage.setItem("live:leaders", JSON.stringify(LD)); } catch {} };
 function effChips(t) {

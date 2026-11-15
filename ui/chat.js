@@ -123,8 +123,8 @@ export function mountChat({ getClient }) {
   /* ---------- floating orb ---------- */
   const orb = document.createElement("button");
   orb.type = "button"; orb.className = "ai-orb press"; orb.id = "aiOrb";
-  orb.setAttribute("aria-haspopup", "dialog"); orb.setAttribute("aria-label", "Open Hooptrax AI");
-  orb.innerHTML = `${ORB_SVG}<span class="orb-l">Hooptrax AI</span>`;
+  orb.setAttribute("aria-haspopup", "dialog"); orb.setAttribute("aria-label", "Ask Hooptrax, the NBA AI assistant");
+  orb.innerHTML = `<span class="orb-spark-txt" aria-hidden="true">✦</span><span class="orb-l">Ask Hooptrax</span>`;
 
   /* ---------- sheet ---------- */
   const panel = document.createElement("section");

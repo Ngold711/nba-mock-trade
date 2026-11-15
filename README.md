@@ -498,3 +498,23 @@ Built by an offline generator that cross-checks editorial data against ESPN:
 - **Game Log (active players):** the last 15 games of 2026–27 from ESPN `/gamelog`, refreshed every 2 minutes while open. ESPN's game log has no +/-, so that column isn't shown.
 - **Actions:** ⚖️ Compare Player (the existing Compare tool) and ⇄ Load in Trade Machine (active players). Player Quick-View gained a **📖 Full Profile** button.
 - **Header on phones:** the signed-in account pill shrinks to the team-logo circle under 768px, and the "30 Teams" label hides under 480px, so the header fits from 320 to 1280px with the new button.
+
+## Round 11: calmer, iOS-style architecture
+
+- **Four tabs:** Live · GM Lab · Reference · Arcade. The header holds only the logo, 30 Teams, Account and Theme. The search button and status dot are gone, and a screen-reader status region replaces the dot. Tool pages show a `‹ GM Lab` / `‹ Arcade` back link where the logo would be.
+- **Ask Hooptrax pill:** a labeled floating `✦ Ask Hooptrax` pill sits above the tab bar. On phones the body padding leaves room for it so it doesn't cover the last content.
+- **Live:** the LED ticker and pills stay. Under Games is a League Leaders Snapshot (top 5 for PPG, RPG, APG, 3PM and TS%). **View Full Leaderboard →** opens the full 25-row explorer in a sheet.
+- **Hubs:**
+  - `gmlab.html`: launcher cards for the Trade Machine, 3-2-1 Lottery & Mock Draft, and All-Star Ballot / Awards / 2K27, each with live chips.
+  - `reference.html`:
+    - Encyclopedia search with filters: All, Players, Coaches, GMs / Execs, Owners.
+    - Browse sheets: All-Time Leaders, Champions & Awards, Retired Jerseys, and the current 30 front offices.
+  - `arcade.html`: a featured McConnell card with a streak pill, plus Coming Soon cards.
+- **People data (`nba_people.json`):** coaches, presidents/GMs and owners. Current 30-team front offices and notable all-time figures carry `verified:true` plus a source only when the fact was checked against a 2026 report. Anything else is `verified:false` and is shown with a "?" marker. Head coaches always come live from ESPN.
+- **API:**
+  - `GET /api/people/:id`: profile with player, coach, exec and owner sections.
+  - `GET /api/front-offices`: the 30 teams' coach, president, GM and owner.
+  - `/api/players/search?role=coach|exec|owner`: returns people only. Without a role, players and people are merged.
+- **Multi-role profiles:** a role switcher (Player Career | Coaching Career | Front Office / GM | Ownership) covers MJ, Bird, Riley, West, Kerr, Ainge, Rivers, Redick, Russell and Phil Jackson.
+- **30 Teams Vault:** each team shows its Head Coach, Basketball Ops lead and Owner. Linked names open profiles.
+- **ⓘ popovers:** on screens ≤900px they become a fixed bottom sheet with 16px gutters and close when you tap outside or press Escape.

@@ -37,6 +37,23 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
   };
   const ratingOf = (ratings, id) => ratings?.players?.find((p) => p.id === String(id)) || null;
 
+  /* Leadership: head coach (ESPN, live) + president/GM + owner (nba_people.json); tap opens a profile when we have one */
+  let foP = null;
+  const loadFrontOffices = () => (foP ||= fetch("/api/front-offices").then((r) => r.json()).then((j) => Object.fromEntries((j.data?.teams || []).map((t) => [t.team, t]))));
+  const leadership = (fo, liveCoach) => {
+    const row = (label, x) => {
+      if (!x?.name) return `<div class="ld-cell"><small>${label}</small><b class="muted">Not confirmed</b></div>`;
+      const inner = `<small>${label}${x.title && label !== "Head Coach" ? ` · ${esc(x.title)}` : ""}</small><b>${esc(x.name)}${x.verified ? "" : ' <span class="unv" title="Not confirmed for 2026–27">?</span>'}</b>`;
+      return x.person ? `<button class="ld-cell press" type="button" data-person-open="${esc(x.person)}" data-person-role="${label === "Head Coach" ? "coach" : label === "Owner" ? "owner" : "exec"}">${inner}<span class="chev" aria-hidden="true">›</span></button>` : `<div class="ld-cell">${inner}</div>`;
+    };
+    const coach = fo?.coach || (liveCoach ? { name: liveCoach, verified: true } : null);
+    return `<div class="leadership">${row("Head Coach", coach)}${row("Basketball Ops", fo?.president || fo?.gm)}${row("Owner", fo?.owner)}</div>`;
+  };
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-person-open]"); if (!b) return;
+    dispatchEvent(new CustomEvent("htx:person", { detail: { id: b.dataset.personOpen, role: b.dataset.personRole } }));
+  });
+
   /* =================================================================== Team Vault */
   let vaultTab = "roster";
   async function openTeam(input) {
@@ -44,7 +61,8 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
     const code = toCode(input);
     const look = teamLook(code);
     const espnAbbr = CODE_TO_ESPN[code] || code;
-    const S = { roster: null, err: null, standing: null, lottery: null, inv: null, book: null, ratings: null, stats: null, schedule: null, schedErr: null, eff: null, history: null };
+    const S = { roster: null, err: null, standing: null, lottery: null, inv: null, book: null, ratings: null, stats: null, schedule: null, schedErr: null, eff: null, history: null, fo: null };
+    loadFrontOffices().then((m) => { S.fo = m[code] || null; if (sheet.isOpen) sheet.refresh(); }).catch(() => {});
     const draw = (body) => {
       const st = S.standing;
       const head = `<div class="hub-head" style="--c:${look.color}">${teamLogo(look, { size: "3.25rem" })}
@@ -52,7 +70,8 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
         <div class="hub-meta num">${st ? `${st.wins}-${st.losses} · ${st.seed ? `#${st.seed} in the ${esc(st.conf)}` : esc(st.conf)}${st.streak ? ` · ${esc(st.streak)}` : ""}` : S.roster?.team?.record ? esc(S.roster.team.record) : '<span class="sk" style="display:inline-block;width:8rem;height:.8rem;border-radius:4px"></span>'}</div>
         ${S.eff ? `<div class="hub-meta eff-badges">${[["ortg", "ORtg"], ["drtg", "DRtg"], ["net", "Net"], ["pace", "Pace"]].map(([k, l]) => `<span class="pill" title="${l} ${S.eff[k]}">#${S.eff.ranks?.[k] ?? "–"} ${l} <b class="num">${k === "net" && S.eff[k] > 0 ? "+" : ""}${S.eff[k]}</b></span>`).join("")}</div>` : ""}
         ${S.lottery ? `<div class="hub-meta"><span class="pill lot">3-2-1 lottery seed ${S.lottery.seed} · ${(S.lottery.p1 * 100).toFixed(1)}% for #1</span></div>` : ""}
-        ${S.roster?.coach ? `<div class="hub-meta">Coach ${esc(S.roster.coach)}</div>` : ""}</div></div>
+        </div></div>
+        ${leadership(S.fo, S.roster?.coach)}
         <div class="seg vault-tabs" role="tablist" style="--n:4"><span class="thumb" style="transform:translateX(${["roster", "picks", "schedule", "history"].indexOf(vaultTab) * 100}%)"></span>
           ${[["roster", "Roster & Cap"], ["picks", "Picks"], ["schedule", "Schedule"], ["history", "History & #s"]].map(([k, l]) => `<button type="button" role="tab" data-vtab="${k}" aria-pressed="${vaultTab === k}">${l}</button>`).join("")}</div>`;
       let tab = "";

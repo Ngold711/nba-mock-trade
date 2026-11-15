@@ -545,23 +545,55 @@ async function feedRoute(req, res, m, q) {
    Player Encyclopedia: search (active rosters + all-time legends + ESPN) and the full profile.
    ===================================================================== */
 import { searchLocal, mergeSearch, trophies } from "./service/player.js";
+import { searchPeople, personProfile, frontOffices, byPlayerId } from "./service/people.js";
+let peopleData = null;
+const loadPeople = () => (peopleData ||= readFile(join(ROOT, "nba_people.json"), "utf8").then(JSON.parse).catch(() => ({ teams: {}, people: [] })));
 import { retiredBy } from "./service/chat.js";
 import { resolveSalary as salaryOf } from "./service/trade.js";
 const timeout = (p, ms, fallback) => Promise.race([p, new Promise((r) => setTimeout(() => r(fallback), ms))]);
 async function playerSearchRoute(req, res, m, q) {
   const term = String(q.get("q") || "").trim();
   if (term.length < 2 || term.length > 40) return json(res, 400, { error: "Search needs 2–40 characters" });
-  const [league, d] = await Promise.all([store.get("league").then((r) => r.data).catch(() => null), chatData().catch(() => ({}))]);
-  const ppg = new Map(((await store.get("players").then((r) => r.data).catch(() => null))?.players || []).map((p) => [String(p.id), p.stats?.pts || 0]));
+  const role = ["player", "coach", "exec", "owner"].includes(q.get("role")) ? q.get("role") : null;     // null = everyone
+  const pd = await loadPeople();
+  res.setHeader("cache-control", "public, max-age=300");
+  if (role && role !== "player") {                     // Coaches / GMs & Execs / Owners: the people archive only
+    return json(res, 200, { data: { players: searchPeople(term, pd.people, { role }).map(({ score, ...p }) => p) } });
+  }
+  const [league, d, stats] = await Promise.all([store.get("league").then((r) => r.data).catch(() => null), chatData().catch(() => ({})), store.get("players").then((r) => r.data).catch(() => null)]);
+  const ppg = new Map((stats?.players || []).map((p) => [String(p.id), p.stats?.pts || 0]));
   const active = (league?.players || []).map((p) => ({ ...p, ppg: ppg.get(String(p.id)) || 0 }));
+  const roleOf = byPlayerId(pd.people);
+  const tag = (p) => (roleOf.has(String(p.id)) ? { ...p, roles: roleOf.get(String(p.id)).roles, personId: roleOf.get(String(p.id)).id } : p);
   const local = searchLocal(term, { active, legends: d.history?.legends || [] }, 12);
   // ESPN's athlete search fills in anyone our caches don't know (deep benches, older players); never wait long for it
   const remote = local.length >= 8 ? [] : await timeout(store.get("search", { q: term.toLowerCase() }).then((r) => r.data).catch(() => []), 1500, []);
-  res.setHeader("cache-control", "public, max-age=300");
-  return json(res, 200, { data: { players: mergeSearch(local, remote, 12) } });
+  const pplHits = role === "player" ? [] : searchPeople(term, pd.people);
+  const pplNames = new Set(pplHits.map((p) => p.name.toLowerCase()));
+  // drop ESPN "athlete" duplicates of people we profile ourselves (e.g. Popovich), unless it's their real player id
+  const players = mergeSearch(local, remote, 12).filter((p) => local.some((l) => l.id === p.id) || !pplNames.has(String(p.name).toLowerCase()) || roleOf.has(String(p.id)))
+    .map((p) => ({ ...tag(p), score: local.find((l) => l.id === p.id)?.score ?? 30 }));
+  // people not already shown as a player result (Auerbach, Popovich, Presti, owners, and players we lack stats for, like Riley)
+  const shown = new Set(players.map((p) => String(p.id)));
+  const people = pplHits.filter((p) => !p.playerId || !shown.has(String(p.playerId)));
+  const out = [...players, ...people].sort((a, b) => b.score - a.score).slice(0, 12).map(({ score, ...p }) => p);
+  return json(res, 200, { data: { players: out } });
 }
 /** ESPN's displayDOB is day/month/year ("17/2/1963") → "Feb 17, 1963". */
 const fmtDob = (d) => { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(d || "")); return m ? new Date(Date.UTC(+m[3], +m[2] - 1, +m[1])).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : String(d || ""); };
+async function personRoute(req, res, m) {
+  const pd = await loadPeople();
+  const p = pd.people.find((x) => x.id === m[1]);
+  if (!p) return json(res, 404, { error: "No profile with that id" });
+  const [standings, league, d] = await Promise.all([store.get("standings").then((r) => r.data).catch(() => null), store.get("league").then((r) => r.data).catch(() => null), chatData().catch(() => ({}))]);
+  res.setHeader("cache-control", "no-cache");
+  return json(res, 200, { data: personProfile(p, { standings, league, history: d.history }) });
+}
+async function frontOfficesRoute(req, res) {
+  const [pd, league] = await Promise.all([loadPeople(), store.get("league").then((r) => r.data).catch(() => null)]);
+  res.setHeader("cache-control", "public, max-age=300");
+  return json(res, 200, { data: { asOf: pd.asOf, about: pd.about, teams: frontOffices(pd, league) } });
+}
 async function playerFullRoute(req, res, m) {
   const id = m[1];
   const get = (name, params) => store.get(name, params).then((r) => r.data).catch(() => null);
@@ -599,6 +631,8 @@ async function playerFullRoute(req, res, m) {
     seasons, career: career?.career || null,
     gameLog: active && log?.games?.length ? log : null,
     sources: { stats: career ? "ESPN" : null, awards: "nba_history.json + ESPN honors" },
+    ...(await loadPeople().then((pd) => { const person = byPlayerId(pd.people).get(id); return person ? { roles: person.roles, personId: person.id } : {}; })),
+    legendCareer: !seasons.length && leg ? { gp: leg.gp, pts: leg.pts, reb: leg.reb, ast: leg.ast, totals: leg.totals } : null,
   };
   res.setHeader("cache-control", "no-cache");
   return json(res, 200, { data: profile });
@@ -612,6 +646,8 @@ const routes = [
   [/^\/api\/feed$/, feedRoute],
   [/^\/api\/players\/search$/, playerSearchRoute],
   [/^\/api\/players\/(\d{1,12})\/full$/, playerFullRoute],
+  [/^\/api\/people\/([a-z0-9-]{3,40})$/, personRoute],
+  [/^\/api\/front-offices$/, frontOfficesRoute],
   [/^\/api\/ai-threads(?:\/([A-Za-z0-9_-]{5,40})(?:\/(delete))?)?$/, aiThreadsRoute],
   // spec names: /api/saved-items (your own items; POST saves) and /api/profile (your profile). Both require a session.
   [/^\/api\/saved-items(?:\/(public|private))?$/, (req, res, m, q) => (req.method === "POST" ? itemsRoute(req, res, [m[0]]) : meRoute(req, res, [m[0], "items", m[1] || q.get("visibility") || undefined]))],

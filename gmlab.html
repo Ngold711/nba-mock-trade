@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>GM Lab · Hooptrax</title>
+<meta name="description" content="Hooptrax GM Lab: the 2026–27 NBA Trade Machine, the 3-2-1 Draft Lottery and Mock Draft, and the All-Star Ballot, Awards and 2K27 ratings." />
+<meta name="theme-color" content="#0B0E14" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#F8FAFC" media="(prefers-color-scheme: light)" />
+<meta name="color-scheme" content="dark light" />
+<script>/* Privacy: purge pre-account history (the old global AI chat list and un-scoped trades, mock drafts and ballots). Personal work is now stored per user (ui/scoped.js); guests keep nothing. */(function(){var R=/^(hooptrax_ai_threads|hooptrax_ai_active|chat:v1|trade:workspace:v1|draft:v2:\d{4}|draft:simcount:\d{4}|awards:ballot|awards:ballot:v2|awards:picks)$/;[function(){return localStorage},function(){return sessionStorage}].forEach(function(f){try{var s=f();for(var i=s.length-1;i>=0;i--){var k=s.key(i);if(k&&R.test(k))s.removeItem(k)}}catch(e){}})})();</script>
+<script>/* theme before first paint: dark default, light optional (localStorage "htx:theme") */(function(){var t="dark";try{t=localStorage.getItem("htx:theme")==="light"?"light":"dark"}catch(e){}document.documentElement.setAttribute("data-theme",t);var c=t==="light"?"#F8FAFC":"#0B0E14";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c)})})();</script>
+<link rel="manifest" href="public/manifest.json" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Hooptrax" />
+<link rel="icon" href="public/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="public/favicon-32.png" type="image/png" sizes="32x32" />
+<link rel="apple-touch-icon" href="public/apple-touch-icon.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="public/apple-touch-icon.png" />
+<meta property="og:site_name" content="Hooptrax" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="GM Lab · Hooptrax" />
+<meta property="og:description" content="Hooptrax GM Lab: the 2026–27 NBA Trade Machine, the 3-2-1 Draft Lottery and Mock Draft, and the All-Star Ballot, Awards and 2K27 ratings." />
+<meta property="og:url" content="https://hooptrax.com/gmlab.html" />
+<meta property="og:image" content="https://hooptrax.com/public/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Hooptrax: live NBA trade machine, 3-2-1 lottery simulator and draft hub" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="GM Lab · Hooptrax" />
+<meta name="twitter:description" content="Hooptrax GM Lab: the 2026–27 NBA Trade Machine, the 3-2-1 Draft Lottery and Mock Draft, and the All-Star Ballot, Awards and 2K27 ratings." />
+<meta name="twitter:image" content="https://hooptrax.com/public/og-image.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
+<link rel="stylesheet" href="ui/base.css" />
+<style>
+
+</style>
+</head>
+<body>
+<header class="bar" id="bar"></header>
+<main class="hub-page">
+  <h1 class="large-title">GM Lab</h1>
+  <p class="hub-lede">Run a front office: build trades, run the lottery, draft, and vote.</p>
+  <div class="launch-list">
+    <a class="launch press" href="index.html" style="--tint:#F59E0B">
+      <span class="launch-ic" aria-hidden="true">⇄</span>
+      <span class="launch-t"><b>NBA Trade Machine</b><small>Build 2026–27 CBA deals &amp; check cap rules</small><span class="launch-chip" id="chipTrade"></span></span>
+      <span class="chev" aria-hidden="true">›</span></a>
+    <a class="launch press" href="draft.html" style="--tint:#10B981">
+      <span class="launch-ic" aria-hidden="true">🎲</span>
+      <span class="launch-t"><b>3-2-1 Lottery &amp; Mock Draft</b><small>2K envelope reveal &amp; 2027–2029 mock boards</small><span class="launch-chip" id="chipDraft"></span></span>
+      <span class="chev" aria-hidden="true">›</span></a>
+    <a class="launch press" href="awards.html" style="--tint:#6366F1">
+      <span class="launch-ic" aria-hidden="true">🏆</span>
+      <span class="launch-t"><b>All-Star Ballot, Awards &amp; 2K27</b><small>Vote starters, track MVP races &amp; live 2K ratings</small><span class="launch-chip" id="chipAwards"></span></span>
+      <span class="chev" aria-hidden="true">›</span></a>
+  </div>
+</main>
+<script src="data.js"></script>
+<script type="module">
+import { mountShell } from "./ui/shell.js";
+mountShell({ active: "gmlab" });
+const chip = (id, html) => { const el = document.getElementById(id); if (el && html) { el.innerHTML = html; el.classList.add("on"); } };
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+// quiet live previews: one line each, never blocking the hub
+fetch("/api/trending-trades").then((r) => r.json()).then(({ data }) => { const p = data?.players?.[0]; if (p) chip("chipTrade", `🔥 Most rumored: ${esc(p.name)} (${esc(p.team.code)})`); }).catch(() => {});
+fetch("/api/standings").then((r) => r.json()).then(({ data }) => {
+  const all = (data?.conferences || []).flatMap((c) => c.teams || []);
+  const worst = all.filter((t) => t.wins + t.losses > 0).sort((a, b) => a.wins / (a.wins + a.losses) - b.wins / (b.wins + b.losses))[0];
+  if (worst) chip("chipDraft", `Worst record: ${esc(worst.team.displayName || worst.team.abbr)} ${worst.wins}-${worst.losses}`);
+}).catch(() => {});
+fetch("/api/2k-ratings").then((r) => r.json()).then(({ data }) => { const p = data?.players?.[0]; if (p) chip("chipAwards", `2K27 #1: ${esc(p.name)} · ${p.ovr}`); }).catch(() => {});
+</script>
+</body>
+</html>

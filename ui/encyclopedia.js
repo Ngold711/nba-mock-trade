@@ -10,6 +10,20 @@ const money = (m) => (m == null ? "—" : `$${m >= 10 ? Math.round(m * 10) / 10 
 const f = (x, d = 1) => (x == null || x === "" ? "—" : typeof x === "number" ? (Number.isInteger(x) && d === 1 ? String(x) : x.toFixed(d)) : esc(x));
 const pct = (x) => (x == null ? "—" : Number(x).toFixed(1));
 const shortDate = (iso) => { const t = new Date(iso); return isNaN(t) ? "" : t.toLocaleDateString("en-US", { month: "numeric", day: "numeric", timeZone: "America/New_York" }); };
+const ROLE_LABEL = { player: "Player Career", coach: "Coaching Career", exec: "Front Office / GM", owner: "Ownership" };
+const ROLE_TAG = { player: "Player", coach: "Coach", exec: "Exec", owner: "Owner" };
+/** Segmented role switcher (Player Career | Coaching Career | Front Office / GM | Ownership). */
+const rolesBar = (roles, current) => (roles?.length > 1 ? `<div class="seg enc-roles" role="tablist" aria-label="Career" style="--n:${roles.length}">${roles.map((r) => `<button type="button" role="tab" data-role="${r}" aria-selected="${r === current}">${ROLE_LABEL[r]}</button>`).join("")}</div>` : "");
+/** One search-result row (player or person). */
+export function resultRow(p) {
+  const isPerson = p.kind === "person";
+  const tag = isPerson ? p.roles.map((r) => ROLE_TAG[r]).join(" · ") : p.roles ? p.roles.map((r) => ROLE_TAG[r]).join(" · ") : p.active ? "Active" : p.active === false ? "Legend" : "NBA";
+  const sub = isPerson ? (p.team ? `${esc(p.team)} · ` : "") + p.roles.map((r) => ROLE_LABEL[r].replace(" Career", "")).join(", ") : p.active ? `${esc(p.team)}${p.position ? ` · ${esc(p.position)}` : ""}` : p.years ? esc(p.years) : esc(p.team || "NBA");
+  return `<li><button class="row press" type="button" ${isPerson ? `data-person="${esc(p.id)}"` : `data-enc="${esc(p.id)}"`}>
+    ${avatar({ name: p.name, headshot: p.headshot || (p.playerId ? `https://a.espncdn.com/i/headshots/nba/players/full/${p.playerId}.png` : null) }, { size: "2.6rem", color: "#475569" })}
+    <span class="meta"><span class="nm">${esc(p.name)}</span><span class="sub">${sub}</span></span>
+    <span class="enc-tag ${isPerson || p.roles ? "role" : p.active ? "act" : "leg"}">${tag}</span></button></li>`;
+}
 const yearsTxt = (ys) => (ys.length > 6 ? `${ys.slice(0, 3).join(", ")} … ${ys.slice(-2).join(", ")}` : ys.join(", "));
 
 export function mountEncyclopedia({ sheet, openCompare = () => {}, toast = () => {} }) {
@@ -36,17 +50,14 @@ export function mountEncyclopedia({ sheet, openCompare = () => {}, toast = () =>
             const r = await fetch(`/api/players/search?q=${encodeURIComponent(q)}`);
             const j = await r.json(); if (seq !== searchSeq || !sheet.isOpen) return;
             const list = j.data?.players || [];
-            body.innerHTML = list.length ? `<ul class="list enc-results">${list.map((p) => `<li><button class="row press" type="button" data-enc="${esc(p.id)}">
-                ${avatar({ name: p.name, headshot: p.headshot }, { size: "2.6rem", color: "#475569" })}
-                <span class="meta"><span class="nm">${esc(p.name)}</span><span class="sub">${p.active ? `${esc(p.team)}${p.position ? ` · ${esc(p.position)}` : ""}` : p.years ? esc(p.years) : esc(p.team || "NBA")}</span></span>
-                <span class="enc-tag ${p.active ? "act" : "leg"}">${p.active ? "Active" : p.active === false ? "Legend" : "NBA"}</span></button></li>`).join("")}</ul>`
+            body.innerHTML = list.length ? `<ul class="list enc-results">${list.map(resultRow).join("")}</ul>`
               : `<div class="empty">No NBA player matches “${esc(q)}”.</div>`;
           } catch { if (seq === searchSeq) body.innerHTML = `<div class="empty">Search is unavailable right now.</div>`; }
         }, 140);
       },
     });
     if (initial) { const s = document.getElementById("sheetSearch"); if (s) { s.value = initial; sheet.refresh(); } }
-    sheet.body.onclick = (e) => { const b = e.target.closest("[data-enc]"); if (b) openProfile(b.dataset.enc); };
+    sheet.body.onclick = (e) => { const b = e.target.closest("[data-enc]"); if (b) return openProfile(b.dataset.enc); const pp = e.target.closest("[data-person]"); if (pp) openPerson(pp.dataset.person); };
   }
 
   /* ---------- profile ---------- */
@@ -69,6 +80,7 @@ export function mountEncyclopedia({ sheet, openCompare = () => {}, toast = () =>
           const md = t.closest("[data-emode]"); if (md) { S.mode = md.dataset.emode; draw(body); return; }
           if (t.closest("[data-ecompare]")) { openCompare(String(id)); return; }
           if (t.closest("[data-eback]")) { openSearch(); return; }
+          const rb = t.closest("[data-role]"); if (rb && S.p?.personId && rb.dataset.role !== "player") { openPerson(S.p.personId, { role: rb.dataset.role }); return; }
         };
         draw(body);
       },
@@ -112,10 +124,10 @@ export function mountEncyclopedia({ sheet, openCompare = () => {}, toast = () =>
         </div><p class="enc-note">All-Star selections aren't in ESPN's free feeds; All-Star Game MVPs are shown.</p>` : "";
       const acts = `<div class="enc-acts"><button class="btn ghost press" type="button" data-ecompare>⚖️ Compare Player</button>${p.active && p.team ? `<a class="btn primary press" href="index.html#t=${encodeURIComponent(`${p.team.code},_`)}&a=${encodeURIComponent(`${p.team.code}:p${p.id}>_`)}">⇄ Load in Trade Machine</a>` : ""}</div>`;
       const tabs = `<div class="seg2 enc-tabs" role="tablist"><button type="button" role="tab" data-etab="stats" aria-selected="${S.tab === "stats"}">Career Stats</button><button type="button" role="tab" data-etab="log" aria-selected="${S.tab === "log"}" ${p.gameLog ? "" : "disabled"}>Game Log</button></div>`;
-      body.innerHTML = hero + shelf + acts + tabs + (S.tab === "log" && p.gameLog ? logTable(p) : statsTable(p));
+      body.innerHTML = hero + rolesBar(p.roles, "player") + shelf + acts + tabs + (S.tab === "log" && p.gameLog ? logTable(p) : statsTable(p));
     }
     function statsTable(p) {
-      if (!p.seasons.length) return `<div class="empty">ESPN has no NBA season stats for this player.</div>`;
+      if (!p.seasons.length) return p.legendCareer ? careerCard(p.legendCareer) : `<div class="empty">ESPN has no NBA season stats for this player.</div>`;
       const m = S.mode;
       const cols = m === "adv" ? [["gp", "GP"], ["min", "MIN"], ["tsPct", "TS%"], ["efgPct", "eFG%"], ["astTo", "AST/TO"], ["gmsc", "GmSc"], ["fgPct", "FG%"], ["tpPct", "3P%"], ["ftPct", "FT%"]]
         : [["gp", "GP"], ["min", "MIN"], ["pts", "PTS"], ["reb", "REB"], ["ast", "AST"], ["stl", "STL"], ["blk", "BLK"], ["tov", "TOV"], ["fg", "FG"], ["fgPct", "FG%"], ["tp", "3PT"], ["tpPct", "3P%"], ["ft", "FT"], ["ftPct", "FT%"]];
@@ -145,5 +157,79 @@ export function mountEncyclopedia({ sheet, openCompare = () => {}, toast = () =>
     }
   }
 
-  return { openSearch, openProfile };
+  /* ---------- coaches, executives, owners (and the non-player eras of multi-role people) ---------- */
+  const careerCard = (c) => `<div class="enc-facts">${[["Games", c.gp], ["PPG", c.pts], ["RPG", c.reb], ["APG", c.ast], ["Career points", c.totals?.pts?.toLocaleString("en-US")]].filter(([, v]) => v != null).map(([k, v]) => `<div class="enc-fact"><small>${k}</small><b>${typeof v === "number" ? (Number.isInteger(v) ? v : v.toFixed(1)) : v}</b></div>`).join("")}</div>
+    <p class="enc-note">Career totals from the Hooptrax legends archive; ESPN has no season-by-season line for this player.</p>`;
+  const yearsChips = (label, ys, icon) => (ys?.length ? `<div class="tro" title="${esc(label)}: ${ys.join(", ")}"><span class="tro-i">${icon}</span><b>${ys.length > 1 ? `${ys.length}× ` : ""}${esc(label)}</b><small>${esc(yearsTxt(ys))}</small></div>` : "");
+  const teamRow = (t, right = "", sub = "") => `<li class="pp-row"><img src="${esc(t.logo)}" alt="" width="28" height="28" loading="lazy" referrerpolicy="no-referrer"><span class="pp-who"><b>${esc(t.name)}</b>${sub ? `<small>${sub}</small>` : ""}</span><span class="pp-r">${right}</span></li>`;
+  const pct3 = (x) => (x == null ? "—" : x.toFixed(3).replace(/^0/, ""));
+  function personSection(p, role) {
+    if (role === "player") {
+      const pl = p.player || {};
+      return `${pl.note ? `<p class="pp-lede">${esc(pl.note)}</p>` : ""}${pl.career ? careerCard(pl.career) : ""}${pl.span ? `<p class="enc-note">Playing career ${esc(pl.span)}.</p>` : ""}`;
+    }
+    if (role === "coach" && p.coach) {
+      const c = p.coach, r = c.record;
+      return `<div class="enc-facts">
+          ${r ? `<div class="enc-fact"><small>Regular season</small><b>${r.w.toLocaleString("en-US")}–${r.l.toLocaleString("en-US")} <small>(${pct3(r.pct)})</small></b></div>` : ""}
+          ${r?.pw != null ? `<div class="enc-fact"><small>Playoffs</small><b>${r.pw}–${r.pl} <small>(${pct3(r.playoffPct)})</small></b></div>` : ""}
+          ${c.current ? `<div class="enc-fact"><small>2026–27 (live)</small><b>${c.current.w}–${c.current.l} <small>#${c.current.seed} ${esc(c.current.conf)}</small></b></div>` : ""}
+          <div class="enc-fact"><small>Titles as coach</small><b>${c.titles.length}</b></div>
+        </div>
+        <div class="enc-shelf">${yearsChips("NBA Champion (coach)", c.titles, "🏆")}${yearsChips("Coach of the Year", c.coy, "📋")}</div>
+        <h4 class="pp-h">Teams coached</h4><ul class="pp-list">${c.stints.map((s) => teamRow(s, esc(s.years), esc(s.note))).join("")}</ul>
+        ${c.notes.length ? `<ul class="pp-notes">${c.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
+        ${!r ? `<p class="enc-note">Career win–loss totals are shown for finished coaching careers; active coaches show this season's live record.</p>` : ""}`;
+    }
+    if (role === "exec" && p.exec) {
+      const x = p.exec;
+      return `<div class="enc-shelf">${yearsChips("Championships built", x.titles, "🏆")}${yearsChips("Executive of the Year", x.eoy, "🧠")}</div>
+        <h4 class="pp-h">Front-office tenure</h4><ul class="pp-list">${x.stints.map((s) => teamRow(s, esc(s.years), esc(s.title))).join("")}</ul>
+        ${x.notes.length ? `<h4 class="pp-h">Signature moves</h4><ul class="pp-notes">${x.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}`;
+    }
+    if (role === "owner" && p.owner) {
+      const o = p.owner;
+      return `<div class="enc-shelf">${yearsChips("Titles as owner", o.titles, "🏆")}</div>
+        <h4 class="pp-h">Franchises owned</h4><ul class="pp-list">${o.teams.map((s) => teamRow(s, esc(s.years), [s.price && `Purchase: ${esc(s.price)}`, esc(s.note)].filter(Boolean).join(" · "))).join("")}</ul>`;
+    }
+    return `<div class="empty">No details for this role yet.</div>`;
+  }
+  const people = new Map();
+  async function loadPerson(id) {
+    if (people.has(id)) return people.get(id);
+    const r = await fetch(`/api/people/${encodeURIComponent(id)}`); const j = await r.json();
+    if (!r.ok) throw new Error(j.error || "Not found");
+    people.set(id, j.data); return j.data;
+  }
+  function openPerson(id, { role = null } = {}) {
+    const S = { p: null, role, err: "" };
+    clearInterval(logTimer);
+    sheet.open({
+      title: "Profile",
+      render(body) {
+        body.onclick = (e) => {
+          if (e.target.closest("[data-eback]")) { openSearch(); return; }
+          const rb = e.target.closest("[data-role]"); if (!rb || !S.p) return;
+          if (rb.dataset.role === "player" && S.p.player?.playerId) { openProfile(S.p.player.playerId); return; }
+          S.role = rb.dataset.role; draw(body);
+        };
+        draw(body);
+      },
+      onClose() { if (sheet.body) sheet.body.onclick = null; },
+    });
+    loadPerson(id).then((p) => { S.p = p; S.role ||= p.roles.find((r) => r !== "player") || p.roles[0]; if (sheet.isOpen) draw(sheet.body); })
+      .catch((e) => { S.err = e.message; if (sheet.isOpen) draw(sheet.body); });
+    function draw(body) {
+      if (!body) return;
+      if (S.err) { body.innerHTML = `<div class="empty">${esc(S.err)}</div>`; return; }
+      const p = S.p;
+      if (!p) { body.innerHTML = `<div class="enc-hero"><div class="sk c" style="width:5.5rem;height:5.5rem;border-radius:99px"></div><div style="flex:1;display:grid;gap:.4rem"><div class="sk" style="height:1.4rem;width:70%"></div></div></div>`; return; }
+      body.innerHTML = `<div class="enc-hero"><div class="enc-face">${avatar({ name: p.name, headshot: p.headshot }, { size: "5rem", color: "#475569", full: true })}</div>
+          <div class="enc-id"><h3>${esc(p.name)}</h3><div class="enc-sub">${p.roles.map((r) => `<span class="enc-team role">${ROLE_TAG[r]}</span>`).join("")}</div></div></div>
+        ${rolesBar(p.roles, S.role)}${personSection(p, S.role)}
+        <p class="enc-note">Coaching, front-office and ownership details are editorial (nba_people.json); current head coaches and records come live from ESPN.</p>`;
+    }
+  }
+
+  return { openSearch, openProfile, openPerson };
 }

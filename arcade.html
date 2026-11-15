@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Arcade · Hooptrax</title>
+<meta name="description" content="Hooptrax Arcade: NBA mini-games, starring McConnell, the daily and unlimited mystery NBA player game." />
+<meta name="theme-color" content="#0B0E14" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#F8FAFC" media="(prefers-color-scheme: light)" />
+<meta name="color-scheme" content="dark light" />
+<script>/* Privacy: purge pre-account history (the old global AI chat list and un-scoped trades, mock drafts and ballots). Personal work is now stored per user (ui/scoped.js); guests keep nothing. */(function(){var R=/^(hooptrax_ai_threads|hooptrax_ai_active|chat:v1|trade:workspace:v1|draft:v2:\d{4}|draft:simcount:\d{4}|awards:ballot|awards:ballot:v2|awards:picks)$/;[function(){return localStorage},function(){return sessionStorage}].forEach(function(f){try{var s=f();for(var i=s.length-1;i>=0;i--){var k=s.key(i);if(k&&R.test(k))s.removeItem(k)}}catch(e){}})})();</script>
+<script>/* theme before first paint: dark default, light optional (localStorage "htx:theme") */(function(){var t="dark";try{t=localStorage.getItem("htx:theme")==="light"?"light":"dark"}catch(e){}document.documentElement.setAttribute("data-theme",t);var c=t==="light"?"#F8FAFC":"#0B0E14";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c)})})();</script>
+<link rel="manifest" href="public/manifest.json" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Hooptrax" />
+<link rel="icon" href="public/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="public/favicon-32.png" type="image/png" sizes="32x32" />
+<link rel="apple-touch-icon" href="public/apple-touch-icon.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="public/apple-touch-icon.png" />
+<meta property="og:site_name" content="Hooptrax" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Arcade · Hooptrax" />
+<meta property="og:description" content="Hooptrax Arcade: NBA mini-games, starring McConnell, the daily and unlimited mystery NBA player game." />
+<meta property="og:url" content="https://hooptrax.com/arcade.html" />
+<meta property="og:image" content="https://hooptrax.com/public/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Hooptrax: live NBA trade machine, 3-2-1 lottery simulator and draft hub" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Arcade · Hooptrax" />
+<meta name="twitter:description" content="Hooptrax Arcade: NBA mini-games, starring McConnell, the daily and unlimited mystery NBA player game." />
+<meta name="twitter:image" content="https://hooptrax.com/public/og-image.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
+<link rel="stylesheet" href="ui/base.css" />
+<style>
+
+</style>
+</head>
+<body>
+<header class="bar" id="bar"></header>
+<main class="hub-page">
+  <h1 class="large-title">Arcade</h1>
+  <a class="feature press" href="mcconnell.html">
+    <span class="feature-art" aria-hidden="true"><span class="q">?</span></span>
+    <span class="feature-body">
+      <span class="feature-kicker">Featured · Daily</span>
+      <b>McConnell</b>
+      <small>Daily &amp; Unlimited Mystery NBA Player Game</small>
+      <span class="feature-row"><span class="streak" id="streak">🔥 Streak 0</span><span class="play">Play Now</span></span>
+    </span></a>
+  <h2 class="group-h">More games coming soon</h2>
+  <div class="soon-grid">
+    <div class="soon"><span class="soon-ic" aria-hidden="true">📈</span><b>Box Score Blitz</b><small>Name the player from one stat line</small><span class="soon-tag">Soon</span></div>
+    <div class="soon"><span class="soon-ic" aria-hidden="true">⚖️</span><b>Trade Grader</b><small>Who won the deal? Grade real trades</small><span class="soon-tag">Soon</span></div>
+    <div class="soon"><span class="soon-ic" aria-hidden="true">🎟️</span><b>Draft Day Roulette</b><small>Guess the pick before the reveal</small><span class="soon-tag">Soon</span></div>
+    <div class="soon"><span class="soon-ic" aria-hidden="true">👕</span><b>Rafters</b><small>Whose number hangs where?</small><span class="soon-tag">Soon</span></div>
+  </div>
+</main>
+<script src="data.js"></script>
+<script type="module">
+import { mountShell } from "./ui/shell.js";
+mountShell({ active: "arcade" });
+try { const s = JSON.parse(localStorage.getItem("mc:stats") || "null"); if (s) document.getElementById("streak").textContent = `🔥 Streak ${s.streak || 0} · Best ${s.maxStreak || 0}`; } catch {}
+</script>
+</body>
+</html>
