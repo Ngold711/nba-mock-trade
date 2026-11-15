@@ -17,6 +17,17 @@ const rolesBar = (roles, current) => (roles?.length > 1 ? `<div class="seg enc-r
 /** One search-result row (player or person). */
 const wikiCards = new Map();   // id → Wikipedia bio card from the last searches
 const WIKI_ROLE = { coach: "Coach", exec: "Front Office", owner: "Owner", player: "Player" };
+/** "1984 • Rd 1 • Pick #3 (CHI)", "1959 • Territorial Pick • PHW", "1974 • ABA Draft • Rd 3 • Utah Stars", "Undrafted". */
+export function draftLine(d) {
+  if (!d) return "";
+  if (d.type === "undrafted" || (!d.year && /undrafted/i.test(d.text || ""))) return "Undrafted";
+  if (!d.year) return d.text ? esc(d.text) : "";
+  const team = d.team ? esc(d.team) : "";
+  if (d.type === "territorial") return `${d.year} • Territorial Pick${team ? ` • ${team}` : ""}`;
+  if (d.type === "aba") return `${d.year} • ABA Draft${d.round ? ` • Rd ${d.round}` : ""}${team ? ` • ${team}` : ""}`;
+  const parts = [d.type === "baa" ? `${d.year} BAA` : `${d.year}`, d.round ? `Rd ${d.round}` : "", d.pick ? `Pick #${d.pick}` : ""].filter(Boolean).join(" • ");
+  return `${parts}${team ? ` (${team})` : ""}`;
+}
 export function resultRow(p) {
   if (p.kind === "wiki") {
     wikiCards.set(p.id, p);
@@ -112,7 +123,7 @@ export function mountEncyclopedia({ sheet, openCompare = () => {}, toast = () =>
         : `<span class="enc-team ret">${p.hof ? "🏛 Hall of Fame" : "Retired"}</span>`;
       const fact = (k, v) => (v ? `<div class="enc-fact"><small>${k}</small><b>${v}</b></div>` : "");
       const d = p.draft;
-      const draftTxt = d?.year ? `${d.year} • Rd ${d.round} • Pick #${d.pick}${d.team ? ` (${esc(d.team)})` : ""}` : d?.text ? esc(d.text) : "";   // no record ≠ undrafted: omit the row
+      const draftTxt = draftLine(d);
       const hero = `<button class="link-back press" type="button" data-eback>‹ Search</button>
         <div class="enc-hero">
           <div class="enc-face">${avatar({ name: p.name, headshot: p.headshot }, { size: "5.5rem", color: p.team?.color || "#475569", full: true })}${p.ovr ? `<span class="enc-ovr" title="NBA 2K27 OVR${p.ovr.official ? " (official)" : " (Hooptrax estimate)"}">${p.ovr.value}</span>` : ""}</div>

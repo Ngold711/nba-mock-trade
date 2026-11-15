@@ -569,3 +569,17 @@ Built by an offline generator that cross-checks editorial data against ESPN:
   - Bird's draft line (1978, Rd 1, Pk 6, BOS) was added.
   - Profile career cards always show PPG/RPG/APG to one decimal.
 - **Draft line:** a missing ESPN draft record is no longer shown as "Undrafted". A player who debuted before 1985 with no record anywhere simply has no Draft row.
+
+## Round 15: complete draft pedigree for legends
+
+- `nba_history.json` legends that ESPN's bio has no draft record for now carry `draftInfo` `{ year, round, pick, team, type }`. This covers 66 legends.
+  - `type` is `nba`, `baa`, `territorial`, `aba` or `undrafted`; `team` is the drafting franchise's code at the time (PHW, MNL, CIN, STL, BUF, SDC, KCK…).
+  - Picks were checked against Basketball-Reference and Wikipedia draft pages. Bill Bridges is the one legend left without data, because his 1961 pick couldn't be confirmed.
+  - The generator applies the same table (`fillDrafts`).
+- Profile headers (`draftLine` in `ui/encyclopedia.js`):
+  - Regular pick: `1984 • Rd 1 • Pick #3 (CHI)`
+  - Territorial: `1959 • Territorial Pick • PHW`
+  - ABA: `1974 • ABA Draft • Rd 3 • Utah Stars`
+  - BAA: `1948 BAA • Rd 1 • Pick #4 (NYK)`
+  - Otherwise `Undrafted`, never `Rd null` / `Pick #undefined`.
+- ESPN draft lines get the drafting franchise of that year (`draftTeamAt` in `service/player.js`): Kobe 1996 → CHH, Chris Paul 2005 → NOH, 1993 Washington → WSB.

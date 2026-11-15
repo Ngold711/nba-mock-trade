@@ -149,3 +149,30 @@ export function trophies({ name, history, honors = [], seasons = [] }) {
   return ORDER.filter((key) => map[key]?.size).map((key) => ({ key, label: LABEL[key], count: map[key].size, years: [...map[key]].map(Number).sort((a, b) => a - b) }));
 }
 export { teamFull };
+
+/* ------------------------------------------------------------------ draft pedigree */
+/** ESPN reuses today's codes for old picks ("CHA" for the 1996 Hornets): show the drafting franchise of that year. */
+export function draftTeamAt(code, year) {
+  if (!code || !year) return code || "";
+  const y = +year;
+  switch (code) {
+    case "CHA": return y <= 2002 ? "CHH" : "CHA";
+    case "NO": return y <= 2012 ? "NOH" : "NOP";
+    case "WSH": return y < 1997 ? "WSB" : "WAS";
+    case "SA": return "SAS"; case "GS": return "GSW"; case "NY": return "NYK"; case "UTAH": return "UTA"; case "NJ": return "NJN";
+    default: return code;
+  }
+}
+/**
+ * Draft line for a profile: ESPN's bio first, then our legends' draft pedigree (territorial, ABA, BAA and undrafted
+ * entries included), then the legends' ESPN-format string. "No record" is never shown as "Undrafted".
+ */
+export function draftOf(bio, leg) {
+  if (bio?.draft?.year) return { ...bio.draft, type: "nba", team: draftTeamAt(bio.draft.team, bio.draft.year) };
+  if (leg?.draftInfo) return { ...leg.draftInfo, overall: leg.draftInfo.pick };
+  const m = /^(\d{4}): Rd (\d+), Pk (\d+)(?: \(([A-Z]+)\))?/.exec(leg?.draft || "");
+  if (m) return { year: +m[1], round: +m[2], pick: +m[3], overall: +m[3], team: draftTeamAt(m[4] || "", +m[1]), type: "nba", text: leg.draft };
+  const debut = leg?.from ?? bio?.debutYear ?? null;
+  if (debut != null && debut < 1985) return null;
+  return bio?.draft || null;
+}

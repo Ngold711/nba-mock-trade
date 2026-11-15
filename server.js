@@ -544,7 +544,7 @@ async function feedRoute(req, res, m, q) {
 /* =====================================================================
    Player Encyclopedia: search (active rosters + all-time legends + ESPN) and the full profile.
    ===================================================================== */
-import { searchLocal, mergeSearch, trophies } from "./service/player.js";
+import { searchLocal, mergeSearch, trophies, draftOf } from "./service/player.js";
 import { searchPeople, personProfile, frontOffices, byPlayerId, directory } from "./service/people.js";
 import { wikiLookup } from "./service/wiki.js";
 let peopleData = null;
@@ -614,19 +614,6 @@ async function frontOfficesRoute(req, res) {
   const [pd, league, standings] = await Promise.all([loadPeople(), store.get("league").then((r) => r.data).catch(() => null), store.get("standings").then((r) => r.data).catch(() => null)]);
   res.setHeader("cache-control", "public, max-age=300");
   return json(res, 200, { data: { asOf: pd.asOf, about: pd.about, teams: frontOffices(pd, league, standings) } });
-}
-/**
- * Draft line for a profile. ESPN's bio has no draft record for many pre-1985 players, and "no record" isn't the same
- * as "undrafted": use our legends' draft string when ESPN has none, and say nothing (rather than "Undrafted") for an
- * early-era player with no record anywhere.
- */
-function draftOf(bio, leg) {
-  if (bio?.draft?.year) return bio.draft;
-  const m = /^(\d{4}): Rd (\d+), Pk (\d+)(?: \(([A-Z]+)\))?/.exec(leg?.draft || "");
-  if (m) return { year: +m[1], round: +m[2], pick: +m[3], overall: +m[3], team: m[4] || "", text: leg.draft };
-  const debut = leg?.from ?? bio?.debutYear ?? null;
-  if (debut != null && debut < 1985) return null;
-  return bio?.draft || null;
 }
 async function playerFullRoute(req, res, m) {
   const id = m[1];
