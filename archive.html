@@ -46,7 +46,7 @@
   <h1 class="large-title">Archive</h1>
   <div class="ref-search">
     <label class="ref-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M15.5 15.5 20 20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-      <input id="refQ" type="search" enterkeyhint="search" placeholder="Every player, coach, GM and owner" autocomplete="off" autocapitalize="words" spellcheck="false" aria-label="Search the NBA archive" />
+      <input id="refQ" type="search" enterkeyhint="search" placeholder="Search any player, coach, GM, or owner..." autocomplete="off" autocapitalize="words" spellcheck="false" aria-label="Search the NBA archive" />
       <button class="ref-clear" id="refClear" type="button" aria-label="Clear search" hidden>✕</button></label>
     <div class="ref-filters" role="tablist" aria-label="Filter">
       <button type="button" role="tab" data-role="" aria-selected="true">All</button><button type="button" role="tab" data-role="player" aria-selected="false">Players</button><button type="button" role="tab" data-role="coach" aria-selected="false">Coaches</button><button type="button" role="tab" data-role="exec" aria-selected="false">Front Office</button><button type="button" role="tab" data-role="owner" aria-selected="false">Owners</button>
@@ -64,6 +64,7 @@ import { mountShell } from "./ui/shell.js";
 import { resultRow } from "./ui/encyclopedia.js";
 import { renderHistory } from "./ui/history.js";
 import { createSheet } from "./ui/motion.js";
+import { sget, sset, sdel } from "./ui/scoped.js";
 const shell = mountShell({ active: "archive" });
 const sheet = createSheet();
 const $ = (s) => document.querySelector(s);
@@ -81,7 +82,7 @@ const browserWiki = (term, r) => (wikiMod ||= import("./service/wiki.js")).then(
 async function search() {
   const term = q.value.trim();
   clear.hidden = !term;
-  if (term.length < 2) { res.hidden = true; dir.hidden = false; return; }
+  if (term.length < 2) { res.hidden = true; dir.hidden = false; if (!role || role === "player") renderDir(); return; }
   res.hidden = false; dir.hidden = true;
   const my = ++seq;
   res.innerHTML = `<li class="empty">Searching…</li>`;
@@ -114,27 +115,27 @@ function setRole(r) {
 document.querySelectorAll(".ref-filters [data-role]").forEach((b) => b.addEventListener("click", () => setRole(b.dataset.role)));
 
 /* ---------- directory below the search ---------- */
-let featuredP = null, officesP = null;
-const featured = () => (featuredP ||= fetch("/api/archive/featured").then((r) => r.json()).then((j) => j.data).catch(() => { featuredP = null; return null; }));
+let officesP = null;
+/* recent searches: profiles the viewer opened from search (per account; guests keep them for this visit only) */
+const TRY = ["LeBron James", "Gregg Popovich", "Sam Presti", "Steve Ballmer"];
+const RKEY = "archive:recent";
+const recent = () => { try { const v = JSON.parse(sget(RKEY) || "[]"); return Array.isArray(v) ? v.slice(0, 8) : []; } catch { return []; } };
+function remember(item) {
+  if (!item?.name) return;
+  const list = [item, ...recent().filter((x) => !(x.kind === item.kind && x.id === item.id))].slice(0, 8);
+  sset(RKEY, JSON.stringify(list));
+}
 const offices = () => (officesP ||= fetch("/api/front-offices").then((r) => r.json()).then((j) => j.data).catch(() => { officesP = null; return null; }));
 const face = (src, name) => `<span class="dir-face">${src ? `<img src="${esc(src)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}<span>${esc(String(name).split(" ").map((w) => w[0]).slice(0, 2).join(""))}</span></span>`;
 const sk = (n) => `<ul class="dir-list">${Array.from({ length: n }, () => `<li class="dir-row"><span class="sk" style="width:2.5rem;height:2.5rem;border-radius:99px"></span><span class="sk" style="height:1rem;flex:1"></span></li>`).join("")}</ul>`;
 async function renderDir() {
   const r = role;
-  if (!r || r === "player") {
-    dir.innerHTML = `<h2 class="group-h">Trending &amp; Legends</h2>${sk(6)}`;
-    const d = await featured(); if (role !== r) return;
-    if (!d) { dir.innerHTML = `<p class="empty">The directory is unavailable right now. Search still works.</p>`; return; }
-    const season = d.trending[0]?.season;
-    dir.innerHTML = `${d.trending.length ? `<h2 class="group-h">Trending · ${season ? `${season - 1}–${String(season).slice(2)}` : "this season"} scoring leaders</h2>
-      <ul class="dir-list">${d.trending.map((p) => `<li><button class="dir-row press" type="button" data-enc="${esc(p.id)}">${face(p.headshot, p.name)}
-        <span class="dir-who"><b>${esc(p.name)}</b><small><img class="dir-badge" src="${esc(p.teamLogo || logo(p.team))}" alt="" width="16" height="16" loading="lazy" referrerpolicy="no-referrer">${esc(p.team)}</small></span>
-        <span class="dir-stat"><b>${p.line.pts ?? "–"}</b><small>${p.line.reb ?? "–"} REB · ${p.line.ast ?? "–"} AST</small></span></button></li>`).join("")}</ul>` : ""}
-      <h2 class="group-h">Legends</h2>
-      <ul class="dir-list">${d.legends.map((p) => `<li><button class="dir-row press" type="button" data-enc="${esc(p.id)}">${face(p.headshot, p.name)}
-        <span class="dir-who"><b>${esc(p.name)}</b><small>${esc(p.span)}${p.mvp ? ` · ${p.mvp}× MVP` : ""}</small></span>
-        <span class="dir-stat"><b>${p.line.pts ?? "–"}</b><small>${p.line.reb ?? "–"} REB · ${p.line.ast ?? "–"} AST</small></span></button></li>`).join("")}</ul>
-      <p class="enc-note">Stat columns are points per game, then rebounds and assists. Search finds every NBA player since 1946.</p>`;
+  if (!r || r === "player") {          // calm, search-first landing: recent searches (or a few quick tries), then whitespace
+    const rec = recent();
+    dir.innerHTML = rec.length
+      ? `<div class="spot-h"><h2 class="group-h">Recent Searches</h2><button class="link spot-clear" type="button" data-recent-clear>Clear</button></div>
+         <div class="spot-chips">${rec.map((x, i) => `<button class="press" type="button" data-recent="${i}">${esc(x.name)}</button>`).join("")}</div>`
+      : `<h2 class="group-h">Try</h2><div class="spot-chips">${TRY.map((n) => `<button class="press" type="button" data-try="${esc(n)}">${esc(n)}</button>`).join("")}</div>`;
     return;
   }
   const TITLE = { coach: "Head Coaches", exec: "Front Offices", owner: "Owners & Governors" };
@@ -159,9 +160,18 @@ async function renderDir() {
 /* ---------- taps ---------- */
 document.addEventListener("click", (e) => {
   if (e.target.closest(".sheet")) return;
-  const p = e.target.closest("main [data-enc]"); if (p) { shell.encyclopedia.openProfile(p.dataset.enc); return; }
-  const x = e.target.closest("main [data-person]"); if (x) { shell.encyclopedia.openPerson(x.dataset.person, { role: x.dataset.rolePref || null }); return; }
-  const w = e.target.closest("main [data-wiki]"); if (w) { shell.encyclopedia.openWiki(w.dataset.wiki); return; }
+  const fromSearch = !!e.target.closest("#refResults");
+  const nameOf = (el) => el.querySelector(".nm, .dir-who b")?.textContent.trim() || "";
+  const p = e.target.closest("main [data-enc]"); if (p) { if (fromSearch) remember({ kind: "player", id: p.dataset.enc, name: nameOf(p) }); shell.encyclopedia.openProfile(p.dataset.enc); return; }
+  const x = e.target.closest("main [data-person]"); if (x) { if (fromSearch) remember({ kind: "person", id: x.dataset.person, name: nameOf(x) }); shell.encyclopedia.openPerson(x.dataset.person, { role: x.dataset.rolePref || null }); return; }
+  const w = e.target.closest("main [data-wiki]"); if (w) { if (fromSearch) remember({ kind: "query", id: q.value.trim().toLowerCase(), name: nameOf(w), q: q.value.trim() }); shell.encyclopedia.openWiki(w.dataset.wiki); return; }
+  const rc = e.target.closest("[data-recent]");
+  if (rc) { const it = recent()[+rc.dataset.recent]; if (!it) return;
+    remember(it); renderDir();
+    if (it.kind === "player") shell.encyclopedia.openProfile(it.id); else if (it.kind === "person") shell.encyclopedia.openPerson(it.id); else { q.value = it.q || it.name; search(); }
+    return; }
+  if (e.target.closest("[data-recent-clear]")) { sdel(RKEY); renderDir(); return; }
+  const tr = e.target.closest("[data-try]"); if (tr) { q.value = tr.dataset.try; search(); q.focus({ preventScroll: true }); return; }
   const b = e.target.closest("main [data-browse]"); if (b) browseOpen(b.dataset.browse);
 });
 let historyP = null;

@@ -615,25 +615,18 @@ async function frontOfficesRoute(req, res) {
   res.setHeader("cache-control", "public, max-age=300");
   return json(res, 200, { data: { asOf: pd.asOf, about: pd.about, teams: frontOffices(pd, league, standings) } });
 }
-/** Archive landing list: this season's trending scorers + all-time legends (real headshots, team badges, stats). */
-const LEGEND_IDS = ["1035", "4145", "2334", "2335", "4152", "4142", "110", "215", "614", "619"];
-async function archiveFeaturedRoute(req, res) {
-  const [league, stats, d] = await Promise.all([store.get("league").then((r) => r.data).catch(() => null), store.get("players").then((r) => r.data).catch(() => null), chatData().catch(() => ({}))]);
-  const code = (a) => ({ GS: "GSW", NO: "NOP", NY: "NYK", SA: "SAS", UTAH: "UTA", WSH: "WAS" })[a] || a;
-  const r1 = (x) => (x == null ? null : Math.round(x * 10) / 10);
-  const trending = (stats?.players || []).filter((p) => (p.stats?.gp || 0) >= 3).sort((a, b) => (b.stats?.pts || 0) - (a.stats?.pts || 0)).slice(0, 8).map((p) => {
-    const team = league?.teams?.[p.teamAbbr];
-    return { id: String(p.id), name: p.name, team: code(p.teamAbbr), teamLogo: team?.logo || null, headshot: p.headshot || `https://a.espncdn.com/i/headshots/nba/players/full/${p.id}.png`,
-      line: { pts: r1(p.stats.pts), reb: r1(p.stats.reb), ast: r1(p.stats.ast) }, season: stats?.season || null };
-  });
-  const legends = d.history?.legends || [];
-  const byId = new Map(legends.map((l) => [String(l.id), l]));
-  const picked = LEGEND_IDS.map((id) => byId.get(id)).filter(Boolean);
-  const rest = legends.filter((l) => !l.active && !LEGEND_IDS.includes(String(l.id))).sort((a, b) => (b.honors?.mvp || 0) - (a.honors?.mvp || 0) || (b.totals?.pts || 0) - (a.totals?.pts || 0));
-  const legendRows = [...picked, ...rest].slice(0, 10).map((l) => ({ id: String(l.id), name: l.name, span: l.from && l.to ? `${l.from}–${l.active ? "now" : l.to}` : "", headshot: l.headshot,
-    line: { pts: l.pts, reb: l.reb, ast: l.ast }, mvp: l.honors?.mvp || 0 }));
-  res.setHeader("cache-control", "public, max-age=300");
-  return json(res, 200, { data: { trending, legends: legendRows } });
+/**
+ * Draft line for a profile. ESPN's bio has no draft record for many pre-1985 players, and "no record" isn't the same
+ * as "undrafted": use our legends' draft string when ESPN has none, and say nothing (rather than "Undrafted") for an
+ * early-era player with no record anywhere.
+ */
+function draftOf(bio, leg) {
+  if (bio?.draft?.year) return bio.draft;
+  const m = /^(\d{4}): Rd (\d+), Pk (\d+)(?: \(([A-Z]+)\))?/.exec(leg?.draft || "");
+  if (m) return { year: +m[1], round: +m[2], pick: +m[3], overall: +m[3], team: m[4] || "", text: leg.draft };
+  const debut = leg?.from ?? bio?.debutYear ?? null;
+  if (debut != null && debut < 1985) return null;
+  return bio?.draft || null;
 }
 async function playerFullRoute(req, res, m) {
   const id = m[1];
@@ -662,7 +655,7 @@ async function playerFullRoute(req, res, m) {
     height: bio?.height || lp?.height || leg?.height || "", weight: bio?.weight || lp?.weight || "",
     age: active ? bio?.age ?? lp?.age ?? null : null, dob: fmtDob(bio?.dob), birthPlace: bio?.birthPlace || leg?.birthPlace || "",
     college: bio?.college || "", country: bio?.country || "",
-    draft: bio?.draft || (leg?.draft ? { text: leg.draft } : null),
+    draft: draftOf(bio, leg),
     yearsPro: years.length || null, span: years.length ? `${Math.min(...years) - 1}–${Math.max(...years)}` : leg?.from ? `${leg.from}–${leg.to}` : "",
     team, salary: sal ? { amount: sal.salary, estimate: sal.source === "estimate" } : null,
     ovr: rating ? { value: rating.ovr, official: !!rating.seeded } : null,
@@ -689,7 +682,6 @@ const routes = [
   [/^\/api\/players\/(\d{1,12})\/full$/, playerFullRoute],
   [/^\/api\/people\/([a-z0-9-]{3,40})$/, personRoute],
   [/^\/api\/front-offices$/, frontOfficesRoute],
-  [/^\/api\/archive\/featured$/, archiveFeaturedRoute],
   [/^\/api\/ai-threads(?:\/([A-Za-z0-9_-]{5,40})(?:\/(delete))?)?$/, aiThreadsRoute],
   // spec names: /api/saved-items (your own items; POST saves) and /api/profile (your profile). Both require a session.
   [/^\/api\/saved-items(?:\/(public|private))?$/, (req, res, m, q) => (req.method === "POST" ? itemsRoute(req, res, [m[0]]) : meRoute(req, res, [m[0], "items", m[1] || q.get("visibility") || undefined]))],

@@ -112,7 +112,7 @@ export function mountEncyclopedia({ sheet, openCompare = () => {}, toast = () =>
         : `<span class="enc-team ret">${p.hof ? "🏛 Hall of Fame" : "Retired"}</span>`;
       const fact = (k, v) => (v ? `<div class="enc-fact"><small>${k}</small><b>${v}</b></div>` : "");
       const d = p.draft;
-      const draftTxt = d?.year ? `${d.year} • Rd ${d.round} • Pick #${d.pick}${d.team ? ` (${esc(d.team)})` : ""}` : esc(d?.text || "Undrafted");
+      const draftTxt = d?.year ? `${d.year} • Rd ${d.round} • Pick #${d.pick}${d.team ? ` (${esc(d.team)})` : ""}` : d?.text ? esc(d.text) : "";   // no record ≠ undrafted: omit the row
       const hero = `<button class="link-back press" type="button" data-eback>‹ Search</button>
         <div class="enc-hero">
           <div class="enc-face">${avatar({ name: p.name, headshot: p.headshot }, { size: "5.5rem", color: p.team?.color || "#475569", full: true })}${p.ovr ? `<span class="enc-ovr" title="NBA 2K27 OVR${p.ovr.official ? " (official)" : " (Hooptrax estimate)"}">${p.ovr.value}</span>` : ""}</div>
@@ -167,7 +167,7 @@ export function mountEncyclopedia({ sheet, openCompare = () => {}, toast = () =>
   }
 
   /* ---------- coaches, executives, owners (and the non-player eras of multi-role people) ---------- */
-  const careerCard = (c) => `<div class="enc-facts">${[["Games", c.gp], ["PPG", c.pts], ["RPG", c.reb], ["APG", c.ast], ["Career points", c.totals?.pts?.toLocaleString("en-US")]].filter(([, v]) => v != null).map(([k, v]) => `<div class="enc-fact"><small>${k}</small><b>${typeof v === "number" ? (Number.isInteger(v) ? v : v.toFixed(1)) : v}</b></div>`).join("")}</div>
+  const careerCard = (c) => `<div class="enc-facts">${[["Games", c.gp], ["PPG", c.pts], ["RPG", c.reb], ["APG", c.ast], ["Career points", c.totals?.pts?.toLocaleString("en-US")]].filter(([, v]) => v != null).map(([k, v]) => `<div class="enc-fact"><small>${k}</small><b>${typeof v === "number" ? (k === "Games" ? v.toLocaleString("en-US") : v.toFixed(1)) : v}</b></div>`).join("")}</div>
     <p class="enc-note">Career totals from the Hooptrax legends archive; ESPN has no season-by-season line for this player.</p>`;
   const yearsChips = (label, ys, icon) => (ys?.length ? `<div class="tro" title="${esc(label)}: ${ys.join(", ")}"><span class="tro-i">${icon}</span><b>${ys.length > 1 ? `${ys.length}× ` : ""}${esc(label)}</b><small>${esc(yearsTxt(ys))}</small></div>` : "");
   const teamRow = (t, right = "", sub = "") => `<li class="pp-row"><img src="${esc(t.logo)}" alt="" width="28" height="28" loading="lazy" referrerpolicy="no-referrer"><span class="pp-who"><b>${esc(t.name)}</b>${sub ? `<small>${sub}</small>` : ""}</span><span class="pp-r">${right}</span></li>`;

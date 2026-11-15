@@ -556,3 +556,16 @@ Built by an offline generator that cross-checks editorial data against ESPN:
 - **Head coaches:** still live from ESPN rosters. `coachSince` gives each current coach's start year, and it applies only while ESPN names that coach.
 - **Profiles:** each one shows the person's current team, title and start year under their name, then a *Career highlights* card (titles, awards, signature moves, recent notes), then the role tabs. The source is shown at the bottom.
 - **UI:** the `?` badges are gone from the Archive rows, search results, profiles and the 30 Teams Vault.
+
+## Round 14: Spotlight-style Archive, legend data polish
+
+- **Archive empty state:** with `All` or `Players` selected and an empty search, the page shows only the search field ("Search any player, coach, GM, or owner...", 16px), the role pills, the browse links and one chip row, then open space.
+  - The chip row is **Recent Searches** (the last 8 profiles opened from search) with a `Clear` link. With no history yet, it shows four quick-try pills.
+  - Recent searches are stored per account via `ui/scoped.js` (`archive:recent`). Guests keep them in memory for the visit only, in line with the round 9 guest-privacy rule.
+  - The live scoring-leader and legends lists are gone, along with `/api/archive/featured`.
+  - Typing searches players, coaches, GMs and owners immediately. `Coaches`, `Front Office` and `Owners` still open their 30-team directories.
+- **Legend data:**
+  - All 22 legends whose ESPN season logs didn't load now have career years, e.g. Larry Bird 1979–1992. This is a fallback table in the generator, also applied to `nba_history.json`.
+  - Bird's draft line (1978, Rd 1, Pk 6, BOS) was added.
+  - Profile career cards always show PPG/RPG/APG to one decimal.
+- **Draft line:** a missing ESPN draft record is no longer shown as "Undrafted". A player who debuted before 1985 with no record anywhere simply has no Draft row.

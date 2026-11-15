@@ -12,7 +12,7 @@
 // the server.
 
 /** Keys that hold personal work. Anything matching must go through sget/sset. */
-export const SCOPED = /^(trade:workspace:v1|draft:v2:\d{4}|draft:simcount:\d{4}|awards:ballot:v2|awards:picks)$/;
+export const SCOPED = /^(archive:recent|trade:workspace:v1|draft:v2:\d{4}|draft:simcount:\d{4}|awards:ballot:v2|awards:picks)$/;
 /** Legacy, un-scoped keys from before accounts existed (and the old global chat history). Purged on every load. */
 export const LEGACY = /^(hooptrax_ai_threads|hooptrax_ai_active|chat:v1|trade:workspace:v1|draft:v2:\d{4}|draft:simcount:\d{4}|awards:ballot|awards:ballot:v2|awards:picks)$/;
 
