@@ -348,3 +348,33 @@ Built by an offline generator that cross-checks editorial data against ESPN:
 - **PROPOSE TRADE** opens a GM verdict stamp:
   - **✓ TRADE APPROVED**, or **✕ TRADE REJECTED** with a front-office reason taken from the actual CBA failure.
   - A Sandbox Override switch and a Share Trade Card button.
+
+## Hooptrax AI assistant (round 6)
+
+**Opening it**
+- The header button is gone. A floating 48px **Hooptrax AI** orb (dark/amber glass, sparkle-basketball icon) sits bottom-right, above the mobile tab bar and the safe area.
+- On pages with a bottom dock (Trade Machine) or the draft's Sim Again bar, the orb lifts above them.
+- It opens an 88vh sheet with **🕒 History**, **＋ New Chat** and **✕**. The input is 16px so iOS doesn't zoom.
+
+**Answers**
+- Answers stream in token by token.
+- Replies can include tappable **stat cards**:
+  - Player: headshot, team logo, PPG/RPG/APG, 2K27 OVR.
+  - Game: logos, score or tip time in ET, live dot.
+- Player and team names are linked chips.
+
+**Conversations**
+- Saved in `localStorage["hooptrax_ai_threads"]` as `{ id, title, updatedAt, messages[] }`. The title comes from the first question. The cap is 50 threads and 80 messages each.
+- A new browser/app session, or coming back after 10+ minutes away, opens a fresh blank chat with 4 starter prompts. Moving between Hooptrax pages in the same session keeps the open chat.
+- The History drawer lists threads newest first, with relative time and message count. Tap a thread to continue it.
+- 🗑 deletes one thread. **Clear All History** needs a second tap to confirm.
+
+**Server (`/api/nba-chat`, `{ message, history, stream: true }` → NDJSON `meta` / `delta` / `done`)**
+- **Schedule cache:** yesterday, today and the next 14 days (16 dates, `America/New_York`) are fetched from ESPN's scoreboard in parallel at startup, then every 15 minutes.
+- **Question slicing:** `service/chat.js` reads players, teams, years, dates ("tomorrow", "friday", "Nov 20", "this week") and intent (schedule, scores, injuries, standings, trade/cap, draft, 2k, history). Only the matching slice of data goes to the model.
+- **Gemini:** uses `streamGenerateContent`. The first token must arrive within **6 s** or the reply comes from the local engine (under 100 ms). A model that returns 404/429 or times out is skipped for a cooldown.
+  - Default model order: `gemini-3.5-flash-lite, gemini-flash-lite-latest, gemini-flash-latest`, overridable with `GEMINI_MODELS`.
+  - `gemini-2.5-flash` returns 404 for new API keys.
+  - In testing, the free-tier flash models often returned 429 or stalled, while flash-lite started answering in about 0.5 s.
+- **Scope:** Gemini uses its own NBA knowledge for history (1946–2026), the live data for 2026–27, and declines non-NBA questions.
+- **Limits:** 15 AI answers per IP per hour, after which the local engine answers.

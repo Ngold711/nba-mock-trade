@@ -5,12 +5,14 @@
 // Pure: the server passes in the data it has cached.
 import { TIERS, teamTier, money, resolveSalary } from "./trade.js";
 
-export const SYSTEM_PROMPT = `You are "Ask Hooptrax", the NBA assistant inside the Hooptrax app (live NBA trade machine, 3-2-1 lottery simulator, draft hub, awards and history).
+export const SYSTEM_PROMPT = `You are "Hooptrax AI", the NBA assistant inside the Hooptrax app (live scores and schedules, trade machine, 3-2-1 lottery simulator, draft hub, awards and history).
 Rules:
-1. Only answer questions about NBA basketball (players, teams, games, stats, standings, injuries, trades, contracts and the salary cap, the draft and lottery, awards, history, and Hooptrax features). For anything else, reply in one short sentence that you only cover the NBA, and suggest an NBA question instead.
-2. Ground every fact in the DATA block when it covers the question. It is live (ESPN feeds plus Hooptrax models) and newer than your training. If the data doesn't cover something, say so briefly instead of guessing; never invent scores, stats, injuries or contracts.
-3. Hooptrax 2K27 ratings are estimates except where marked as from the official update; salaries marked "est." are estimates; cap thresholds are 2026–27 projections. Say so when it matters.
-4. Be concise and scannable: short paragraphs or bullets, at most about 150 words unless asked for more. Use full player and team names so the app can link them. No markdown tables.`;
+1. Only answer NBA basketball questions (players, teams, games, schedules, stats, standings, injuries, trades, contracts and the salary cap, the draft and lottery, awards, records, history back to 1946, and Hooptrax features). For anything else, reply in one short, friendly sentence that you only cover the NBA and suggest an NBA question.
+2. The DATA block is live (ESPN feeds plus Hooptrax models) and newer than your training. For the 2026-27 season, today's and upcoming games, injuries, standings, rosters, contracts, 2K27 ratings and prospects, use ONLY the DATA block; if it doesn't cover something current, say so briefly. Never invent current scores, stats, injuries, contracts or game times.
+3. For NBA history (1946 to 2026: champions, MVPs and other awards, drafts, records, retired numbers, legends, famous games) use your full NBA knowledge, and prefer the DATA block wherever it covers the same fact.
+4. Game times are US Eastern Time. Say "tonight"/"tomorrow" relative to the TODAY line in the DATA block.
+5. Hooptrax 2K27 ratings are estimates except where marked official; salaries marked "est." are estimates; cap thresholds are 2026-27 projections. Mention it when it matters.
+6. Be fast and scannable: a one-line answer first, then short bullets. At most about 120 words unless asked for more. Use full player and team names so the app can link them. Use **bold** sparingly. No markdown tables or headings.`;
 
 const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
 const CODE_OF = { GS: "GSW", NO: "NOP", NY: "NYK", SA: "SAS", UTAH: "UTA", WSH: "WAS" };
@@ -34,7 +36,7 @@ export function buildIndex({ league, history }) {
   return { players, teams, uniqueLast: (l) => lastCount.get(l) === 1 };
 }
 
-export function findEntities(text, idx) {
+export function findEntities(text, idx, { maxPlayers = 4, maxTeams = 3 } = {}) {
   const q = ` ${norm(text)} `;
   const players = [];
   for (const p of idx.players) if (q.includes(` ${p.key} `)) players.push(p);
@@ -43,23 +45,106 @@ export function findEntities(text, idx) {
   for (const t of idx.teams) if (t.keys.some((k) => q.includes(` ${k} `) && !(k === "jazz" && false))) teams.push(t);
   // ambiguous one-word city keys ("los angeles") match both LA teams; keep the explicit name match when present
   const years = [...q.matchAll(/\b(19[4-9]\d|20[0-3]\d)\b/g)].map((m) => +m[1]);
-  return { players: dedupe(players).slice(0, 4), teams: dedupe(teams, "abbr").slice(0, 3), years };
+  return { players: dedupe(players).slice(0, maxPlayers), teams: dedupe(teams, "abbr").slice(0, maxTeams), years };
 }
 const dedupe = (arr, k = "id") => arr.filter((x, i) => arr.findIndex((y) => y[k] === x[k]) === i);
 
-const isNba = (q) => /\b(nba|basketball|hoop|player|team|game|games|score|scores|tonight|today|standings?|seed|playoffs?|injur|trade|salary|contract|cap|apron|draft|lottery|prospect|rookie|mvp|roy|dpoy|award|champion|finals|title|ring|retired|jersey|record|stats?|points|rebounds|assists|steals|blocks|three|2k|rating|ovr|coach|all.?star|leader|hooptrax|stepien|tank|odds)\b/i.test(q);
+const isNba = (q) => /\b(nba|basketball|hoop|player|team|game|games|score|scores|tonight|today|tomorrow|schedule|plays|playing|upcoming|standings?|seed|playoffs?|injur|trade|salary|contract|cap|apron|draft|lottery|prospect|rookie|mvp|roy|dpoy|award|champion|finals|title|ring|retired|jersey|record|stats?|points|rebounds|assists|steals|blocks|three|2k|rating|ovr|coach|all.?star|leader|hooptrax|stepien|tank|odds)\b/i.test(q);
+
+/* ---------------------------------------------------------- dates (US Eastern) */
+const ET_FMT = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" });
+/** YYYYMMDD in America/New_York, `offset` days from `now`. */
+export function etDate(offset = 0, now = Date.now()) {
+  const [y, m, d] = ET_FMT.format(new Date(now)).split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + offset));
+  return `${t.getUTCFullYear()}${String(t.getUTCMonth() + 1).padStart(2, "0")}${String(t.getUTCDate()).padStart(2, "0")}`;
+}
+/** Yesterday, today and the next 14 days (16 dates), US Eastern. */
+export const scheduleDates = (now = Date.now()) => Array.from({ length: 16 }, (_, i) => etDate(i - 1, now));
+const DOW = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const MON = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+const ymdDate = (ymd) => new Date(Date.UTC(+ymd.slice(0, 4), +ymd.slice(4, 6) - 1, +ymd.slice(6, 8)));
+export const dayLabel = (ymd) => ymdDate(ymd).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+const etTime = (iso) => { try { return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }) + " ET"; } catch { return ""; } };
+
+/** Which dates a question is about (YYYYMMDD list), from words like tonight, tomorrow, friday, "nov 20", "this week". */
+export function datesAsked(question, now = Date.now()) {
+  const q = norm(question), out = new Set();
+  if (/\b(today|tonight|tonite)\b/.test(q)) out.add(etDate(0, now));
+  if (/\b(tomorrow|tmrw|tmr)\b/.test(q)) out.add(etDate(1, now));
+  if (/\b(yesterday|last night)\b/.test(q)) out.add(etDate(-1, now));
+  const todayDow = ymdDate(etDate(0, now)).getUTCDay();
+  DOW.forEach((d, i) => { if (new RegExp(`\\b${d}s?\\b`).test(q)) { let k = (i - todayDow + 7) % 7; if (/\bnext\b/.test(q) && k === 0) k = 7; out.add(etDate(k, now)); } });
+  for (const m of q.matchAll(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.? (\d{1,2})\b/g)) {
+    const y = +etDate(0, now).slice(0, 4), mi = MON.indexOf(m[1]);
+    for (const yy of [y, y + 1]) { const ymd = `${yy}${String(mi + 1).padStart(2, "0")}${String(+m[2]).padStart(2, "0")}`; if (ymd >= etDate(-1, now)) { out.add(ymd); break; } }
+  }
+  if (/\b(this week|next 7 days|coming week)\b/.test(q)) for (let i = 0; i < 7; i++) out.add(etDate(i, now));
+  if (/\b(next week)\b/.test(q)) for (let i = 7; i < 14; i++) out.add(etDate(i, now));
+  if (/\b(weekend)\b/.test(q)) [5, 6, 0].forEach((dw) => out.add(etDate((dw - todayDow + 7) % 7, now)));
+  return [...out].sort();
+}
+
+/** What a question is about. */
+export function intentsOf(question) {
+  const q = String(question || "");
+  const t = (re) => re.test(q);
+  const out = new Set();
+  if (t(/\b(schedule|tonight|tonite|today|tomorrow|tmrw|yesterday|last night|this week|next week|weekend|upcoming|next game|play(s|ing)? (next|on|against|vs)|who plays|when (do|does|is|are)|game time|tip.?off|(mon|tues|wednes|thurs|fri|satur|sun)day|games?)\b/i)) out.add("schedule");
+  if (t(/\b(score|scores|final|won|beat|lost|result|live|halftime|quarter)\b/i) && !t(/\b(19[4-9]\d|20[0-2]\d|mvp|award|champion|title|finals mvp|ever|all.?time|career|history)\b/i)) out.add("scores");
+  if (t(/\binjur|\b(out|questionable|doubtful|day.to.day|hurt|return|status)\b/i)) out.add("injuries");
+  if (t(/\b(standings?|seed|seeds|record|first place|best record|worst record|playoff|play.in|conference|lottery|odds|tank)\b/i)) out.add("standings");
+  if (t(/\b(trade|traded|salary|contract|cap|apron|tax|payroll|signed|waived|transaction|deal|free agent)\b/i)) out.add("trade");
+  if (t(/\b(draft|prospect|big board|mock|lottery|no\.? ?1 pick|top pick)\b/i)) out.add("draft");
+  if (t(/\b(2k|2k27|rating|ratings|ovr|overall)\b/i)) out.add("2k");
+  if (t(/\b(history|all.?time|career|ever|record|records|champion|champions|title|titles|finals|ring|mvp|rookie of the year|roy|dpoy|sixth man|most improved|coach of the year|retired|jersey|legend|hall of fame|19[4-9]\d|20[0-2]\d)\b/i)) out.add("history");
+  return out;
+}
+
+/** All cached games in the schedule window (deduped), each tagged with its ET date. */
+const windowGames = (d) => {
+  const seen = new Set(), out = [];
+  for (const day of d.schedule || []) for (const g of day.games || []) if (!seen.has(g.id)) { seen.add(g.id); out.push({ ...g, ymd: day.date }); }
+  return out;
+};
+const gameLine = (g) => {
+  const st = g.status?.state;
+  const sc = st === "pre" ? etTime(g.date) : `${g.away?.score ?? ""}-${g.home?.score ?? ""} ${st === "post" ? "Final" : g.status?.shortDetail || "live"}`;
+  return `${g.away?.abbr} @ ${g.home?.abbr} ${sc}${g.broadcast ? ` (${g.broadcast})` : ""}`;
+};
 
 /** Facts for the model, targeted at the question. */
-export function buildContext(question, d, idx) {
+export function buildContext(question, d, idx, now = Date.now()) {
   const ent = findEntities(question, idx);
+  const intents = intentsOf(question);
+  const general = !ent.players.length && !ent.teams.length && !ent.years.length && !intents.size;
   const out = [];
-  const today = (d.scoreboard?.games || []).map((g) => `${g.away?.abbr} ${g.away?.score ?? ""} @ ${g.home?.abbr} ${g.home?.score ?? ""} (${g.status?.shortDetail || g.status?.state})`);
-  out.push(`TODAY'S GAMES (${new Date().toISOString().slice(0, 10)}): ${today.join("; ") || "none"}`);
-  for (const conf of d.standings?.conferences || []) out.push(`${conf.abbr || conf.name} STANDINGS: ${conf.teams.map((t) => `${t.seed}.${t.team.abbr} ${t.wins}-${t.losses}`).join(", ")}`);
-  if (d.lottery) out.push(`3-2-1 LOTTERY PROJECTION (seed: team, #1 odds, top-4, floor): ${d.lottery.slice(0, 16).map((r) => `${r.seed}:${r.team} ${(r.p1 * 100).toFixed(1)}% ${(r.top4 * 100).toFixed(0)}% #${r.floor}`).join(", ")}. Seeds 1-3 are draft-relegated (2 balls, floor #12). All 16 picks drawn.`);
-  out.push(`RECENT INJURIES: ${(d.injuries || []).slice(0, 25).map((i) => `${i.athlete?.name} (${i.team?.abbr}) ${i.status}${i.injury ? " – " + i.injury : ""}`).join("; ")}`);
-  out.push(`RECENT TRANSACTIONS: ${(d.transactions || []).slice(0, 12).map((t) => `${t.team?.abbr}: ${t.description}`).join(" | ")}`);
-  out.push(`2K27 TOP 20 (Hooptrax; * = official Nov 2026 update): ${(d.ratings?.players || []).slice(0, 20).map((p) => `${p.name} ${p.ovr}${p.seeded ? "*" : ""}`).join(", ")}`);
+  const today = etDate(0, now);
+  out.push(`TODAY (US Eastern): ${dayLabel(today)} ${today.slice(0, 4)}. Season: 2026-27.`);
+  // Schedule: dates asked about, plus each mentioned team's last result and next 3 games.
+  const all = windowGames(d);
+  const asked = datesAsked(question, now);
+  const wantSched = intents.has("schedule") || intents.has("scores") || general;
+  const dates = asked.length ? asked : wantSched && !ent.teams.length ? [today, etDate(1, now)] : [];
+  for (const ymd of dates.slice(0, 7)) {
+    const games = all.filter((g) => g.ymd === ymd);
+    const known = (d.schedule || []).some((x) => x.date === ymd);
+    out.push(`GAMES ${dayLabel(ymd)}: ${known ? games.map(gameLine).join("; ") || "no games" : "outside the cached 14-day window"}`);
+  }
+  for (const t of ent.teams) {
+    const mine = all.filter((g) => g.home?.abbr === t.abbr || g.away?.abbr === t.abbr);
+    const last = mine.filter((g) => g.status?.state === "post").slice(-1);
+    const next = mine.filter((g) => g.status?.state !== "post").slice(0, 3);
+    if (mine.length) out.push(`${t.abbr} SCHEDULE: ${[...last, ...next].map((g) => `${dayLabel(g.ymd)} ${gameLine(g)}`).join("; ")}`);
+  }
+  if (intents.has("standings") || general || ent.teams.length) for (const conf of d.standings?.conferences || []) out.push(`${conf.abbr || conf.name} STANDINGS: ${conf.teams.map((t) => `${t.seed}.${t.team.abbr} ${t.wins}-${t.losses}`).join(", ")}`);
+  if (d.lottery && (intents.has("standings") || intents.has("draft"))) out.push(`3-2-1 LOTTERY PROJECTION (seed: team, #1 odds, top-4, floor): ${d.lottery.slice(0, 16).map((r) => `${r.seed}:${r.team} ${(r.p1 * 100).toFixed(1)}% ${(r.top4 * 100).toFixed(0)}% #${r.floor}`).join(", ")}. Seeds 1-3 are draft-relegated (2 balls, floor #12). All 16 picks drawn.`);
+  if (intents.has("injuries")) {
+    const scoped = ent.teams.length ? (d.injuries || []).filter((i) => ent.teams.some((t) => t.abbr === i.team?.abbr)) : (d.injuries || []).slice(0, 25);
+    out.push(`INJURIES: ${scoped.map((i) => `${i.athlete?.name} (${i.team?.abbr}) ${i.status}${i.injury ? " – " + i.injury : ""}`).join("; ") || "none reported"}`);
+  }
+  if (intents.has("trade")) out.push(`RECENT TRANSACTIONS: ${(d.transactions || []).slice(0, 12).map((t) => `${t.team?.abbr}: ${t.description}`).join(" | ")}`);
+  if (intents.has("2k") && !ent.players.length) out.push(`2K27 TOP 20 (Hooptrax; * = official Nov 2026 update): ${(d.ratings?.players || []).slice(0, 20).map((p) => `${p.name} ${p.ovr}${p.seeded ? "*" : ""}`).join(", ")}`);
   const statsById = new Map((d.stats?.players || []).map((p) => [p.id, p]));
   for (const p of ent.players) {
     if (p.active) {
@@ -95,25 +180,37 @@ export function buildContext(question, d, idx) {
   if (/champion|title|finals|ring/i.test(question) && d.history) out.push(`RECENT CHAMPIONS: ${d.history.champions.slice(0, 12).map((c) => `${c.year} ${c.champion}${c.fmvp ? ` (FMVP ${c.fmvp})` : ""}`).join("; ")}`);
   if (/mvp|rookie|defensive|sixth|improved|coach of/i.test(question) && d.history) for (const k of ["mvp", "roy", "dpoy", "smoy", "mip", "coy"]) out.push(`${k.toUpperCase()} last 8: ${(d.history.awards[k] || []).slice(0, 8).map((a) => `${a.year} ${a.name}`).join("; ")}`);
   if (/cap|apron|tax|salary|contract|payroll/i.test(question) && d.book?.cba) { const c = d.book.cba; out.push(`2026-27 CAP (projected): cap ${money(c.salaryCap)}, tax ${money(c.taxLine)}, 1st apron ${money(c.firstApron)}, 2nd apron ${money(c.secondApron)}.`); }
-  return { text: out.join("\n"), entities: ent };
+  return { text: out.join("\n"), entities: ent, intents };
 }
 
 /* ------------------------------------------------------------------ local engine */
-export function localAnswer(question, d, idx) {
+export function localAnswer(question, d, idx, now = Date.now()) {
   const q = String(question || "");
   const ent = findEntities(q, idx);
   const L = [];
   const has = (re) => re.test(q);
-  if (!ent.players.length && !ent.teams.length && !isNba(q)) {
+  if (!ent.players.length && !ent.teams.length && !isNba(q) && !datesAsked(q, now).length) {
     return { text: "I only cover the NBA. Try something like “Who's playing tonight?”, “What's Victor Wembanyama's 2K27 rating?” or “Who has the best lottery odds?”", entities: ent, refused: true };
   }
   const statsById = new Map((d.stats?.players || []).map((p) => [p.id, p]));
   const standingOf = (abbr) => { for (const c of d.standings?.conferences || []) for (const x of c.teams) if (x.team.abbr === abbr) return { ...x, conf: c.abbr || c.name }; return null; };
 
-  if (has(/\b(tonight|today|score|scores|games?|playing)\b/i) && !ent.players.length) {
-    const games = d.scoreboard?.games || [];
-    L.push(games.length ? `**Today's games (${games.length}):**` : "No games on today's ESPN scoreboard.");
-    for (const g of games) L.push(`• ${g.away?.displayName || g.away?.abbr} ${g.away?.score ?? ""} @ ${g.home?.displayName || g.home?.abbr} ${g.home?.score ?? ""} — ${g.status?.shortDetail || g.status?.state}`);
+  const all = windowGames(d), asked = datesAsked(q, now), intents = intentsOf(q);
+  if (ent.teams.length && (intents.has("schedule") || intents.has("scores")) && !asked.length) {
+    for (const t of ent.teams) {
+      const mine = all.filter((g) => g.home?.abbr === t.abbr || g.away?.abbr === t.abbr);
+      const last = mine.filter((g) => g.status?.state === "post").slice(-1)[0];
+      const next = mine.filter((g) => g.status?.state !== "post").slice(0, 3);
+      L.push([`**${t.name} schedule**`, last ? `• Last: ${dayLabel(last.ymd)} — ${gameLine(last)}` : "", ...next.map((g) => `• ${dayLabel(g.ymd)} — ${gameLine(g)}`)].filter(Boolean).join("\n"));
+    }
+  } else if ((intents.has("schedule") || intents.has("scores") || asked.length) && !ent.players.length) {
+    const dates = asked.length ? asked.slice(0, 7) : [etDate(0, now)];
+    for (const ymd of dates) {
+      const games = all.filter((g) => g.ymd === ymd);
+      const known = (d.schedule || []).some((x) => x.date === ymd);
+      const scoped = ent.teams.length ? games.filter((g) => ent.teams.some((t) => t.abbr === g.home?.abbr || t.abbr === g.away?.abbr)) : games;
+      L.push(!known ? `${dayLabel(ymd)} is outside the 14-day schedule window I keep cached.` : scoped.length ? [`**${dayLabel(ymd)} — ${scoped.length} game${scoped.length > 1 ? "s" : ""} (ET):**`, ...scoped.map((g) => `• ${gameLine(g)}`)].join("\n") : `No games on ${dayLabel(ymd)}.`);
+    }
   }
   if (has(/\b(lottery|odds|tank|worst record)\b/i) && d.lottery) {
     L.push("**3-2-1 lottery projection** (current standings, exact odds):");
@@ -201,14 +298,57 @@ export function localAnswer(question, d, idx) {
     if (aw.length || fm.length) lines.push(`Honors: ${[...fm, ...aw].join(", ")}`);
     if (lines.length) L.push(lines.join("\n"));
   }
-  if (!L.length) L.push("I can answer from live Hooptrax data: tonight's games, standings, injuries, the 3-2-1 lottery, 2027–2029 prospects, 2K27 ratings, salaries and the cap, retired numbers, champions and award winners. Name a player or team to get started.");
+  if (!L.length) L.push("I can answer from live Hooptrax data: games and schedules for the next 14 days, standings, injuries, the 3-2-1 lottery, 2027–2029 prospects, 2K27 ratings, salaries and the cap, retired numbers, champions and award winners. Name a player or team to get started.");
   return { text: L.join("\n\n"), entities: ent };
 }
 
 /** Player/team chips for the UI: anything in the index that appears in the answer text. */
 export function chipsFor(text, idx, entities) {
-  const found = findEntities(text, idx);
+  const found = findEntities(text, idx, { maxPlayers: 8, maxTeams: 30 });
   const players = dedupe([...(entities?.players || []), ...found.players]).slice(0, 8);
-  const teams = dedupe([...(entities?.teams || []), ...found.teams], "abbr").slice(0, 6);
+  const allTeams = dedupe([...(entities?.teams || []), ...found.teams], "abbr");
+  const teams = allTeams.length > 6 ? [] : allTeams;     // a schedule list: the game cards cover the teams
   return [...players.map((p) => ({ type: "player", id: p.id, label: p.name })), ...teams.map((t) => ({ type: "team", id: t.code, label: t.name }))];
+}
+
+/** Compact stat cards for the UI: up to 3 players and up to 4 games relevant to the question. */
+export function cardsFor(question, d, idx, entities, now = Date.now()) {
+  const ent = entities || findEntities(question, idx);
+  const cards = [];
+  const statsById = new Map((d.stats?.players || []).map((p) => [p.id, p]));
+  const teamOf = (abbr) => d.league?.teams?.[abbr] || null;
+  for (const p of ent.players.slice(0, 3)) {
+    const lp = d.league?.players?.find((x) => x.id === p.id);
+    const s = statsById.get(p.id)?.stats, r = d.ratings?.players?.find((x) => x.id === p.id);
+    const leg = d.history?.legends?.find((l) => l.id === p.id);
+    if (!lp && !leg) continue;
+    const t = lp ? teamOf(lp.teamAbbr) : null;
+    cards.push({
+      type: "player", id: p.id, name: p.name,
+      headshot: lp?.headshotSmall || lp?.headshot || `https://a.espncdn.com/combiner/i?img=/i/headshots/nba/players/full/${p.id}.png&w=96&h=70&scale=crop&cquality=80&location=origin`,
+      team: t ? { abbr: t.abbr, logo: t.logo, color: t.color } : null,
+      sub: lp ? [lp.position, t?.abbr].filter(Boolean).join(" · ") : `${leg.from}–${leg.to}`,
+      line: s?.gp ? { label: "2026–27", ppg: +f1(s.pts), rpg: +f1(s.reb), apg: +f1(s.ast), gp: s.gp } : leg ? { label: "Career", ppg: +f1(leg.pts), rpg: +f1(leg.reb), apg: +f1(leg.ast), gp: leg.gp } : null,
+      ovr: r?.ovr ?? null,
+    });
+  }
+  const intents = intentsOf(question), asked = datesAsked(question, now), all = windowGames(d);
+  let games = [];
+  if (ent.teams.length) {
+    for (const t of ent.teams) {
+      const mine = all.filter((g) => g.home?.abbr === t.abbr || g.away?.abbr === t.abbr);
+      const live = mine.find((g) => g.status?.state === "in");
+      games.push(...(asked.length ? mine.filter((g) => asked.includes(g.ymd)) : [live || mine.filter((g) => g.status?.state === "post").slice(-1)[0], ...mine.filter((g) => g.status?.state === "pre").slice(0, live ? 1 : 1)]).filter(Boolean));
+    }
+  } else if (intents.has("schedule") || intents.has("scores") || asked.length) {
+    const ymds = asked.length ? asked : [etDate(0, now)];
+    games = all.filter((g) => ymds.includes(g.ymd));
+  }
+  const seen = new Set();
+  for (const g of games) {
+    if (seen.has(g.id) || seen.size >= 4) continue; seen.add(g.id);
+    const side = (x) => ({ abbr: x?.abbr, logo: x?.logo, color: x?.color, score: x?.score ?? null, record: x?.record || "" });
+    cards.push({ type: "game", id: g.id, day: dayLabel(g.ymd), state: g.status?.state, detail: g.status?.state === "pre" ? etTime(g.date) : g.status?.state === "post" ? "Final" : g.status?.shortDetail || "Live", away: side(g.away), home: side(g.home), broadcast: g.broadcast || "" });
+  }
+  return cards;
 }

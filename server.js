@@ -122,13 +122,29 @@ async function pollsRoute(req, res, m, q) {
   return json(res, 200, { data: pollView(poll) });
 }
 
-/* Ask Hooptrax: Gemini (free tier) grounded in the live cache, with a zero-key local engine fallback. */
-import { SYSTEM_PROMPT, buildIndex, buildContext, localAnswer, chipsFor } from "./service/chat.js";
+/* Hooptrax AI: Gemini (free tier, streamed) grounded in a question-sliced view of the live cache,
+   with a zero-key local engine fallback that answers in milliseconds. */
+import { SYSTEM_PROMPT, buildIndex, buildContext, localAnswer, chipsFor, cardsFor, scheduleDates } from "./service/chat.js";
 import { projectLottery, lotteryTable, DEFAULT_FORMAT } from "./service/draft.js";
-const GEMINI_MODELS = (process.env.GEMINI_MODELS || "gemini-flash-latest,gemini-2.5-flash,gemini-3-flash-preview,gemini-3.5-flash").split(",").map((x) => x.trim()).filter(Boolean);
+// gemini-2.5-flash is closed to new API keys (404) and the free-tier flash models are often over quota (429),
+// so the fast flash-lite models lead. Override with GEMINI_MODELS.
+const GEMINI_MODELS = (process.env.GEMINI_MODELS || "gemini-3.5-flash-lite,gemini-flash-lite-latest,gemini-flash-latest").split(",").map((x) => x.trim()).filter(Boolean);
+const FIRST_TOKEN_MS = 6000, STREAM_MAX_MS = 25000;
+const modelDownUntil = new Map();            // model -> ms timestamp; skip models that just failed (404/429/timeout)
 const AI_PER_HOUR = 15;
 const aiHits = new Map();                    // ip -> timestamps (ms) of AI calls in the last hour
-let staticData = null;
+
+/* 14-day schedule cache: yesterday, today and the next 14 days (US Eastern), refreshed every 15 minutes. */
+let schedule = [];
+export async function refreshSchedule() {
+  const dates = scheduleDates();
+  const got = await Promise.allSettled(dates.map((date) => store.get("scoreboard", { date })));
+  const fresh = dates.map((date, i) => (got[i].status === "fulfilled" ? { date, games: got[i].value.data?.games || [] } : schedule.find((x) => x.date === date))).filter(Boolean);
+  if (fresh.length) schedule = fresh;
+  return schedule;
+}
+
+let staticData = null, indexMemo = { league: null, history: null, index: null };
 async function chatData() {
   staticData ||= Promise.all([readFile(join(ROOT, "nba_history.json"), "utf8"), readFile(join(ROOT, "prospects.json"), "utf8"), readFile(join(ROOT, "salaries_2026_27.json"), "utf8")])
     .then(([h, p, b]) => ({ history: JSON.parse(h), prospects: JSON.parse(p), book: JSON.parse(b) })).catch(() => ({}));
@@ -136,6 +152,9 @@ async function chatData() {
   const got = await Promise.allSettled(names.map((n) => store.get(n)));
   const d = { ...(await staticData) };
   names.forEach((n, i) => { d[n === "players" ? "stats" : n] = got[i].status === "fulfilled" ? got[i].value.data : null; });
+  if (!schedule.length) await refreshSchedule().catch(() => {});
+  // keep today's entry in step with the live scoreboard
+  d.schedule = schedule.map((x) => (d.scoreboard?.games?.length && x.games.some((g) => d.scoreboard.games[0].id === g.id) ? { ...x, games: d.scoreboard.games } : x));
   if (d.standings) {
     try {
       const proj = projectLottery(d.standings, DEFAULT_FORMAT, () => 0.5);
@@ -143,55 +162,103 @@ async function chatData() {
       d.lottery = table.map((r) => ({ ...r, team: proj.lottery[r.seed - 1]?.team }));
     } catch {}
   }
-  d.index = buildIndex(d);
+  if (indexMemo.league !== d.league || indexMemo.history !== d.history) indexMemo = { league: d.league, history: d.history, index: buildIndex(d) };
+  d.index = indexMemo.index;
   return d;
 }
-async function askGemini(question, history, contextText) {
+
+/** Stream a Gemini answer. Calls onDelta(text) per chunk; resolves { text, model } or { error }.
+ *  Gives up (so the caller can answer locally) if no text arrives within FIRST_TOKEN_MS of `t0`. */
+async function askGemini(question, history, contextText, onDelta = () => {}, t0 = Date.now()) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return { error: "no-key" };
   const contents = [...history.slice(-6).map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: String(m.text || "").slice(0, 1500) }] })),
-    { role: "user", parts: [{ text: `DATA (live, ${new Date().toISOString()}):\n${contextText}\n\nQUESTION: ${question}` }] }];
+    { role: "user", parts: [{ text: `DATA (live):\n${contextText}\n\nQUESTION: ${question}` }] }];
   let last = "unavailable";
-  for (const model of GEMINI_MODELS) {
+  const order = [...GEMINI_MODELS.filter((m) => !(modelDownUntil.get(m) > Date.now())), ...GEMINI_MODELS.filter((m) => modelDownUntil.get(m) > Date.now())];
+  for (const model of order) {
+    const left = FIRST_TOKEN_MS - (Date.now() - t0);
+    if (left < 400) { last = "timeout"; break; }
+    const ac = new AbortController();
+    let firstTimer = setTimeout(() => ac.abort(new Error("first-token")), left);
+    const hardTimer = setTimeout(() => ac.abort(new Error("max")), STREAM_MAX_MS);
+    let text = "", finish = "";
     try {
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
         method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": key },
-        body: JSON.stringify({ systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }, contents, generationConfig: { temperature: 0.3, maxOutputTokens: 4096 } }),
-        signal: AbortSignal.timeout(20000),
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }, contents, generationConfig: { temperature: 0.3, maxOutputTokens: 2048 } }),
+        signal: ac.signal,
       });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) { last = `${r.status} ${j?.error?.status || ""}`; if (r.status === 400 && /API key/i.test(j?.error?.message || "")) return { error: "bad-key" }; continue; }
-      const cand = j.candidates?.[0];
-      const text = (cand?.content?.parts || []).filter((p) => !p.thought).map((p) => p.text || "").join("").trim();
-      if (text && cand?.finishReason !== "MAX_TOKENS") return { text, model };
-      if (text) return { text: text + " …", model };
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        last = `${r.status} ${j?.error?.status || ""}`.trim();
+        if (r.status === 400 && /API key/i.test(j?.error?.message || "")) return { error: "bad-key" };
+        modelDownUntil.set(model, Date.now() + (r.status === 404 ? 6 * 3600e3 : r.status === 429 ? 90e3 : 30e3));
+        continue;
+      }
+      const dec = new TextDecoder(); let buf = "";
+      for await (const chunk of r.body) {
+        buf += dec.decode(chunk, { stream: true });
+        let nl;
+        while ((nl = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+          if (!line.startsWith("data:")) continue;
+          let j; try { j = JSON.parse(line.slice(5)); } catch { continue; }
+          const cand = j.candidates?.[0];
+          const piece = (cand?.content?.parts || []).filter((p) => !p.thought).map((p) => p.text || "").join("");
+          if (cand?.finishReason) finish = cand.finishReason;
+          if (piece) { if (!text) clearTimeout(firstTimer); text += piece; onDelta(piece); }
+        }
+      }
+      clearTimeout(firstTimer); clearTimeout(hardTimer);
+      if (text.trim()) { modelDownUntil.delete(model); return { text: text.trim() + (finish === "MAX_TOKENS" ? " …" : ""), model }; }
       last = "empty";
-    } catch (e) { last = e.name === "TimeoutError" ? "timeout" : "network"; }
+    } catch (e) {
+      clearTimeout(firstTimer); clearTimeout(hardTimer);
+      if (text.trim()) return { text: text.trim() + " …", model };           // cut off mid-stream: keep what we have
+      last = ac.signal.reason?.message === "first-token" ? "timeout" : "network";
+      if (last === "timeout") modelDownUntil.set(model, Date.now() + 60e3);
+    }
   }
   return { error: last };
 }
+
 async function chatRoute(req, res) {
   if (req.method !== "POST") { res.writeHead(405); return res.end(); }
+  const t0 = Date.now();
   let body;
-  try { body = JSON.parse(await readBody(req, 16 * 1024)); } catch { return json(res, 400, { error: "Send JSON: { message, history }" }); }
+  try { body = JSON.parse(await readBody(req, 24 * 1024)); } catch { return json(res, 400, { error: "Send JSON: { message, history }" }); }
   const question = String(body?.message || "").trim().slice(0, 500);
   if (!question) return json(res, 400, { error: "Empty message" });
   const history = Array.isArray(body?.history) ? body.history.filter((m) => m && typeof m.text === "string").slice(-6) : [];
   const d = await chatData();
   const ctx = buildContext(question, d, d.index);
+  const cards = cardsFor(question, d, d.index, ctx.entities);
   const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
   const now = Date.now(), hits = (aiHits.get(ip) || []).filter((t) => now - t < 3600e3);
-  let answer = null, source = "local", note = "";
-  if (hits.length >= AI_PER_HOUR) note = "AI limit reached for this hour; answering from live Hooptrax data.";
-  else if (process.env.GEMINI_API_KEY) {
-    hits.push(now); aiHits.set(ip, hits);
-    if (aiHits.size > 5000) aiHits.delete(aiHits.keys().next().value);
-    const g = await askGemini(question, history, ctx.text);
-    if (g.text) { answer = g.text; source = `gemini:${g.model}`; }
-    else note = g.error === "bad-key" ? "AI key rejected; answering from live Hooptrax data." : "AI is busy right now; answering from live Hooptrax data.";
+  const local = localAnswer(question, d, d.index);
+  const useAi = Boolean(process.env.GEMINI_API_KEY) && hits.length < AI_PER_HOUR;
+  if (useAi) { hits.push(now); aiHits.set(ip, hits); if (aiHits.size > 5000) aiHits.delete(aiHits.keys().next().value); }
+  const limitNote = !process.env.GEMINI_API_KEY ? "" : !useAi ? "AI limit reached for this hour; answered from live Hooptrax data." : "";
+
+  if (body?.stream) {
+    // NDJSON stream: {t:"meta"} → {t:"delta"}* → {t:"done"}
+    res.writeHead(200, { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-store", "x-accel-buffering": "no" });
+    const send = (o) => res.write(JSON.stringify(o) + "\n");
+    send({ t: "meta", cards });
+    let answer, source = "local", note = limitNote;
+    if (useAi) {
+      const g = await askGemini(question, history, ctx.text, (piece) => send({ t: "delta", text: piece }), t0);
+      if (g.text) { answer = g.text; source = `gemini:${g.model}`; }
+    }
+    if (!answer) { answer = local.text; send({ t: "delta", text: answer, replace: true }); }
+    send({ t: "done", answer, source, note, chips: chipsFor(answer, d.index, ctx.entities), ms: Date.now() - t0, aiRemaining: Math.max(0, AI_PER_HOUR - hits.length) });
+    return res.end();
   }
-  if (!answer) { const l = localAnswer(question, d, d.index); answer = l.text; }
-  json(res, 200, { data: { answer, source, note, chips: chipsFor(answer, d.index, ctx.entities), aiRemaining: Math.max(0, AI_PER_HOUR - hits.length) } });
+  let answer = null, source = "local";
+  if (useAi) { const g = await askGemini(question, history, ctx.text, undefined, t0); if (g.text) { answer = g.text; source = `gemini:${g.model}`; } }
+  if (!answer) answer = local.text;
+  json(res, 200, { data: { answer, source, note: limitNote, cards, chips: chipsFor(answer, d.index, ctx.entities), aiRemaining: Math.max(0, AI_PER_HOUR - hits.length) } });
 }
 
 const routes = [
@@ -297,7 +364,11 @@ export function startPolling() {
   }));
   const sweeper = setInterval(() => store.sweep(), 10 * 60 * 1000);
   sweeper.unref?.();
-  return () => { stops.forEach((s) => s()); clearInterval(sweeper); };
+  // Hooptrax AI: yesterday + today + next 14 days of games (US Eastern), every 15 minutes
+  refreshSchedule().catch(() => {});
+  const sched = setInterval(() => refreshSchedule().catch(() => {}), 15 * 60 * 1000);
+  sched.unref?.();
+  return () => { stops.forEach((s) => s()); clearInterval(sweeper); clearInterval(sched); };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

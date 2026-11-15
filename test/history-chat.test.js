@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { buildIndex, findEntities, localAnswer, buildContext, chipsFor } from "../service/chat.js";
+import { buildIndex, findEntities, localAnswer, buildContext, chipsFor, cardsFor, etDate, scheduleDates, datesAsked, intentsOf } from "../service/chat.js";
 
 const H = JSON.parse(readFileSync(new URL("../nba_history.json", import.meta.url)));
 const league = {
@@ -54,4 +54,71 @@ test("grounding context targets the question; chips map names to ids", () => {
   assert.match(ctx.text, /Finals MVP 2026/);
   const chips = chipsFor("Jalen Brunson led the New York Knicks.", idx, ctx.entities);
   assert.deepEqual(chips.map((c) => [c.type, c.id]), [["player", "3934672"], ["team", "NYK"]]);
+});
+
+/* ---------- Hooptrax AI: US Eastern dates, 14-day schedule, sliced context, cards ---------- */
+// 2026-11-15 04:30 UTC is still Saturday Nov 14, 11:30 PM in New York.
+const NOW = Date.parse("2026-11-15T04:30:00Z");
+const game = (id, ymdIso, away, home, state, sa = null, sh = null) => ({ id, date: ymdIso, status: { state, shortDetail: state === "post" ? "Final" : "" }, broadcast: "",
+  away: { abbr: away, displayName: away, score: sa, logo: "", color: "#111111" }, home: { abbr: home, displayName: home, score: sh, logo: "", color: "#222222" } });
+const sched = {
+  ...data,
+  schedule: [
+    { date: "20261113", games: [game("1", "2026-11-14T00:30Z", "BOS", "NY", "post", 101, 112)] },
+    { date: "20261114", games: [] },
+    { date: "20261115", games: [game("2", "2026-11-15T23:00Z", "NY", "LAL", "pre")] },
+    { date: "20261116", games: [game("3", "2026-11-17T00:00Z", "LAL", "BOS", "pre")] },
+  ],
+};
+
+test("AI dates are US Eastern: today, tomorrow, weekdays, month-day, 16-day window", () => {
+  assert.equal(etDate(0, NOW), "20261114");                              // not the UTC date
+  assert.equal(etDate(1, NOW), "20261115");
+  assert.equal(etDate(0, Date.parse("2026-03-08T07:30:00Z")), "20260308"); // DST change day (EDT)
+  const w = scheduleDates(NOW);
+  assert.equal(w.length, 16); assert.equal(w[0], "20261113"); assert.equal(w[15], "20261128");
+  assert.deepEqual(datesAsked("Who plays tomorrow?", NOW), ["20261115"]);
+  assert.deepEqual(datesAsked("any games friday", NOW), ["20261120"]);
+  assert.deepEqual(datesAsked("Nov 20 slate", NOW), ["20261120"]);
+  assert.equal(datesAsked("games this week", NOW).length, 7);
+  assert.deepEqual(datesAsked("Who won MVP in 1996?", NOW), []);
+});
+
+test("AI intents: schedule vs scores vs history", () => {
+  assert.deepEqual([...intentsOf("Who plays tomorrow?")], ["schedule"]);
+  assert.ok(intentsOf("Lakers score").has("scores"));
+  assert.ok(!intentsOf("Who won MVP in 1956?").has("scores"));
+  assert.ok(intentsOf("Who won MVP in 1956?").has("history"));
+  assert.ok(intentsOf("Is Jalen Brunson out tonight?").has("injuries"));
+  assert.ok(intentsOf("Celtics payroll and apron").has("trade"));
+});
+
+test("AI context is sliced to the question and schedules come from the 14-day cache", () => {
+  const t = buildContext("Who plays tomorrow?", sched, idx, NOW).text;
+  assert.match(t, /TODAY \(US Eastern\): Sat, Nov 14/);
+  assert.match(t, /GAMES Sun, Nov 15: NY @ LAL/);
+  assert.doesNotMatch(t, /STANDINGS|INJURIES|TRANSACTIONS|2K27 TOP/);    // irrelevant slices left out
+  const k = buildContext("When do the Knicks play next?", sched, idx, NOW).text;
+  assert.match(k, /NY SCHEDULE: Fri, Nov 13 BOS @ NY 101-112 Final; Sun, Nov 15 NY @ LAL/);
+  const h = buildContext("Who won MVP in 1956?", sched, idx, NOW).text;
+  assert.doesNotMatch(h, /GAMES /);
+  assert.match(buildContext("games on Dec 25", sched, idx, NOW).text, /outside the cached 14-day window/);
+});
+
+test("local engine answers schedules instantly; cards for players and games", () => {
+  const t0 = performance.now();
+  const a = localAnswer("Who plays tomorrow?", sched, idx, NOW);
+  assert.ok(performance.now() - t0 < 100);
+  assert.match(a.text, /Sun, Nov 15 — 1 game \(ET\)/); assert.match(a.text, /NY @ LAL/);
+  assert.match(localAnswer("When do the Knicks play next?", sched, idx, NOW).text, /Last: Fri, Nov 13 — BOS @ NY 101-112 Final[\s\S]*Sun, Nov 15 — NY @ LAL/);
+  assert.match(localAnswer("Any games next Tuesday?", sched, idx, NOW).text, /No games on Tue, Nov 17|outside/);
+  const cards = cardsFor("How is Jalen Brunson doing?", sched, idx, null, NOW);
+  assert.deepEqual(cards.map((c) => c.type), ["player"]);
+  assert.equal(cards[0].ovr, 95); assert.equal(cards[0].line.ppg, 26.6);
+  const g = cardsFor("Who plays tomorrow?", sched, idx, null, NOW);
+  assert.deepEqual(g.map((c) => [c.type, c.away.abbr, c.home.abbr, c.day]), [["game", "NY", "LAL", "Sun, Nov 15"]]);
+  assert.equal(cardsFor("Who won MVP in 1956?", sched, idx, null, NOW).length, 0);
+  // long schedule answers don't link every team name (game cards cover them)
+  const many = "Boston Celtics, New York Knicks, Los Angeles Lakers";
+  assert.equal(chipsFor(many, idx, null).filter((c) => c.type === "team").length, 3);
 });
