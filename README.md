@@ -378,3 +378,28 @@ Built by an offline generator that cross-checks editorial data against ESPN:
   - In testing, the free-tier flash models often returned 429 or stalled, while flash-lite started answering in about 0.5 s.
 - **Scope:** Gemini uses its own NBA knowledge for history (1946–2026), the live data for 2026–27, and declines non-NBA questions.
 - **Limits:** 15 AI answers per IP per hour, after which the local engine answers.
+
+## Round 7: Live home, tap-outside dismiss, fresh AI chats, trending trades, controlled-team drafts
+
+1. **Live is the home tab.**
+   - `/` (and the home-screen icon, `/?source=homescreen`) returns a 302 to `/live.html`.
+   - Trade Machine links keep working: `/?trade=…`, `/index.html` and the share links all open the Trade page.
+   - Hash links that land on Live are forwarded: `#t=…` (old trade links), `#trade`, `#draft`, `#awards`, `#mcconnell`.
+2. **Tap outside to dismiss.** `dismissOnBackdrop()` in `ui/motion.js` is used on every backdrop: the shared bottom sheet (Team Vault, Quick-View, Compare, Game Center, Prospect Picker, Select Teams), the AI chat, the LiveWire drawer, draft Settings, THE PICK IS IN card and the trade verdict.
+   - It closes on `pointerdown` (iOS Safari doesn't send `click` to plain divs), with `click` as the keyboard fallback.
+   - Only taps on the backdrop itself count, so taps inside a sheet never close it.
+   - It cancels the follow-up tap on touch, so closing never "taps through" to the page underneath.
+   - The sheets sit beside their backdrop, not inside it, so they need no `stopPropagation` (which would also break app-wide link handling).
+3. **Fresh AI chat on every close.** Closing with ✕, a backdrop tap or a swipe down on the top bar saves the conversation to History, and the next tap on the orb opens a blank chat. An answer still streaming when the sheet closes finishes in the background and is saved to its own thread.
+4. **🔥 MOST TRADED & RUMORED** (`GET /api/trending-trades`, `POST /api/trade-adds`, `service/trending.js`)
+   - **Live mentions (refreshed every 30 min):**
+     - The server reads HoopsHype's RSS feed (`HOOPSHYPE_FEEDS`, default `/rumors/feed/`, then `/feed/`) and ESPN's NBA news feed.
+     - It counts each active player's full name in recent items (21 days) that contain trade words. A mention in a headline counts double.
+   - **User trade counter:** every player a Hooptrax user adds to a mock trade, counted once per visitor per 6 hours over a rolling 7 days, saved to `data/trade-adds.json`.
+   - **Baseline:** a small weight for current rumor regulars (Murray, Green, Sabonis, Powell, Herro, Reid, Porter Jr., Randle, Davis, Williamson) so the strip is never empty. General ESPN headline mentions are a weak tiebreaker.
+   - **Accuracy:** team, logo, headshot and salary always come from the cached 2026–27 ESPN rosters and the salary book.
+   - **Strip:** a single row at the top of the Trade page. Tapping a card loads that player's team as Team A and puts him on the outgoing trade block.
+5. **Mock drafts start at Pick #1 and you choose which teams to control.**
+   - "Proceed to Mock Draft" (and "Clear picks") empties the board. Picks from an earlier mock no longer carry over and look like auto-simmed picks.
+   - The **Select Teams to Control** sheet then opens with three presets (All 30 Teams, Lottery Teams Only, Clear Selection) and a 30-team grid that shows how many picks each team owns. The button reads **Start Draft (X Teams Controlled) →**.
+   - The On the Clock banner shows **YOUR PICK** or **CPU**. On a CPU pick, **Sim to Next User Pick** runs CPU picks until one of your teams is up. **Teams (X)** lets you change your teams mid-draft.

@@ -315,6 +315,21 @@ body.stage-open { overflow: hidden; }
 .clk-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; padding: 0 0.75rem 0.8rem; position: relative; z-index: 1; }
 .clk-btn { border: 1px solid rgba(255,255,255,.28); background: rgba(0,0,0,.25); color: #fff; border-radius: 999px; min-height: 42px; font-weight: 750; font-size: 0.8125rem; cursor: pointer; padding: 0 0.4rem; }
 .clk-btn.primary { background: #F59E0B; border-color: #F59E0B; color: #0B0E14; }
+.clk-teams { position: absolute; z-index: 2; top: 0.6rem; right: 0.65rem; border: 1px solid rgba(255,255,255,.3); background: rgba(0,0,0,.3); color: #fff; border-radius: 999px; min-height: 30px; padding: 0 0.7rem; font: 750 0.75rem/1 var(--font); cursor: pointer; }
+.clock.mine { box-shadow: 0 0 0 2px #F59E0B, 0 10px 30px rgba(245,158,11,.25); }
+.clock .clk-main { padding-right: 5.5rem; }
+.ctl-sub { margin: 0 0 0.75rem; font-size: 0.875rem; color: var(--label-2); }
+.ctl-presets { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.8rem; }
+.ctl-presets button { border: 0; border-radius: 999px; min-height: 38px; padding: 0 0.9rem; background: var(--fill); color: var(--label); font: 650 0.8125rem/1 var(--font); cursor: pointer; }
+.ctl-presets button:hover { background: var(--fill-strong); }
+.ctl-presets button[data-ctl="all"], .ctl-presets button[data-ctl="lottery"] { color: #F59E0B; background: rgba(245,158,11,.14); }
+.ctl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(5.4rem, 1fr)); gap: 0.45rem; }
+.ctl-team { display: grid; justify-items: center; gap: 0.2rem; padding: 0.6rem 0.3rem 0.5rem; border-radius: 0.9rem; border: 0; background: var(--surface-2); box-shadow: inset 0 0 0 0.5px var(--sep); color: var(--label); cursor: pointer; font: inherit; min-height: 44px; }
+.ctl-team b { font-size: 0.8125rem; } .ctl-team small { font-size: 0.6875rem; color: var(--label-3); font-weight: 600; }
+.ctl-team[aria-pressed="true"] { background: rgba(245,158,11,.16); box-shadow: inset 0 0 0 2px #F59E0B; }
+.ctl-team[aria-pressed="true"] small { color: #F59E0B; }
+.ctl-foot { position: sticky; bottom: 0; margin: 0.8rem -1rem -1rem; padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--surface) 70%, transparent); }
+.ctl-start { width: 100%; min-height: 48px; font-size: 0.9375rem; background: #F59E0B; color: #0B0E14; }
 .clk-done { padding: 1rem; display: grid; gap: 0.2rem; } .clk-done span { font-size: 0.8125rem; opacity: 0.85; }
 @media (prefers-reduced-motion: reduce) { .clock::after { animation: none; } }
 
@@ -403,7 +418,7 @@ body.stage-open { overflow: hidden; }
 <script type="module">
 import { createClient } from "./ui/client.js";
 import { avatar, teamLogo, esc } from "./ui/avatar.js";
-import { Spring, createSheet, createToast, scrollEdge, springIn } from "./ui/motion.js";
+import { Spring, createSheet, createToast, scrollEdge, springIn, dismissOnBackdrop } from "./ui/motion.js";
 import { projectLottery, simulateLottery, resolvePickOwnership, lotteryTable, LOTTERY_FORMATS, DEFAULT_FORMAT, monteCarlo, pickGrid } from "./service/draft.js";
 import { advanced, inMode } from "./service/advanced.js";
 import { collegeHeadshot } from "./service/normalize.js";
@@ -732,11 +747,69 @@ $("#mcBtn").addEventListener("click", () => {
   $("#mcWrap").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   toast(`1,000 lotteries in ${Math.round(performance.now() - t0)} ms`);
 });
+/** CPU drafts until a team you control is on the clock (or the draft ends). */
+async function simToUser() {
+  if (simming) return; simming = true;
+  try {
+    const s = yearState(), ctrl = ctrlSet();
+    for (const next of allPicksNow()) {
+      if (s.picks[next.pick]) continue;
+      if (ctrl.has(next.owner)) break;
+      const p = cpuChoice(next.owner); if (!p) break;
+      if (anim && !fastSim) await makePick(next.pick, p.id, { announce: true, quick: true });
+      else s.picks[next.pick] = p.id;
+    }
+    save(); render(); fastSim = false;
+    setTimeout(() => $("#clock").scrollIntoView({ behavior: RM() ? "auto" : "smooth", block: "start" }), 40);
+  } finally { simming = false; }
+}
+
+/* ---------- Select Teams to Control ---------- */
+const ctrlSet = () => new Set(yearState().control || []);
+function openControl({ start = false } = {}) {
+  const s = yearState();
+  const sel = new Set(s.control || []);
+  const codes = Object.keys(TEAMS).sort((a, b) => `${TEAMS[a].city} ${TEAMS[a].name}`.localeCompare(`${TEAMS[b].city} ${TEAMS[b].name}`));
+  const commitSel = () => { s.control = [...sel]; save(); paintClock(); };
+  const label = () => `${start ? "Start Draft" : "Done"} (${sel.size} Team${sel.size === 1 ? "" : "s"} Controlled)${start ? " →" : ""}`;
+  sheet.open({
+    title: "Select Teams to Control",
+    render(body) {
+      const picks = allPicksNow(), counts = {};
+      for (const p of picks) counts[p.owner] = (counts[p.owner] || 0) + 1;
+      body.innerHTML = `<p class="ctl-sub">Draft for any team you like: one, several or all 30. The CPU picks for the rest.</p>
+        <div class="ctl-presets"><button class="press" type="button" data-ctl="all">All 30 Teams</button><button class="press" type="button" data-ctl="lottery">Lottery Teams Only (1–${F().teams})</button><button class="press" type="button" data-ctl="none">Clear Selection</button></div>
+        <div class="ctl-grid" role="group" aria-label="NBA teams">${codes.map((c) => `<button class="ctl-team press" type="button" data-team="${c}" aria-pressed="${sel.has(c)}">${teamLogo(teamOf(c), { size: "2rem" })}<b>${c}</b><small>${counts[c] || 0} Pick${counts[c] === 1 ? "" : "s"}</small></button>`).join("")}</div>
+        <div class="ctl-foot"><button class="btn primary ctl-start press" type="button" data-ctl="start">${label()}</button></div>`;
+      body.onclick = (e) => {
+        const t = e.target.closest("[data-team]"), c = e.target.closest("[data-ctl]");
+        if (t) { const code = t.dataset.team; sel.has(code) ? sel.delete(code) : sel.add(code); t.setAttribute("aria-pressed", String(sel.has(code))); body.querySelector(".ctl-start").textContent = label(); return; }
+        if (!c) return;
+        const k = c.dataset.ctl;
+        if (k === "all") codes.forEach((x) => sel.add(x));
+        if (k === "none") sel.clear();
+        if (k === "lottery") { sel.clear(); picks.filter((p) => p.pick <= F().teams).forEach((p) => sel.add(p.owner)); }
+        if (k === "start") {
+          commitSel(); sheet.close();
+          const nx = allPicksNow().find((p) => !yearState().picks[p.pick]);
+          if (start && nx) toast(sel.has(nx.owner) ? `You're on the clock at #${nx.pick}` : sel.size ? "CPU is on the clock. Tap Sim to Next User Pick" : "No teams selected: the CPU drafts every pick");
+          setTimeout(() => $("#clock").scrollIntoView({ behavior: RM() ? "auto" : "smooth", block: "start" }), 120);
+          return;
+        }
+        body.querySelectorAll("[data-team]").forEach((b) => b.setAttribute("aria-pressed", String(sel.has(b.dataset.team))));
+        body.querySelector(".ctl-start").textContent = label();
+      };
+    },
+    onClose() { sheet.body.onclick = null; commitSel(); },
+  });
+}
+
 $("#boardMode").addEventListener("click", (e) => { const b = e.target.closest("[data-bm]"); if (!b) return; boardMode = b.dataset.bm; store.set("draft:boardMode", boardMode); paintBoardMode(); });
 $("#clearBtn").addEventListener("click", () => {
   const s = yearState(); const prev = { ...s.picks };
   s.picks = {}; save(); render();
   toast("Picks cleared", { label: "Undo", run: () => { s.picks = prev; save(); render(); } });
+  if (boardMode === "board") setTimeout(() => openControl({ start: true }), 80);
 });
 $("#autoBtn").addEventListener("click", () => {
   const s = yearState(); const taken = new Set(Object.values(s.picks));
@@ -923,7 +996,8 @@ const settings = $("#settings"), setScrim = $("#settingsScrim");
 const openSettings = () => { settings.hidden = false; setScrim.hidden = false; requestAnimationFrame(() => settings.classList.add("in")); };
 const closeSettings = () => { settings.classList.remove("in"); setScrim.hidden = true; setTimeout(() => { if (!settings.classList.contains("in")) settings.hidden = true; }, RM() ? 0 : 220); };
 $("#settingsBtn").addEventListener("click", openSettings);
-setScrim.addEventListener("click", closeSettings);
+dismissOnBackdrop(setScrim, closeSettings, { isOpen: () => !settings.hidden });
+dismissOnBackdrop($("#pickin"), () => pickinResolve && pickinResolve(), { isOpen: () => !!pickinResolve });
 settings.querySelector("[data-close-settings]").addEventListener("click", closeSettings);
 settings.querySelector(".dk-set-actions").addEventListener("click", (e) => { if (e.target.closest("button")) setTimeout(closeSettings, 60); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !settings.hidden) closeSettings(); });
@@ -997,7 +1071,12 @@ function closeStage({ toBoard = false } = {}) {
   stageRun++;
   const stage = $("#stage"); stage.classList.remove("in"); document.body.classList.remove("stage-open");
   setTimeout(() => { if (!stage.classList.contains("in")) stage.hidden = true; }, RM() ? 0 : 260);
-  if (toBoard) { boardMode = "board"; store.set("draft:boardMode", "board"); paintBoardMode(); paintClock(); setTimeout(() => ($("#clock").hidden ? $("#board") : $("#clock")).scrollIntoView({ behavior: RM() ? "auto" : "smooth", block: "start" }), 60); }
+  if (toBoard) {
+    // every mock draft starts clean at Pick #1 (picks from an earlier mock never carry over)
+    const s = yearState(); s.picks = {}; save();
+    boardMode = "board"; store.set("draft:boardMode", "board"); render(); paintBoardMode(); paintClock();
+    setTimeout(() => openControl({ start: true }), RM() ? 0 : 280);
+  }
 }
 $("#lotteryBtn").addEventListener("click", startLottery);
 $("#stageSkip").addEventListener("click", () => finishStage(stageRows()));
@@ -1017,19 +1096,30 @@ function paintClock() {
   const next = allPicksNow().find((p) => !s.picks[p.pick]);
   if (!next) { el.hidden = false; el.style.setProperty("--c", "#334155"); el.innerHTML = `<div class="clk-done"><b>Draft complete</b><span>All ${30 * rounds} picks are in. Clear picks in ⚙ to redo it.</span></div>`; return; }
   const own = teamOf(next.owner);
+  const ctrl = ctrlSet(), mine = ctrl.has(next.owner);
+  const upcomingMine = ctrl.size && allPicksNow().some((p) => !s.picks[p.pick] && ctrl.has(p.owner));
   const need = needCache.get(next.owner);
   if (!need && client) teamNeed(next.owner).then(paintClock);
   const needs = [...new Set((need || []).map((x) => (x === "PG" || x === "SG" ? "Guard" : x === "SF" || x === "PF" ? "Forward" : "Center")))].slice(0, 2);
   el.hidden = false; el.style.setProperty("--c", own.color);
-  el.innerHTML = `<div class="clk-main">${teamLogo(own, { size: "3.25rem" })}
-      <div class="clk-t"><span class="clk-live">ON THE CLOCK</span><b>${esc(own.city)} ${esc(own.name)}</b>
+  const acts = !ctrl.size || mine
+    ? [["pick", "Pick Player", true], ["sim", "Sim Pick"], ["rest", "Sim Rest of Draft"]]
+    : upcomingMine
+      ? [["touser", "Sim to Next User Pick", true], ["sim", "Sim Pick"], ["rest", "Sim Rest of Draft"]]
+      : [["sim", "Sim Pick"], ["rest", "Sim Rest of Draft", true], ["pick", "Pick Player"]];
+  el.classList.toggle("mine", mine);
+  el.innerHTML = `<button class="clk-teams" type="button" data-clk="teams" aria-label="Teams you control: ${ctrl.size}">Teams (${ctrl.size})</button>
+    <div class="clk-main">${teamLogo(own, { size: "3.25rem" })}
+      <div class="clk-t"><span class="clk-live">ON THE CLOCK${mine ? " · YOUR PICK" : ctrl.size ? " · CPU" : ""}</span><b>${esc(own.city)} ${esc(own.name)}</b>
         <span class="clk-meta">Pick <b class="num">#${next.pick}</b>${next.pick > 30 ? " · Round 2" : ""}${next.owner !== next.originalTeam ? ` · via ${esc(teamOf(next.originalTeam).abbr)}` : ""}${needs.length ? ` · Needs: ${needs.join(", ")}` : ""}</span></div>
       <span class="clk-num num">${next.pick}</span></div>
-    <div class="clk-actions"><button class="clk-btn primary" type="button" data-clk="pick">Pick Player</button><button class="clk-btn" type="button" data-clk="sim">Sim Pick</button><button class="clk-btn" type="button" data-clk="rest">Sim Rest of Draft</button></div>`;
+    <div class="clk-actions">${acts.map(([k, label, primary]) => `<button class="clk-btn${primary ? " primary" : ""}" type="button" data-clk="${k}">${label}</button>`).join("")}</div>`;
 }
 $("#clock").addEventListener("click", (e) => {
   const b = e.target.closest("[data-clk]"); if (!b) return;
+  if (b.dataset.clk === "teams") return openControl();
   const s = yearState(); const next = allPicksNow().find((p) => !s.picks[p.pick]); if (!next) return;
+  if (b.dataset.clk === "touser") return simToUser();
   if (b.dataset.clk === "pick") return pickSheet(next.pick);
   if (b.dataset.clk === "sim") return simPick(next, { announce: anim });
   if (b.dataset.clk === "rest") return simRest();
@@ -1094,7 +1184,6 @@ function showPickIn(pickNo, id, { quick = false } = {}) {
     pickinResolve = done;
     el.querySelector('[data-pk="ok"]').addEventListener("click", done);
     el.querySelector('[data-pk="fast"]')?.addEventListener("click", () => { fastSim = true; done(); });
-    el.addEventListener("click", (e) => { if (e.target === el) done(); }, { once: true });
     pickinTimer = setTimeout(done, quick ? 900 : 2600);
   });
 }

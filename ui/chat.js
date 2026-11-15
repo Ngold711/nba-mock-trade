@@ -4,23 +4,18 @@
 // Quick-View / Team Vault through the shell's global [data-player] / [data-team-hub] delegation.
 //
 // Conversations: localStorage "hooptrax_ai_threads" = [{ id, title, updatedAt, messages[] }], newest first.
-// A fresh blank chat opens on a new app session (or after 10+ minutes away); moving between Hooptrax pages
-// in the same session keeps the open conversation. Past threads live in the History drawer.
+// Closing the sheet (✕, backdrop tap, swipe down) saves the conversation to History and resets: the next tap on
+// the orb always opens a brand-new blank chat. An answer still streaming when the sheet closes finishes in the
+// background and is saved to its own thread.
 import { esc, avatar, teamLogo } from "./avatar.js";
-import { reduceMotion } from "./motion.js";
+import { reduceMotion, dismissOnBackdrop } from "./motion.js";
 
 const STORE = "hooptrax_ai_threads";
-const ACTIVE = "hooptrax_ai_active";          // sessionStorage: { id, seen }
-const AWAY_MS = 10 * 60 * 1000;
 const MAX_THREADS = 50, MAX_MSGS = 80;
 
 const ls = {
   read() { try { const v = JSON.parse(localStorage.getItem(STORE) || "[]"); return Array.isArray(v) ? v : []; } catch { return []; } },
   write(list) { try { localStorage.setItem(STORE, JSON.stringify(list.slice(0, MAX_THREADS))); } catch {} },
-};
-const ss = {
-  read() { try { return JSON.parse(sessionStorage.getItem(ACTIVE) || "null"); } catch { return null; } },
-  write(v) { try { sessionStorage.setItem(ACTIVE, JSON.stringify(v)); } catch {} },
 };
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const titleOf = (q) => { const t = String(q).replace(/\s+/g, " ").trim().replace(/[?.!]+$/, ""); return t.length > 48 ? t.slice(0, 46).replace(/\s+\S*$/, "") + "…" : t || "New chat"; };
@@ -134,25 +129,18 @@ export function mountChat({ getClient }) {
 
   /* ---------- threads ---------- */
   let threads = ls.read();
-  let cur = null;                           // { id, title, updatedAt, messages }
-  let busy = false, live = null;            // live = { el, text, chips, cards } while streaming
+  let cur = null;                           // the open thread { id, title, updatedAt, messages }
+  const pending = new Set();                // ids of threads with an answer still streaming
+  const deleted = new Set();
+  const busyHere = () => !!cur && pending.has(cur.id);
   const blank = () => ({ id: uid(), title: "New chat", updatedAt: Date.now(), messages: [] });
-  function persist() {
-    if (!cur?.messages.length) return;
-    cur.updatedAt = Date.now();
-    cur.messages = cur.messages.slice(-MAX_MSGS);
-    threads = [cur, ...ls.read().filter((t) => t.id !== cur.id)];
+  function persist(th = cur) {
+    if (!th?.messages.length || deleted.has(th.id)) return;
+    th.updatedAt = Date.now();
+    th.messages = th.messages.slice(-MAX_MSGS);
+    threads = [th, ...ls.read().filter((t) => t.id !== th.id)];
     ls.write(threads);
   }
-  function touch() { if (cur) ss.write({ id: cur.id, seen: Date.now() }); }
-  function resumeOrFresh() {
-    const a = ss.read();
-    const t = a && Date.now() - a.seen < AWAY_MS ? ls.read().find((x) => x.id === a.id) : null;
-    cur = t || (cur && !cur.messages.length ? cur : blank());
-    touch();
-  }
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && cur) touch(); });
-  addEventListener("pagehide", () => cur && touch());
 
   /* ---------- paint ---------- */
   const srcLabel = (m) => (m.source?.startsWith("gemini") ? "Hooptrax AI · live data" : "Hooptrax data engine") + (m.note ? ` · ${m.note}` : "");
@@ -162,7 +150,7 @@ export function mountChat({ getClient }) {
     log.innerHTML = msgs.length
       ? msgs.map((m) => (m.role === "user" ? `<div class="msg user">${esc(m.text)}</div>` : `<div class="msg bot">${botHtml(m)}</div>`)).join("")
       : `<div class="chat-hello"><span class="hello-orb" aria-hidden="true">${ORB_SVG}</span><b>What do you want to know?</b><span>Tonight's games and the next 14 days of schedules, live stats, injuries, standings, trades and the cap, the draft, 2K27 ratings, and every era of NBA history.</span></div>`;
-    if (busy && !live) log.insertAdjacentHTML("beforeend", `<div class="msg bot typing" aria-label="Thinking"><i></i><i></i><i></i></div>`);
+    if (busyHere()) log.insertAdjacentHTML("beforeend", `<div class="msg bot typing" aria-label="Thinking"><i></i><i></i><i></i></div>`);
     starters.hidden = msgs.length > 0;
     scrollDown(true);
   }
@@ -202,38 +190,40 @@ export function mountChat({ getClient }) {
   }
   histList.addEventListener("click", (e) => {
     const o = e.target.closest("[data-open]"), d = e.target.closest("[data-del]");
-    if (o && !busy) { const t = ls.read().find((x) => x.id === o.dataset.open); if (t) { cur = t; touch(); showHist(false); paint(); } }
+    if (o) { const t = ls.read().find((x) => x.id === o.dataset.open); if (t) { cur = t; showHist(false); paint(); } }
     if (d) {
       const id = d.dataset.del;
-      ls.write(ls.read().filter((x) => x.id !== id));
-      if (cur?.id === id && !busy) { cur = blank(); touch(); paint(); }
+      deleted.add(id); ls.write(ls.read().filter((x) => x.id !== id));
+      if (cur?.id === id) { cur = blank(); paint(); paintStarters(); }
       paintHist();
     }
   });
   $("[data-clear-all]").addEventListener("click", (e) => {
     const b = e.currentTarget;
     if (!b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "Tap again to delete all"; setTimeout(() => { if (b.dataset.armed) { delete b.dataset.armed; b.textContent = "Clear All History"; } }, 3000); return; }
-    if (busy) return;
-    ls.write([]); cur = blank(); touch(); paintHist(); paint(); paintStarters(); showHist(false);
+    ls.read().forEach((t) => deleted.add(t.id)); pending.forEach((id) => deleted.add(id));
+    ls.write([]); cur = blank(); paintHist(); paint(); paintStarters(); showHist(false);
   });
   $("[data-hist]").addEventListener("click", () => showHist(hist.hidden));
   $("[data-hist-close]").addEventListener("click", () => showHist(false));
-  $("[data-new]").addEventListener("click", () => { if (busy) return; cur = blank(); touch(); showHist(false); paint(); paintStarters(); input.focus({ preventScroll: true }); });
+  $("[data-new]").addEventListener("click", () => { persist(); cur = blank(); showHist(false); paint(); paintStarters(); input.focus({ preventScroll: true }); });
 
   /* ---------- ask (streamed) ---------- */
   async function ask(q) {
-    q = String(q || "").trim(); if (!q || busy) return;
-    if (!cur.messages.length) cur.title = titleOf(q);
-    const history = cur.messages.slice(-6).map(({ role, text }) => ({ role, text }));
-    cur.messages.push({ role: "user", text: q }); busy = true; persist(); touch(); paint();
+    q = String(q || "").trim(); if (!q || busyHere()) return;
+    const th = cur;                         // the answer always lands in this thread, even if the sheet closes
+    if (!th.messages.length) th.title = titleOf(q);
+    const history = th.messages.slice(-6).map(({ role, text }) => ({ role, text }));
+    th.messages.push({ role: "user", text: q }); pending.add(th.id); persist(th); paint();
     const msg = { role: "assistant", text: "", chips: [], cards: [], source: "local" };
     let el = null, raf = 0;
+    const visible = () => cur === th && !panel.hidden;
     const ensureEl = () => {
-      if (el) return el;
+      if (el && el.isConnected) return el;
       log.querySelector(".typing")?.remove();
-      el = document.createElement("div"); el.className = "msg bot streaming"; log.append(el); live = { el }; return el;
+      el = document.createElement("div"); el.className = "msg bot streaming"; log.append(el); return el;
     };
-    const flush = () => { raf = 0; ensureEl().innerHTML = `${render(msg.text, [])}${renderCards(msg.cards)}<span class="caret" aria-hidden="true"></span>`; scrollDown(); };
+    const flush = () => { raf = 0; if (!visible()) return; ensureEl().innerHTML = `${render(msg.text, [])}${renderCards(msg.cards)}<span class="caret" aria-hidden="true"></span>`; scrollDown(); };
     const schedule = () => { if (!raf) raf = requestAnimationFrame(flush); };
     try {
       let r, tries = 0;
@@ -266,10 +256,8 @@ export function mountChat({ getClient }) {
       msg.source = "local"; msg.cards = msg.cards || [];
     }
     cancelAnimationFrame(raf);
-    cur.messages.push(msg); busy = false; live = null; persist(); touch();
-    const node = el || ensureEl();
-    node.classList.remove("streaming"); node.innerHTML = botHtml(msg);
-    live = null; scrollDown();
+    th.messages.push(msg); pending.delete(th.id); persist(th);
+    if (visible()) { const node = ensureEl(); node.classList.remove("streaming"); node.innerHTML = botHtml(msg); scrollDown(); }
   }
 
   /* ---------- input ---------- */
@@ -282,16 +270,38 @@ export function mountChat({ getClient }) {
 
   /* ---------- open / close ---------- */
   $("[data-chat-close]").addEventListener("click", close);
-  scrim.addEventListener("click", close);
+  dismissOnBackdrop(scrim, () => close(), { isOpen: () => isOpen() });
   orb.addEventListener("click", () => (isOpen() ? close() : open()));
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape" || panel.hidden || document.querySelector(".sheet[style*='visible']")) return;
     if (!hist.hidden) showHist(false); else close();
   });
   const isOpen = () => !panel.hidden;
+
+  /* swipe down on the grabber / top bar to dismiss */
+  let drag = null;
+  const grabZone = (e) => e.target.closest(".chat-grab, .chat-head") && !e.target.closest("button");
+  panel.addEventListener("pointerdown", (e) => {
+    if (!grabZone(e) || (e.pointerType === "mouse" && e.button !== 0)) return;
+    drag = { y: e.clientY, t: performance.now(), dy: 0, id: e.pointerId };
+    panel.setPointerCapture?.(e.pointerId); panel.style.transition = "none";
+  });
+  panel.addEventListener("pointermove", (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag.dy = Math.max(0, e.clientY - drag.y);
+    panel.style.transform = `translateY(${drag.dy}px)`;
+  });
+  const endDrag = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const v = drag.dy / Math.max(1, performance.now() - drag.t);       // px/ms
+    const dismiss = drag.dy > 110 || (drag.dy > 30 && v > 0.6);
+    drag = null; panel.style.transition = "";
+    if (dismiss) close(); else panel.style.transform = "";
+  };
+  panel.addEventListener("pointerup", endDrag); panel.addEventListener("pointercancel", endDrag);
   let lastFocus = null;
   function open() {
-    if (!busy) resumeOrFresh();
+    cur ||= blank();
     lastFocus = document.activeElement;
     panel.hidden = false; scrim.classList.add("on"); orb.classList.add("hide"); document.documentElement.classList.add("chat-open");
     requestAnimationFrame(() => panel.classList.add("in"));
@@ -300,8 +310,11 @@ export function mountChat({ getClient }) {
     else $("[data-chat-close]").focus({ preventScroll: true });
   }
   function close() {
+    if (panel.hidden) return;
     panel.classList.remove("in"); scrim.classList.remove("on"); orb.classList.remove("hide"); document.documentElement.classList.remove("chat-open");
-    touch();
+    panel.style.transform = "";
+    persist(); cur = null;                  // saved to History; the next open starts a brand-new chat
+    showHist(false);
     setTimeout(() => { if (!panel.classList.contains("in")) panel.hidden = true; }, reduceMotion.matches ? 0 : 300);
     lastFocus?.focus?.({ preventScroll: true });
   }

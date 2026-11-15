@@ -6,7 +6,7 @@
 //   shell.setWireHandler((item) => …)   // optional: a page can take over ticker clicks
 import { createClient } from "./client.js";
 import { avatar, teamLogo, esc } from "./avatar.js";
-import { Spring, createSheet, createToast, scrollEdge, reduceMotion, project, tracker, rubberband } from "./motion.js";
+import { Spring, createSheet, createToast, scrollEdge, reduceMotion, project, tracker, rubberband, dismissOnBackdrop } from "./motion.js";
 import { mountLiveWire } from "./ticker.js";
 import { pickInventory, toCode } from "../service/draft.js";
 import { logoMark, wordmark, HooptraxWatermark } from "./brand.js";
@@ -45,7 +45,7 @@ export function mountShell({ active = "live" } = {}) {
   const bar = document.getElementById("bar") || document.body.insertBefore(document.createElement("header"), document.body.firstChild);
   bar.id = "bar"; bar.className = "bar app-bar";
   bar.innerHTML = `<div class="bar-inner">
-      <a class="brand-link" href="./" aria-label="Hooptrax home">${logoMark("brand-mark")}${wordmark()}</a>
+      <a class="brand-link" href="live.html" aria-label="Hooptrax home">${logoMark("brand-mark")}${wordmark()}</a>
       <nav class="topnav" aria-label="Tools">${TABS.map(tabLink).join("")}</nav>
       <div class="bar-right">
         <button class="status-pill" type="button" id="statusPill" aria-label="${hasWire ? "Live data status. Open LiveWire." : "Live data status. Go to Live."}"><span class="pulse" id="pulse"></span><span id="sync">Live Sync</span></button>
@@ -107,7 +107,7 @@ export function mountShell({ active = "live" } = {}) {
     const done = () => { if (!drawerOpen) drawer.style.visibility = "hidden"; };
     if (reduceMotion.matches) { dSpring.set(1); done(); } else dSpring.to(1, { damping: 1, response: 0.35, velocity: v, onDone: done });
   }
-  drawerScrim.addEventListener("pointerdown", () => closeDrawer());
+  dismissOnBackdrop(drawerScrim, () => closeDrawer(), { isOpen: () => drawerOpen });
   document.getElementById("statusPill").addEventListener("click", () => (drawerOpen ? closeDrawer() : openDrawer()));
   // drag the grabber to dismiss (momentum projection + rubber band, like the main sheet)
   (() => {

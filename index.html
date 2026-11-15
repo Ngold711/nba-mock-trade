@@ -240,12 +240,39 @@ main { max-width: 72rem; margin: 0 auto; padding: 0 max(1rem, env(safe-area-inse
 .vd-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; justify-self: stretch; } .vd-acts .btn { min-height: 44px; } .vd-acts .btn:first-child { grid-column: 1 / -1; }
 .vd-acts .btn:disabled { opacity: .4; }
 @media (max-width: 999px) { .ai-orb { --orb-lift: 4.4rem; } }
+/* 🔥 Most Traded & Rumored */
+.trend[hidden] { display: none !important; }
+.trend { margin: 0 0 0.9rem; }
+.trend-head { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.45rem; min-width: 0; }
+.trend-title { font: 800 0.75rem/1 var(--font); letter-spacing: 0.06em; color: var(--accent); white-space: nowrap; flex: none; }
+.trend-sub { font-size: 0.6875rem; color: var(--label-3); font-weight: 600; margin-left: auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trend-row { display: flex; gap: 0.5rem; overflow-x: auto; scroll-snap-type: x proximity; margin: 0 calc(-1 * var(--space, 1rem)); padding: 0.1rem var(--space, 1rem) 0.4rem; scrollbar-width: none; overscroll-behavior-x: contain; }
+.trend-row::-webkit-scrollbar { display: none; }
+.trend-card { position: relative; flex: none; scroll-snap-align: start; width: 6.6rem; padding: 0.55rem 0.45rem 0.5rem; border: 0; border-radius: 1rem; cursor: pointer; color: var(--label); font: inherit;
+  display: grid; justify-items: center; gap: 0.25rem; text-align: center;
+  background: linear-gradient(170deg, color-mix(in srgb, var(--c) 26%, var(--surface-2)), var(--surface-2) 65%); box-shadow: inset 0 0 0 0.5px var(--sep); }
+.trend-card:hover { box-shadow: inset 0 0 0 1px var(--accent); }
+.trend-card:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.tc-rank { position: absolute; top: 0.4rem; left: 0.45rem; font: 800 0.6875rem/1 var(--font-mono); color: var(--label-2); }
+.trend-card:nth-child(-n+3) .tc-rank { color: #F59E0B; }
+.tc-face { position: relative; }
+.tc-face .avatar { border-radius: 999px; }
+.tc-logo { position: absolute; right: -0.3rem; bottom: -0.15rem; border-radius: 999px; background: var(--surface); padding: 0.1rem; display: grid; }
+.tc-name { font-size: 0.75rem; font-weight: 700; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tc-sal { font-size: 0.6875rem; color: var(--label-2); font-weight: 600; }
+.tc-heat { font: 750 0.625rem/1 var(--font-mono); padding: 0.22rem 0.45rem; border-radius: 99px; background: var(--fill); color: var(--label-2); }
+.tc-heat.warm { background: rgba(245,158,11,.15); color: #F59E0B; }
+.tc-heat.hot { background: linear-gradient(90deg, #F59E0B, #EF4444); color: #fff; }
 </style>
 </head>
 <body>
 <header class="bar" id="bar"></header>
 
 <main>
+  <section class="trend" id="trend" aria-label="Most traded and rumored players" hidden>
+    <div class="trend-head"><span class="trend-title">🔥 MOST TRADED &amp; RUMORED</span><span class="trend-sub" id="trendSub">Live</span></div>
+    <div class="trend-row" id="trendRow" role="list"></div>
+  </section>
   <div class="page-head">
     <h2>Trade Machine</h2>
     <div class="tools">
@@ -271,8 +298,8 @@ main { max-width: 72rem; margin: 0 auto; padding: 0 max(1rem, env(safe-area-inse
 
 <script src="data.js"></script>
 <script type="module">
-import { Spring, project, rubberband, tracker, reduceMotion, createSheet, createToast, scrollEdge, springIn } from "./ui/motion.js";
-import { avatar, esc } from "./ui/avatar.js";
+import { Spring, project, rubberband, tracker, reduceMotion, createSheet, createToast, scrollEdge, springIn, dismissOnBackdrop } from "./ui/motion.js";
+import { avatar, esc, teamLogo } from "./ui/avatar.js";
 import { createClient } from "./ui/client.js";
 import { mountShell } from "./ui/shell.js";
 import { resolveSalary, validateTrade, firstRoundHoldings, TIERS, money, encodeTrade, decodeTrade, STEPIEN_YEARS } from "./service/trade.js";
@@ -399,6 +426,17 @@ function addAsset(asset) {
   const others = activeTeams().filter((t) => t !== asset.from);
   state.assets.push({ id: asset.id, to: others[0] || null });
   justAdded.add(asset.id); haptic(); commit();
+  if (asset.kind === "player" && asset.espnId) countAdd(asset.espnId);
+}
+/* Hooptrax user trade counter → /api/trending-trades (batched, best-effort) */
+let addQueue = new Set(), addTimer = 0;
+const visitorId = (() => { try { let v = localStorage.getItem("htx:visitor"); if (!v) { v = Math.random().toString(36).slice(2, 14); localStorage.setItem("htx:visitor", v); } return v; } catch { return ""; } })();
+function countAdd(espnId) {
+  addQueue.add(String(espnId)); clearTimeout(addTimer);
+  addTimer = setTimeout(() => {
+    const ids = [...addQueue]; addQueue = new Set();
+    fetch("/api/trade-adds", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ids, visitor: visitorId }), keepalive: true }).catch(() => {});
+  }, 1500);
 }
 function removeAsset(id) { state.assets = state.assets.filter((a) => a.id !== id); haptic(); commit(); }
 function setTeam(slot, abbr) {
@@ -791,12 +829,47 @@ function openVerdict() {
   el.querySelector('[data-vd="share"]').addEventListener("click", () => { closeVerdict(); $("#dockCard").click(); });
   el.querySelector('[data-vd="link"]').addEventListener("click", () => $("#dockLink").click());
   el.querySelector('[data-vd="close"]').addEventListener("click", closeVerdict);
-  el.addEventListener("click", (e) => { if (e.target === el) closeVerdict(); }, { once: true });
   try { navigator.vibrate && navigator.vibrate(approved ? [12, 40, 12] : 30); } catch {}
 }
 function closeVerdict() { const el = $("#verdict"); el.classList.remove("in"); setTimeout(() => { if (!el.classList.contains("in")) el.hidden = true; }, 180); }
 $("#proposeBtn").addEventListener("click", openVerdict);
+dismissOnBackdrop($("#verdict"), closeVerdict, { isOpen: () => $("#verdict").classList.contains("in") });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#verdict").hidden) closeVerdict(); });
+
+/* ---------- 🔥 Most Traded & Rumored strip ---------- */
+let TREND = [];
+async function loadTrending() {
+  try {
+    const r = await fetch("/api/trending-trades"); if (!r.ok) throw new Error(r.status);
+    const { data } = await r.json();
+    TREND = (data.players || []).filter((p) => TEAMS[p.team.code]);
+    if (!TREND.length) return;
+    const live = data.sources?.hoopshype?.ok || data.sources?.espn?.ok;
+    $("#trendSub").textContent = live ? `Rumors · news · Hooptrax trades` : "Hooptrax trades";
+    $("#trendRow").innerHTML = TREND.map((p) => `<button class="trend-card press" type="button" role="listitem" data-trend="${esc(p.id)}" style="--c:${esc(p.team.color)}" aria-label="#${p.rank} ${esc(p.name)}, ${esc(p.team.name)}, ${money(p.salary)}. Load into the trade machine">
+      <span class="tc-rank">#${p.rank}</span>
+      <span class="tc-face">${avatar({ name: p.name, headshotSmall: p.headshot }, { size: "2.6rem", color: p.team.color })}<span class="tc-logo">${teamLogo({ abbr: p.team.code, logo: p.team.logo, color: p.team.color }, { size: "1.05rem" })}</span></span>
+      <span class="tc-name">${esc(p.name.replace(/^(\S)\S*\s/, "$1. "))}</span>
+      <span class="tc-sal num">${money(p.salary)}${p.salaryEstimate ? "*" : ""}</span>
+      <span class="tc-heat ${p.heat >= 85 ? "hot" : p.heat >= 55 ? "warm" : ""}">${p.heat >= 85 ? "🔥" : "▲"} ${p.heat}</span>
+    </button>`).join("");
+    $("#trend").hidden = false;
+  } catch {}
+}
+/** One tap: player's team → Team A, player onto the outgoing block, then pick Team B. */
+function loadTrendPlayer(p) {
+  const code = p.team.code, id = `${code}:p${p.id}`;
+  const keep = state.teams.filter((t) => t && t !== code);
+  state.teams = [code, keep[0] || null, ...keep.slice(1, 3)];
+  state.assets = state.assets.filter((a) => state.teams.includes(a.id.split(":")[0]));
+  if (!state.assets.some((a) => a.id === id)) { state.assets.push({ id, to: null }); justAdded.add(id); }
+  fixDestinations(); haptic(); commit();
+  ensureRoster(code); countAdd(p.id);
+  $("#board").scrollIntoView({ behavior: reduceMotion.matches ? "auto" : "smooth", block: "start" });
+  toast(state.teams[1] ? `${p.name} is on the block` : `${p.name} is on the block. Now pick Team B`);
+}
+$("#trendRow").addEventListener("click", (e) => { const b = e.target.closest("[data-trend]"); if (!b) return; const p = TREND.find((x) => x.id === b.dataset.trend); if (p) loadTrendPlayer(p); });
+loadTrending();
 
 /* ---------- Load: ?trade= link → legacy #t= hash (Team Hub, Quick-View) → auto-save ---------- */
 function decodeLegacyHash() {

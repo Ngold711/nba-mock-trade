@@ -604,3 +604,9 @@ html.chat-open, html.chat-open body { overflow: hidden; }
 @media (max-width: 400px) { .chat-tb { padding: 0 0.6rem; } .chat-title b { display: none; } }
 @media (prefers-reduced-motion: reduce) { .chat, .chat-hist, .ai-orb { transition: none; } .typing i, .caret, .ai-orb .orb-spark, .gc-live { animation: none; } }
 @media (max-width: 359px) { .teams-btn span { display: none; } .teams-btn { padding: 0.45rem 0.55rem; } }
+
+/* Backdrops: tap anywhere outside the sheet to dismiss (cursor:pointer also makes iOS Safari deliver clicks) */
+.scrim, .chat-scrim, .dk-scrim, .verdict, .pickin { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.vd-card, .pk-card { cursor: auto; }
+.chat-grab, .chat-head { touch-action: none; }
+.chat-grab { height: 1.25rem; cursor: grab; }

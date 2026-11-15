@@ -66,6 +66,27 @@ export function springIn(el) {
     .to(1, { damping: 1, response: 0.35, onDone: () => { el.style.transform = ""; } });
 }
 
+
+/**
+ * Tap/click on a backdrop closes its overlay, reliably on iOS Safari:
+ *  - closes on pointerdown (iOS doesn't fire `click` on plain divs), with `click` as the keyboard/AT fallback;
+ *  - only when the backdrop itself is hit (taps inside the sheet/card never count);
+ *  - swallows the follow-up synthetic click so it can't land on whatever was under the backdrop.
+ */
+export function dismissOnBackdrop(el, close, { isOpen = () => true } = {}) {
+  let at = -1e9;
+  el.addEventListener("pointerdown", (e) => {
+    if (e.target !== el || (e.pointerType === "mouse" && e.button !== 0) || !isOpen()) return;
+    at = performance.now(); close();
+  });
+  el.addEventListener("touchend", (e) => { if (e.target === el && performance.now() - at < 800) e.preventDefault(); }, { passive: false });
+  el.addEventListener("click", (e) => {
+    if (e.target !== el) return;
+    if (performance.now() - at < 800) { e.preventDefault(); e.stopPropagation(); return; }
+    if (isOpen()) close();
+  });
+}
+
 /**
  * Draggable bottom sheet. Enters from and exits to the bottom edge, can be grabbed
  * mid-flight, flicked closed (momentum projection + velocity handoff), rubber-bands upward.
@@ -136,7 +157,7 @@ function buildSheet() {
     },
   };
 
-  scrim.addEventListener("pointerdown", () => api.close());
+  dismissOnBackdrop(scrim, () => api.close(), { isOpen: () => !!ctx });
   done.addEventListener("click", () => api.close());
   search.addEventListener("input", () => api.refresh());
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && ctx) api.close(); });

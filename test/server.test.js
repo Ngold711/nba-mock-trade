@@ -76,7 +76,12 @@ test("validation and static safety", async () => {
   assert.equal((await fetch(base + "/server.js")).status, 404);
   assert.equal((await fetch(base + "/service/normalize.js")).status, 200);   // browser fallback needs it
   assert.equal((await fetch(base + "/test/store.test.js")).status, 404);
-  const page = await fetch(base + "/");
+  // Live is the home hub: "/" redirects there, Trade Machine deep links (?trade=) stay on the Trade page
+  const home = await fetch(base + "/", { redirect: "manual" });
+  assert.equal(home.status, 302); assert.equal(home.headers.get("location"), "/live.html");
+  assert.equal((await fetch(base + "/?source=homescreen", { redirect: "manual" })).status, 302);
+  assert.equal((await fetch(base + "/?trade=abc", { redirect: "manual" })).status, 200);
+  const page = await fetch(base + "/index.html");
   assert.equal(page.status, 200);
   const html = await page.text();
   assert.match(html, /<title>Hooptrax — Live NBA Trade Machine/);

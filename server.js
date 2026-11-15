@@ -261,8 +261,75 @@ async function chatRoute(req, res) {
   json(res, 200, { data: { answer, source, note: limitNote, cards, chips: chipsFor(answer, d.index, ctx.entities), aiRemaining: Math.max(0, AI_PER_HOUR - hits.length) } });
 }
 
+
+/* Most Traded & Rumored: HoopsHype + ESPN news trade mentions (refreshed every 30 min), blended with what
+   Hooptrax users put into mock trades (rolling 7 days, flushed to data/trade-adds.json). */
+import { parseFeed, parseEspnNews, playerMatcher, countMentions, rankTrending, createTradeCounter } from "./service/trending.js";
+const HOOPSHYPE_FEEDS = (process.env.HOOPSHYPE_FEEDS || "https://hoopshype.com/rumors/feed/,https://hoopshype.com/feed/").split(",").map((x) => x.trim()).filter(Boolean);
+const ESPN_NEWS = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/news?limit=100";
+const FEED_UA = "Hooptrax/1.0 (+https://hooptrax.com)";
+const ADDS_FILE = join(ROOT, "data", "trade-adds.json");
+const tradeAdds = createTradeCounter();
+try { tradeAdds.load(JSON.parse(await readFile(ADDS_FILE, "utf8"))); } catch {}
+let addsFlush = null;
+const flushAdds = () => {
+  if (addsFlush) return;
+  addsFlush = setTimeout(async () => { addsFlush = null; try { await mkdir(join(ROOT, "data"), { recursive: true }); await writeFile(ADDS_FILE, JSON.stringify(tradeAdds)); } catch {} }, 5000);
+  addsFlush.unref?.();
+};
+let rumorCache = { at: 0, rumor: new Map(), news: new Map(), buzz: new Map(), sources: {} }, rumorLoading = null;
+async function fetchText(url, { ua = true, ms = 12000 } = {}) {
+  const r = await fetch(url, { headers: ua ? { "user-agent": FEED_UA, accept: "application/rss+xml, application/xml;q=0.9, */*;q=0.5" } : {}, signal: AbortSignal.timeout(ms) });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.text();
+}
+export async function refreshRumors() {
+  if (rumorLoading) return rumorLoading;
+  rumorLoading = (async () => {
+    const league = (await store.get("league").catch(() => null))?.data;
+    if (!league?.players?.length) return rumorCache;
+    const match = playerMatcher(league.players);
+    const sources = {};
+    let hh = [];
+    for (const url of HOOPSHYPE_FEEDS) {
+      try { const items = parseFeed(await fetchText(url)); sources.hoopshype = { ok: true, url, items: items.length }; if (items.length) { hh = items; break; } }
+      catch (e) { sources.hoopshype = { ok: false, url, error: String(e.message || e).slice(0, 80) }; }
+    }
+    let espn = [];
+    try { espn = parseEspnNews(JSON.parse(await fetchText(ESPN_NEWS, { ua: false }))); /* ESPN 403s custom user agents; same default client as the other ESPN feeds */ sources.espn = { ok: true, items: espn.length }; }
+    catch (e) { sources.espn = { ok: false, error: String(e.message || e).slice(0, 80) }; }
+    rumorCache = { at: Date.now(), rumor: countMentions(hh, match), news: countMentions(espn, match), buzz: countMentions(espn, match, { tradeOnly: false }), sources };
+    return rumorCache;
+  })().finally(() => { rumorLoading = null; });
+  return rumorLoading;
+}
+let trendMemo = { at: 0, body: null };
+async function trendingRoute(req, res) {
+  if (!rumorCache.at) await refreshRumors().catch(() => {});
+  if (!trendMemo.body || Date.now() - trendMemo.at > 60e3 || trendMemo.rumorAt !== rumorCache.at) {
+    const [league, stats] = await Promise.all([store.get("league").catch(() => null), store.get("players").catch(() => null)]);
+    const book = await chatData().then((d) => d.book).catch(() => null);
+    const players = rankTrending({ league: league?.data, book, stats: stats?.data, rumor: rumorCache.rumor, news: rumorCache.news, buzz: rumorCache.buzz, userAdds: tradeAdds.counts() });
+    trendMemo = { at: Date.now(), rumorAt: rumorCache.at, body: { asOf: new Date(rumorCache.at || Date.now()).toISOString(), sources: rumorCache.sources, players } };
+  }
+  res.setHeader("cache-control", "public, max-age=60");
+  return json(res, 200, { data: trendMemo.body });
+}
+async function tradeAddsRoute(req, res) {
+  if (req.method !== "POST") { res.writeHead(405); return res.end(); }
+  let body; try { body = JSON.parse(await readBody(req, 4096)); } catch { return json(res, 400, { error: "Send JSON: { ids }" }); }
+  const ids = Array.isArray(body?.ids) ? body.ids : [];
+  const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+  const visitor = createHash("sha256").update(`${ip}|${String(body?.visitor || "").slice(0, 40)}`).digest("hex").slice(0, 16);
+  const n = tradeAdds.add(visitor, ids);
+  if (n) { flushAdds(); trendMemo.at = 0; }
+  return json(res, 200, { data: { counted: n } });
+}
+
 const routes = [
   [/^\/api\/nba-chat$/, chatRoute],
+  [/^\/api\/trending-trades$/, trendingRoute],
+  [/^\/api\/trade-adds$/, tradeAddsRoute],
   [/^\/api\/polls$/, pollsRoute],
   [/^\/api\/proxy-image$/, proxyImage],
   [/^\/api\/health$/, (req, res) => json(res, 200, { ok: true, uptime: process.uptime(), cache: store.status() })],
@@ -344,12 +411,17 @@ async function serveStatic(req, res, pathname) {
 
 export const server = createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
-  if (req.method !== "GET" && req.method !== "HEAD" && !(req.method === "POST" && (url.pathname === "/api/polls" || url.pathname === "/api/nba-chat"))) { res.writeHead(405); return res.end(); }
+  if (req.method !== "GET" && req.method !== "HEAD" && !(req.method === "POST" && (url.pathname === "/api/polls" || url.pathname === "/api/nba-chat" || url.pathname === "/api/trade-adds"))) { res.writeHead(405); return res.end(); }
   for (const [re, handler] of routes) {
     const m = re.exec(url.pathname);
     if (m) return handler(req, res, m, url.searchParams);
   }
   if (url.pathname.startsWith("/api/")) return json(res, 404, { error: "Unknown endpoint" });
+  // Live is the home hub. "/" → /live.html, unless the URL carries a deep link for the Trade Machine
+  // (?trade=…). The fragment (#t=…, #draft) survives the redirect and live.html forwards it.
+  if (url.pathname === "/" && ![...url.searchParams.keys()].some((k) => k !== "source")) {
+    res.writeHead(302, { location: "/live.html", "cache-control": "no-cache" }); return res.end();
+  }
   return serveStatic(req, res, url.pathname);
 });
 
@@ -368,7 +440,11 @@ export function startPolling() {
   refreshSchedule().catch(() => {});
   const sched = setInterval(() => refreshSchedule().catch(() => {}), 15 * 60 * 1000);
   sched.unref?.();
-  return () => { stops.forEach((s) => s()); clearInterval(sweeper); clearInterval(sched); };
+  // Most Traded & Rumored: HoopsHype + ESPN news, every 30 minutes (first pass once rosters are warm)
+  setTimeout(() => refreshRumors().catch(() => {}), 8000).unref?.();
+  const rumors = setInterval(() => refreshRumors().catch(() => {}), 30 * 60 * 1000);
+  rumors.unref?.();
+  return () => { stops.forEach((s) => s()); clearInterval(sweeper); clearInterval(sched); clearInterval(rumors); };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
