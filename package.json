@@ -4,9 +4,15 @@
   "private": true,
   "description": "NBA mock trade builder and live data service backed by ESPN's public JSON feeds.",
   "type": "module",
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node server.js",
     "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "pg": "^8.13.1"
   }
 }

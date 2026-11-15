@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { buildIndex, findEntities, localAnswer, buildContext, chipsFor, cardsFor, etDate, scheduleDates, datesAsked, intentsOf } from "../service/chat.js";
+import { buildIndex, findEntities, localAnswer, buildContext, chipsFor, cardsFor, etDate, scheduleDates, datesAsked, intentsOf, retiredBy, retiredLine, isRetiredQ } from "../service/chat.js";
 
 const H = JSON.parse(readFileSync(new URL("../nba_history.json", import.meta.url)));
 const league = {
@@ -121,4 +121,37 @@ test("local engine answers schedules instantly; cards for players and games", ()
   // long schedule answers don't link every team name (game cards cover them)
   const many = "Boston Celtics, New York Knicks, Los Angeles Lakers";
   assert.equal(chipsFor(many, idx, null).filter((c) => c.type === "team").length, 3);
+});
+
+/* ---------- retired numbers: audited data, one source for Vault + AI ---------- */
+test("retired numbers audited through Nov 2026 (Rose, Cooper, Dell Curry; upcoming ceremonies)", () => {
+  const nums = (c) => H.franchises[c].retired.map((r) => `${r.num} ${r.name}`);
+  assert.deepEqual(nums("CHI"), ["1 Derrick Rose", "4 Jerry Sloan", "10 Bob Love", "23 Michael Jordan", "33 Scottie Pippen"]);
+  assert.equal(H.franchises.CHI.retired[0].retiredOn, "2026-01-24");
+  for (const n of ["8 Kobe Bryant", "13 Wilt Chamberlain", "16 Pau Gasol", "21 Michael Cooper", "22 Elgin Baylor", "24 Kobe Bryant", "25 Gail Goodrich", "32 Magic Johnson", "33 Kareem Abdul-Jabbar", "34 Shaquille O'Neal", "42 James Worthy", "44 Jerry West", "52 Jamaal Wilkes"]) assert.ok(nums("LAL").includes(n), n);
+  assert.deepEqual(nums("MEM"), ["9 Tony Allen", "33 Marc Gasol", "50 Zach Randolph"]);
+  assert.ok(nums("TOR").includes("15 Vince Carter") && nums("BKN").includes("15 Vince Carter"));
+  for (const n of ["1 Chris Bosh", "3 Dwyane Wade", "10 Tim Hardaway", "23 Michael Jordan (honorary)", "32 Shaquille O'Neal", "33 Alonzo Mourning", "40 Udonis Haslem"]) assert.ok(nums("MIA").includes(n), n);
+  assert.ok(nums("ORL").includes("32 Shaquille O'Neal"));
+  assert.deepEqual(nums("GSW"), ["9 Andre Iguodala", "13 Wilt Chamberlain", "14 Tom Meschery", "16 Al Attles", "17 Chris Mullin", "24 Rick Barry", "42 Nate Thurmond"]);
+  assert.ok(nums("CHA").includes("30 Dell Curry"));
+  assert.equal(H.franchises.MIN.upcomingRetirements[0].name, "Kevin Garnett");
+  assert.equal(Object.keys(H.franchises).length, 30);
+});
+
+test("Ask Hooptrax grounds retired-number answers in nba_history.json (team, player, whole league)", () => {
+  assert.ok(isRetiredQ("Has Derrick Rose's #1 been retired?") && isRetiredQ("every retired jersey in the NBA") && !isRetiredQ("Who leads the league in assists?"));
+  assert.deepEqual(retiredBy(H, "Vince Carter").map((h) => h.code).sort(), ["BKN", "TOR"]);
+  assert.equal(retiredBy(H, "Kevin Garnett").find((h) => h.code === "MIN").upcoming, true);
+  assert.match(retiredLine("CHI", H.franchises.CHI), /^CHI: #1 Derrick Rose \(2026-01\), #4 Jerry Sloan, #10 Bob Love, #23 Michael Jordan, #33 Scottie Pippen$/);
+  // whole league: one compact row per team, nothing cut off
+  const all = localAnswer("List every retired number for all 30 teams", data, idx).text;
+  assert.equal(all.split("\n").filter((l) => /^[A-Z]{3}: /.test(l)).length, 30);
+  assert.match(all, /CHI: #1 Derrick Rose/); assert.match(all, /CHA: #13 Bobby Phills, #30 Dell Curry/);
+  assert.match(all, /MIN: #2 Malik Sealy \| UPCOMING: #21 Kevin Garnett \(NOT retired yet/);
+  // a team question gets that team's rows with dates in the model context
+  const ctx = buildContext("What numbers have the Lakers retired?", data, idx).text;
+  assert.match(ctx, /LAL: .*#21 Michael Cooper \(2025-01-13\) HOF/);
+  // the Bulls question can't come back "not retired"
+  assert.match(buildContext("Has Derrick Rose's number been retired by the Bulls?", { ...data, league: { ...league, players: [...league.players, { id: "3456", name: "Derrick Rose", teamAbbr: null }] } }, buildIndex({ ...data, league: { ...league, players: [...league.players, { id: "3456", name: "Derrick Rose", teamAbbr: null }] } })).text, /RETIRED Derrick Rose: CHI #1 \(retired 2026-01-24\)/);
 });

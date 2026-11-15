@@ -8,6 +8,7 @@
 <meta name="theme-color" content="#0B0E14" media="(prefers-color-scheme: dark)" />
 <meta name="theme-color" content="#F8FAFC" media="(prefers-color-scheme: light)" />
 <meta name="color-scheme" content="dark light" />
+<script>/* Guest mode: a guest's trades, mock drafts and ballots don't carry over to a new visit (members keep theirs). */(function(){try{var L=localStorage,S=sessionStorage;if(L.getItem("htx:acct")||S.getItem("htx:visit"))return;S.setItem("htx:visit","1");for(var i=L.length-1;i>=0;i--){var k=L.key(i);if(/^(trade:workspace|draft:v2:|draft:simcount:|awards:ballot|awards:picks)/.test(k))L.removeItem(k)}}catch(e){}})();</script>
 <script>/* theme before first paint: dark default, light optional (localStorage "htx:theme") */(function(){var t="dark";try{t=localStorage.getItem("htx:theme")==="light"?"light":"dark"}catch(e){}document.documentElement.setAttribute("data-theme",t);var c=t==="light"?"#F8FAFC":"#0B0E14";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c)})})();</script>
 <link rel="manifest" href="public/manifest.json" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -330,7 +331,9 @@ body.stage-open { overflow: hidden; }
 .ctl-team[aria-pressed="true"] small { color: #F59E0B; }
 .ctl-foot { position: sticky; bottom: 0; margin: 0.8rem -1rem -1rem; padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--surface) 70%, transparent); }
 .ctl-start { width: 100%; min-height: 48px; font-size: 0.9375rem; background: #F59E0B; color: #0B0E14; }
-.clk-done { padding: 1rem; display: grid; gap: 0.2rem; } .clk-done span { font-size: 0.8125rem; opacity: 0.85; }
+.clk-done { padding: 1rem; display: grid; gap: 0.2rem; }
+.clk-save { margin-top: 0.6rem; }
+.dk-set-actions .save-row .btn { width: 100%; } .clk-done span { font-size: 0.8125rem; opacity: 0.85; }
 @media (prefers-reduced-motion: reduce) { .clock::after { animation: none; } }
 
 /* THE PICK IS IN */
@@ -402,6 +405,7 @@ body.stage-open { overflow: hidden; }
     <button class="btn ghost press" type="button" id="autoBtn">Auto-draft remaining picks</button>
     <button class="btn ghost press" type="button" id="projBtn">Reset to projected order</button>
     <button class="btn ghost press" type="button" id="clearBtn">Clear all picks</button>
+    <div class="save-row"><button class="btn ghost press" type="button" data-save="private">🔒 Save Privately</button><button class="btn ghost press" type="button" data-save="public">🌎 Save &amp; Post</button></div>
   </div>
 </div>
 <div class="stage" id="stage" role="dialog" aria-label="Draft lottery reveal" hidden>
@@ -419,6 +423,7 @@ body.stage-open { overflow: hidden; }
 import { createClient } from "./ui/client.js";
 import { avatar, teamLogo, esc } from "./ui/avatar.js";
 import { Spring, createSheet, createToast, scrollEdge, springIn, dismissOnBackdrop } from "./ui/motion.js";
+import { saveFlow } from "./ui/account.js";
 import { projectLottery, simulateLottery, resolvePickOwnership, lotteryTable, LOTTERY_FORMATS, DEFAULT_FORMAT, monteCarlo, pickGrid } from "./service/draft.js";
 import { advanced, inMode } from "./service/advanced.js";
 import { collegeHeadshot } from "./service/normalize.js";
@@ -1094,7 +1099,8 @@ function paintClock() {
   if (!currentOrder() || !board().length || boardMode !== "board") { el.hidden = true; return; }
   const s = yearState();
   const next = allPicksNow().find((p) => !s.picks[p.pick]);
-  if (!next) { el.hidden = false; el.style.setProperty("--c", "#334155"); el.innerHTML = `<div class="clk-done"><b>Draft complete</b><span>All ${30 * rounds} picks are in. Clear picks in ⚙ to redo it.</span></div>`; return; }
+  if (!next) { el.hidden = false; el.style.setProperty("--c", "#334155"); el.innerHTML = `<div class="clk-done"><b>Draft complete</b><span>All ${30 * rounds} picks are in. Save it, post it, or clear picks in ⚙ to redo it.</span>
+      <div class="save-row clk-save"><button class="clk-btn primary" type="button" data-save="private">🔒 Save Privately</button><button class="clk-btn" type="button" data-save="public">🌎 Save &amp; Post</button></div></div>`; return; }
   const own = teamOf(next.owner);
   const ctrl = ctrlSet(), mine = ctrl.has(next.owner);
   const upcomingMine = ctrl.size && allPicksNow().some((p) => !s.picks[p.pick] && ctrl.has(p.owner));
@@ -1189,11 +1195,54 @@ function showPickIn(pickNo, id, { quick = false } = {}) {
 }
 document.addEventListener("keydown", (e) => { if ((e.key === "Escape" || e.key === "Enter") && pickinResolve) pickinResolve(); });
 
+/* ---------- Save Privately / Save & Post ---------- */
+/** The exact mock draft (year, lottery order, every drafted prospect) for a private save or a community post. */
+function draftPayload() {
+  const s = yearState();
+  const byId = Object.fromEntries(board().map((p) => [p.id, p]));
+  const made = allPicksNow().filter((p) => s.picks[p.pick]);
+  if (!made.length) { toast("Draft at least one pick first"); return null; }
+  const rows = made.map((p) => { const pr = byId[s.picks[p.pick]] || {}; return { pick: p.pick, team: p.owner, name: pr.name || "Prospect", pos: pr.position || "", school: pr.school || (pr.type === "international" ? "International" : "") }; });
+  const top = rows[0];
+  return {
+    title: `${year} mock: ${teamOf(top.team).name} take ${top.name} at #${top.pick}`.slice(0, 140),
+    payload: { year, format, formatLabel: F().label, rounds, order: s.order || currentOrder(), lottery: s.lottery || null, picks: s.picks, control: s.control || [], board: rows },
+  };
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-save]"); if (!b) return;
+  if (!settings.hidden) closeSettings();
+  saveFlow({ type: "draft", visibility: b.dataset.save, build: draftPayload });
+});
+/** draft.html?item=ID: load a saved or community mock draft into the board ("Load into Sandbox" / "Open in Mock Draft"). */
+async function loadSharedDraft() {
+  const id = new URLSearchParams(location.search).get("item"); if (!id) return;
+  history.replaceState(null, "", location.pathname);
+  try {
+    const r = await fetch(`/api/items/${encodeURIComponent(id)}`, { credentials: "same-origin" });
+    const j = await r.json(); if (!r.ok) throw new Error(j.error || "Not found");
+    const it = j.data.item, p = it.payloadJson;
+    if (it.type !== "draft" || !p?.year) throw new Error("That post isn't a mock draft");
+    const y = String(p.year);
+    if (p.format && LOTTERY_FORMATS[p.format]) { format = p.format; store.set("draft:format", format); }
+    if (p.rounds === 2 || p.rounds === 1) { rounds = p.rounds; store.set("draft:rounds", rounds); }
+    perYear[y] = { format: p.format || null, order: p.order || null, lottery: p.lottery || null, picks: p.picks || {}, control: p.control || [] };
+    store.set(`draft:v2:${y}`, perYear[y]);
+    const yb = document.querySelector(`#years [data-year="${y}"]`);
+    if (yb && year !== y) yb.click(); else { render(); paintBoardMode(); }
+    boardMode = "board"; store.set("draft:boardMode", "board"); paintBoardMode(); render();
+    document.querySelectorAll("#fmt [data-fmt], #rounds [data-rounds]").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.fmt ? x.dataset.fmt === format : +x.dataset.rounds === rounds)));
+    toast(`Loaded @${it.username}'s ${y} mock draft`);
+    setTimeout(() => $("#board").scrollIntoView({ behavior: "smooth", block: "start" }), 200);
+  } catch (e) { toast(`Couldn't open that mock draft: ${e.message}`); }
+}
+
 /* ---------- boot ---------- */
 (async () => {
   [config, prospects] = await Promise.all([loadJson("draft_picks_2027_2029.json"), loadJson("prospects.json")]).catch((e) => { toast(`Couldn’t load draft data: ${e.message}`); return [{ years: {} }, {}]; });
   proj = placeholderProj();             // until standings arrive
   paintSimCount(); render(); paintBoardMode(); lotView = simValid(yearState()) ? "sim" : "odds"; paintLotView();
+  loadSharedDraft();
   client = await createClient();
   client.watch("sos", {}, (d) => { sos = d.teams; render(); }, () => { if (sos === null) { sos = {}; render(); } });
   // Standings refresh → re-project the order and re-run the ownership engine automatically.

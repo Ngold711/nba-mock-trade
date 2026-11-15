@@ -8,6 +8,7 @@
 <meta name="theme-color" content="#0B0E14" media="(prefers-color-scheme: dark)" />
 <meta name="theme-color" content="#F8FAFC" media="(prefers-color-scheme: light)" />
 <meta name="color-scheme" content="dark light" />
+<script>/* Guest mode: a guest's trades, mock drafts and ballots don't carry over to a new visit (members keep theirs). */(function(){try{var L=localStorage,S=sessionStorage;if(L.getItem("htx:acct")||S.getItem("htx:visit"))return;S.setItem("htx:visit","1");for(var i=L.length-1;i>=0;i--){var k=L.key(i);if(/^(trade:workspace|draft:v2:|draft:simcount:|awards:ballot|awards:picks)/.test(k))L.removeItem(k)}}catch(e){}})();</script>
 <script>/* theme before first paint: dark default, light optional (localStorage "htx:theme") */(function(){var t="dark";try{t=localStorage.getItem("htx:theme")==="light"?"light":"dark"}catch(e){}document.documentElement.setAttribute("data-theme",t);var c=t==="light"?"#F8FAFC":"#0B0E14";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c)})})();</script>
 <link rel="manifest" href="public/manifest.json" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -306,6 +307,7 @@ import { resolveSalary, validateTrade, firstRoundHoldings, TIERS, money, encodeT
 import { renderReceipt } from "./ui/receipt.js";
 import { pickGrid } from "./service/draft.js";
 import { openImageSheet } from "./ui/card.js";
+import { saveFlow } from "./ui/account.js";
 const shell = mountShell({ active: "trade" });
 
 const D = window.NBA_DATA;
@@ -819,6 +821,7 @@ function openVerdict() {
     ${errs.length > 1 ? `<ul class="vd-more">${errs.slice(1).map((e) => `<li>${esc(e)}</li>`).join("")}</ul>` : ""}
     ${v.warnings.length ? `<ul class="vd-more warn">${v.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}
     <label class="switch vd-switch"><input type="checkbox" id="vdSandbox" ${strict ? "" : "checked"} /><span class="track"></span><span>Sandbox Override</span></label>
+    <div class="save-row"><button class="btn ghost press" type="button" data-vd="private">🔒 Save Privately</button><button class="btn ghost press" type="button" data-vd="post">🌎 Save &amp; Post</button></div>
     <div class="vd-acts">
       <button class="btn primary press" type="button" data-vd="share" ${approved ? "" : "disabled"}>Share Trade Card</button>
       <button class="btn ghost press" type="button" data-vd="link" ${approved ? "" : "disabled"}>🔗 Copy Link</button>
@@ -829,7 +832,24 @@ function openVerdict() {
   el.querySelector('[data-vd="share"]').addEventListener("click", () => { closeVerdict(); $("#dockCard").click(); });
   el.querySelector('[data-vd="link"]').addEventListener("click", () => $("#dockLink").click());
   el.querySelector('[data-vd="close"]').addEventListener("click", closeVerdict);
+  el.querySelector('[data-vd="private"]').addEventListener("click", () => { closeVerdict(); saveFlow({ type: "trade", visibility: "private", build: tradePayload }); });
+  el.querySelector('[data-vd="post"]').addEventListener("click", () => { closeVerdict(); saveFlow({ type: "trade", visibility: "public", build: tradePayload }); });
   try { navigator.vibrate && navigator.vibrate(approved ? [12, 40, 12] : 30); } catch {}
+}
+/** The exact trade (teams, players, 2027–29 picks, CBA verdict) for a private save or a community post. */
+function tradePayload() {
+  const v = validate();
+  if (v.status === "incomplete") { toast(v.reasons[0] || "Add players or picks first"); return null; }
+  const teams = activeTeams();
+  const nm = (a) => findAsset(a.id)?.name || a.id.split(":")[1];
+  const lines = teams.map((t) => ({ team: t, gets: state.assets.filter((a) => a.to === t).map(nm) }));
+  const kind = v.legal ? "ok" : strict ? "no" : "sbx";
+  const head = v.legal ? "✓ TRADE APPROVED" : strict ? "✕ TRADE REJECTED" : "⚡ SANDBOX APPROVED";
+  const star = state.assets.map((a) => findAsset(a.id)).filter((a) => a?.kind === "player").sort((a, b) => b.salary - a.salary)[0];
+  return {
+    title: `${teams.map((t) => TEAMS[t]?.name || t).join(" ⇄ ")}${star ? `: ${star.name} moves` : ""}`.slice(0, 140),
+    payload: { trade: encodeTrade(state), teams, assets: state.assets.map(({ id, to }) => ({ id, to })), lines, verdict: { kind, head, legal: !!v.legal, strict: !!strict } },
+  };
 }
 function closeVerdict() { const el = $("#verdict"); el.classList.remove("in"); setTimeout(() => { if (!el.classList.contains("in")) el.hidden = true; }, 180); }
 $("#proposeBtn").addEventListener("click", openVerdict);

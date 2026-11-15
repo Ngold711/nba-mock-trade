@@ -12,6 +12,7 @@ import { pickInventory, toCode } from "../service/draft.js";
 import { logoMark, wordmark, HooptraxWatermark } from "./brand.js";
 import { mountVault } from "./vault.js";
 import { mountChat } from "./chat.js";
+import { mountAccount, account } from "./account.js";
 
 const ICON = {
   live: '<path d="M2 12h3.5l2.5-6 4 12 3-9 2 3H22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
@@ -56,6 +57,7 @@ export function mountShell({ active = "live" } = {}) {
   scrollEdge(bar);
   /* ---------- Light / dark theme ---------- */
   const themeBtn = document.getElementById("themeBtn");
+  mountAccount({ slot: themeBtn });
   const paintTheme = () => { const light = document.documentElement.dataset.theme === "light"; themeBtn.setAttribute("aria-label", light ? "Switch to dark mode" : "Switch to light mode"); themeBtn.title = light ? "Light mode" : "Dark mode"; };
   themeBtn.addEventListener("click", () => {
     const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
@@ -184,7 +186,7 @@ export function mountShell({ active = "live" } = {}) {
   }, true);
 
   instance = {
-    openTeam, openPlayer, openCompare, openDrawer, closeDrawer, chat,
+    openTeam, openPlayer, openCompare, openDrawer, closeDrawer, chat, account,
     setWireHandler(fn) { wireHandler = fn; },
     get wire() { return wire; },
     setStatus(kind, text) {

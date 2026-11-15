@@ -9,6 +9,7 @@
 <meta name="theme-color" content="#F8FAFC" media="(prefers-color-scheme: light)" />
 <meta name="color-scheme" content="dark light" />
 <script>/* deep links that arrive on the Live home (the site root redirects here): #t=… legacy trades, #trade/#draft/#awards */(function(){var h=location.hash,m={"#trade":"index.html","#draft":"draft.html","#awards":"awards.html","#mcconnell":"mcconnell.html"};if(h.indexOf("#t=")===0)location.replace("index.html"+h);else if(m[h])location.replace(m[h]);})();</script>
+<script>/* Guest mode: a guest's trades, mock drafts and ballots don't carry over to a new visit (members keep theirs). */(function(){try{var L=localStorage,S=sessionStorage;if(L.getItem("htx:acct")||S.getItem("htx:visit"))return;S.setItem("htx:visit","1");for(var i=L.length-1;i>=0;i--){var k=L.key(i);if(/^(trade:workspace|draft:v2:|draft:simcount:|awards:ballot|awards:picks)/.test(k))L.removeItem(k)}}catch(e){}})();</script>
 <script>/* theme before first paint: dark default, light optional (localStorage "htx:theme") */(function(){var t="dark";try{t=localStorage.getItem("htx:theme")==="light"?"light":"dark"}catch(e){}document.documentElement.setAttribute("data-theme",t);var c=t==="light"?"#F8FAFC":"#0B0E14";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c)})})();</script>
 <link rel="manifest" href="public/manifest.json" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -40,8 +41,27 @@
 main { max-width: 72rem; margin: 0 auto; padding: 0 max(1rem, env(safe-area-inset-right)) 3rem max(1rem, env(safe-area-inset-left)); }
 .toolbar { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; padding: 1.25rem 0 1rem; }
 .toolbar h2 { margin: 0; font-size: clamp(1.75rem, 4vw, 2.5rem); line-height: 1.05; letter-spacing: -0.026em; font-weight: 750; flex: 1; min-width: 10rem; }
-.tabs { --n: 4; width: min(100%, 26rem); }
+.tabs { --n: 5; width: min(100%, 30rem); }
 .tabs button { font-size: 0.8125rem; padding: 0.4rem 0.25rem; }
+@media (max-width: 420px) { .tabs button { font-size: 0.75rem; padding: 0.4rem 0.1rem; } }
+.feed { display: grid; gap: 0.75rem; padding: 0 0 1rem; }
+.feed-filters { display: flex; gap: 0.4rem; overflow-x: auto; scrollbar-width: none; padding-bottom: 0.1rem; }
+.feed-filters::-webkit-scrollbar { display: none; }
+.feed-filters button { flex: none; border: 0; border-radius: 999px; min-height: 36px; padding: 0 0.85rem; background: var(--fill); color: var(--label-2); font-weight: 650; font-size: 0.8125rem; cursor: pointer; }
+.feed-filters button[aria-selected="true"] { background: #F59E0B; color: #0B0E14; }
+.feed-list { display: grid; gap: 0.7rem; }
+.post { border-radius: var(--r-lg, 1rem); padding: 0.85rem 0.9rem 0.75rem; background: var(--surface); box-shadow: inset 0 0 0 0.5px var(--sep); display: grid; gap: 0.5rem; }
+.post-head { display: flex; align-items: center; gap: 0.55rem; }
+.post-by { flex: 1; min-width: 0; display: grid; } .post-by b { font-size: 0.875rem; overflow: hidden; text-overflow: ellipsis; } .post-by small { color: var(--label-3); font-size: 0.75rem; }
+.post-title { margin: 0; font-size: 1rem; letter-spacing: -0.01em; }
+.post-foot { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.2rem; }
+.vote { border: 0; border-radius: 999px; min-height: 38px; min-width: 3.6rem; padding: 0 0.75rem; background: var(--fill); color: var(--label-2); font-weight: 800; cursor: pointer; }
+.vote[aria-pressed="true"] { background: rgba(245,158,11,.18); color: #F59E0B; box-shadow: inset 0 0 0 1px rgba(245,158,11,.5); }
+.post-open { margin-left: auto; min-height: 38px; text-decoration: none; display: inline-flex; align-items: center; font-size: 0.8125rem; }
+.feed-more { justify-self: center; min-height: 40px; }
+.feed-more[hidden] { display: none; }
+.feed-empty { display: grid; gap: 0.4rem; justify-items: center; text-align: center; padding: 1.5rem 1rem; }
+.feed-empty span { color: var(--label-3); font-size: 0.875rem; }
 .status-line { font-size: 0.8125rem; color: var(--label-2); display: flex; align-items: center; gap: 0.4rem; }
 .err-banner { display: flex; gap: 0.6rem; align-items: center; padding: 0.7rem 0.9rem; border-radius: var(--r-md); background: var(--warn-soft); color: var(--warn); font-size: 0.875rem; font-weight: 550; margin-bottom: 1rem; }
 .view[hidden] { display: none; }
@@ -190,6 +210,7 @@ tr.cut td { border-top: 1.5px dashed var(--fill-strong); }
       <button type="button" role="tab" data-view="standings">Standings</button>
       <button type="button" role="tab" data-view="injuries">Injuries</button>
       <button type="button" role="tab" data-view="moves">Moves</button>
+      <button type="button" role="tab" data-view="feed">Feed</button>
     </div>
   </div>
   <div id="banner"></div>
@@ -218,12 +239,14 @@ tr.cut td { border-top: 1.5px dashed var(--fill-strong); }
     </div>
     <div class="groups" id="injuries"></div>
   </section>
+  <section class="view" id="view-feed" hidden><div class="feed" id="feed"></div></section>
   <section class="view" id="view-moves" hidden><div class="panel moves"><ul class="list" id="moves" style="padding:0 1rem"></ul></div></section>
 
   <p class="fine">Data from ESPN’s public feeds, refreshed every 20 seconds while games are live and every 15–60 minutes for standings, injuries and rosters. Player photos are served by ESPN’s image CDN; players without one show their initials. Not affiliated with the NBA or ESPN.</p>
 </main>
 
 <script type="module">
+import { startFeed } from "./ui/feed.js";
 import { createClient } from "./ui/client.js";
 import { avatar, teamLogo, esc } from "./ui/avatar.js";
 import { Spring, createSheet, scrollEdge, springIn } from "./ui/motion.js";
@@ -279,8 +302,8 @@ function statusPill(g) {
 }
 
 /* ---------- views ---------- */
-const VIEWS = ["games", "standings", "injuries", "moves"];
-const TITLES = { games: "Games", standings: "Standings", injuries: "Injury report", moves: "Transactions" };
+const VIEWS = ["games", "standings", "injuries", "moves", "feed"];
+const TITLES = { games: "Games", standings: "Standings", injuries: "Injury report", moves: "Transactions", feed: "Community Feed" };
 let current = null, stopView = null;
 const tabs = $("#tabs");
 const tabThumb = new Spring(0, (x) => { tabs.querySelector(".thumb").style.transform = `translateX(${x * 100}%)`; }, 0.001);
@@ -297,7 +320,7 @@ function show(view, animate = true) {
   animate ? tabThumb.to(i, { damping: 1, response: 0.3 }) : tabThumb.set(i);
   $("#viewTitle").textContent = TITLES[view];
   $("#banner").innerHTML = "";
-  stopView = ({ games: startGames, standings: startStandings, injuries: startInjuries, moves: startMoves })[view]();
+  stopView = ({ games: startGames, standings: startStandings, injuries: startInjuries, moves: startMoves, feed: () => startFeed($("#feed")) })[view]();
 }
 tabs.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) location.hash = b.dataset.view; });
 addEventListener("hashchange", () => show(location.hash.slice(1)));

@@ -403,3 +403,47 @@ Built by an offline generator that cross-checks editorial data against ESPN:
    - "Proceed to Mock Draft" (and "Clear picks") empties the board. Picks from an earlier mock no longer carry over and look like auto-simmed picks.
    - The **Select Teams to Control** sheet then opens with three presets (All 30 Teams, Lottery Teams Only, Clear Selection) and a 30-team grid that shows how many picks each team owns. The button reads **Start Draft (X Teams Controlled) →**.
    - The On the Clock banner shows **YOUR PICK** or **CPU**. On a CPU pick, **Sim to Next User Pick** runs CPU picks until one of your teams is up. **Teams (X)** lets you change your teams mid-draft.
+
+## Round 8: accounts, private saves, Community Feed; retired-number audit
+
+### Accounts and guest mode
+- **Welcome gate:** on a visitor's first page in a session, a dismissible card offers **Create Free Account / Log In** or **Continue as Guest**.
+- **Account pill:** the header pill shows `@username` and the favorite-team logo. Tapping it opens the profile.
+- **Sign up:** email, `@username` (3–20 letters, numbers or `_`) and a password of at least 8 characters.
+  - Passwords are hashed with **bcrypt** (`bcryptjs`, cost 11).
+  - Sessions are an **HS256 JWT** in an `HttpOnly; SameSite=Lax` cookie (`Secure` on HTTPS), valid for 30 days.
+  - Writes must be same-origin JSON (CSRF), and logins are rate limited.
+- **Guests** get every tool, but their trade workspace, mock drafts and ballots are cleared at the start of each new visit (a new browser session). If a guest taps Save or Post, they're asked to create an account, and the save goes through as soon as they sign up, with their work intact.
+
+### Saving and posting
+- **🔒 Save Privately** and **🌎 Save & Post** (with an optional headline) appear in the Trade Machine verdict, the Mock Draft's "Draft complete" banner and ⚙ Settings.
+- **Trade saves** keep the exact trade: teams, players, 2027–29 picks, the CBA verdict and its share-link code.
+- **Draft saves** keep the year, format, lottery order and every drafted prospect.
+
+### Profile
+- Tabs: **Public Posts** and **🔒 Private Vault**.
+- From any item you can view the full breakdown, switch Private ↔ Public, delete it (tap twice), or **Load into Sandbox** (`index.html?trade=…` / `draft.html?item=…`).
+- You can also change your favorite team and log out here.
+
+### Community Feed
+- **Live → Feed** (`live.html#feed`), filtered by All, Trades, Mock Drafts or Top Upvoted.
+- ▲ upvotes (one per account, toggles) and **Open in Trade Machine / Mock Draft** to remix a post.
+
+### Storage
+- `service/accounts-store.js` has one interface and two adapters:
+  - **PostgreSQL** when `DATABASE_URL` is set. The schema is created on boot, with tables `users` and `saved_items` as specified, so accounts survive restarts and deploys. Works with free Supabase or Neon databases.
+  - **JSON file** `data/hooptrax_users.json` otherwise (local development; written atomically).
+- **Render:** set `DATABASE_URL` and `JWT_SECRET` (any long random string) in Environment. Without `DATABASE_URL`, accounts are lost on every deploy. Without `JWT_SECRET`, everyone is logged out on every deploy.
+- **API:** `POST /api/auth/{signup,login,logout}`, `GET /api/auth/me`, `GET|POST /api/me`, `GET /api/me/items/{public|private}`, `POST /api/items`, `GET /api/items/:id`, `POST /api/items/:id/{update,delete,like}`, `GET /api/feed?type=&sort=new|top&offset=`.
+
+### Retired numbers and Ask Hooptrax grounding
+- **Audit:** `nba_history.json` retired numbers for all 30 teams were checked against team and NBA announcements in November 2026.
+  - Added: **Derrick Rose #1** (CHI, Jan 24 2026), **Dell Curry #30** (CHA, Mar 19 2026) and **Michael Cooper #21** (LAL, Jan 2025).
+  - Retirement dates were added for recent ceremonies: Carter (TOR/BKN), Shaq (ORL), Iguodala, Tony Allen and Pau Gasol.
+  - Announced ceremonies that haven't happened yet are stored in `upcomingRetirements`: Lowry #7 (TOR, Jan 10 2027), Westbrook #0 (OKC, Feb 7 2027), Bogues #1 (CHA, Feb 11 2027) and Garnett #21 (MIN, Feb 28 2027).
+- **One source:** the Team Vault's "History & Retired #s" tab and Ask Hooptrax read the same `nba_history.json`.
+- **Ask Hooptrax:**
+  - Retired-number questions get exact rows for one team, every team that retired a player's number, or all 30 teams as compact rows.
+  - Champion and MVP questions get the full lists.
+  - The system prompt makes that data ground truth over the model's training. League-wide answers aren't truncated (`maxOutputTokens` 4096).
+- **Live check:** for jersey, Hall of Fame or honors questions that name a player or team, `liveVerify()` scans recent ESPN NBA news (the league feed plus that team's feed, 1.5 s budget) and adds matching headlines as `LIVE ESPN NEWS`.

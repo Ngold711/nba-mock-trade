@@ -124,7 +124,7 @@ async function pollsRoute(req, res, m, q) {
 
 /* Hooptrax AI: Gemini (free tier, streamed) grounded in a question-sliced view of the live cache,
    with a zero-key local engine fallback that answers in milliseconds. */
-import { SYSTEM_PROMPT, buildIndex, buildContext, localAnswer, chipsFor, cardsFor, scheduleDates } from "./service/chat.js";
+import { SYSTEM_PROMPT, buildIndex, buildContext, localAnswer, chipsFor, cardsFor, scheduleDates, isRetiredQ } from "./service/chat.js";
 import { projectLottery, lotteryTable, DEFAULT_FORMAT } from "./service/draft.js";
 // gemini-2.5-flash is closed to new API keys (404) and the free-tier flash models are often over quota (429),
 // so the fast flash-lite models lead. Override with GEMINI_MODELS.
@@ -186,7 +186,7 @@ async function askGemini(question, history, contextText, onDelta = () => {}, t0 
     try {
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
         method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": key },
-        body: JSON.stringify({ systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }, contents, generationConfig: { temperature: 0.3, maxOutputTokens: 2048 } }),
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }, contents, generationConfig: { temperature: 0.2, maxOutputTokens: 4096 } }),
         signal: ac.signal,
       });
       if (!r.ok) {
@@ -223,6 +223,39 @@ async function askGemini(question, history, contextText, onDelta = () => {}, t0 
   return { error: last };
 }
 
+/* Live verification for history questions the dataset may not cover yet (new jersey retirements, Hall of Fame
+   classes, 2025-26 events): scan recent ESPN NBA news (league feed + the team's own feed) for matching headlines. */
+const teamNews = new Map();          // espnTeamId -> { at, items }
+async function espnTeamNews(teamId) {
+  const hit = teamNews.get(teamId);
+  if (hit && Date.now() - hit.at < 15 * 60e3) return hit.items;
+  const items = parseEspnNews(JSON.parse(await fetchText(`${ESPN_NEWS.split("?")[0]}?team=${encodeURIComponent(teamId)}&limit=40`, { ua: false, ms: 1400 })));
+  teamNews.set(teamId, { at: Date.now(), items });
+  if (teamNews.size > 40) teamNews.delete(teamNews.keys().next().value);
+  return items;
+}
+const LIVE_WORDS = /retir|jersey|rafters|hall of fame|inducted|enshrin|honou?r|statue|ring of honor/i;
+async function liveVerify(question, ctx, d) {
+  if (!isRetiredQ(question) && !/hall of fame|\bhof\b|inducted|enshrine|honou?r|statue/i.test(question)) return "";
+  const players = ctx.entities.players, teams = ctx.entities.teams;
+  if (!players.length && !teams.length) return "";
+  const pools = [rumorCache.espnItems || []];
+  const ids = teams.map((t) => d.league?.teams?.[t.abbr]?.id).filter(Boolean);
+  for (const p of players) { const tm = d.league?.teams?.[d.league.players.find((x) => x.id === p.id)?.teamAbbr]; if (tm?.id) ids.push(tm.id); }
+  const got = await Promise.race([Promise.allSettled([...new Set(ids)].slice(0, 3).map(espnTeamNews)), new Promise((r) => setTimeout(() => r([]), 1500))]);
+  for (const g of got) if (g.status === "fulfilled") pools.push(g.value);
+  const keys = [...players.map((p) => p.name.split(" ").slice(-1)[0]), ...teams.map((t) => t.name.split(" ").slice(-1)[0])].map((k) => k.toLowerCase());
+  const seen = new Set(), lines = [];
+  for (const it of pools.flat()) {
+    const blob = `${it.title} ${it.text}`;
+    if (!LIVE_WORDS.test(blob) || !keys.some((k) => blob.toLowerCase().includes(k)) || seen.has(it.title)) continue;
+    seen.add(it.title);
+    lines.push(`LIVE ESPN NEWS (${it.date ? new Date(it.date).toISOString().slice(0, 10) : "recent"}): ${it.title}${it.text ? ` — ${it.text.slice(0, 220)}` : ""}`);
+    if (lines.length >= 5) break;
+  }
+  return lines.join("\n");
+}
+
 async function chatRoute(req, res) {
   if (req.method !== "POST") { res.writeHead(405); return res.end(); }
   const t0 = Date.now();
@@ -233,6 +266,8 @@ async function chatRoute(req, res) {
   const history = Array.isArray(body?.history) ? body.history.filter((m) => m && typeof m.text === "string").slice(-6) : [];
   const d = await chatData();
   const ctx = buildContext(question, d, d.index);
+  const live = await liveVerify(question, ctx, d).catch(() => "");
+  if (live) ctx.text += `\n${live}`;
   const cards = cardsFor(question, d, d.index, ctx.entities);
   const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
   const now = Date.now(), hits = (aiHits.get(ip) || []).filter((t) => now - t < 3600e3);
@@ -298,7 +333,7 @@ export async function refreshRumors() {
     let espn = [];
     try { espn = parseEspnNews(JSON.parse(await fetchText(ESPN_NEWS, { ua: false }))); /* ESPN 403s custom user agents; same default client as the other ESPN feeds */ sources.espn = { ok: true, items: espn.length }; }
     catch (e) { sources.espn = { ok: false, error: String(e.message || e).slice(0, 80) }; }
-    rumorCache = { at: Date.now(), rumor: countMentions(hh, match), news: countMentions(espn, match), buzz: countMentions(espn, match, { tradeOnly: false }), sources };
+    rumorCache = { at: Date.now(), rumor: countMentions(hh, match), news: countMentions(espn, match), buzz: countMentions(espn, match, { tradeOnly: false }), espnItems: espn, sources };
     return rumorCache;
   })().finally(() => { rumorLoading = null; });
   return rumorLoading;
@@ -326,8 +361,154 @@ async function tradeAddsRoute(req, res) {
   return json(res, 200, { data: { counted: n } });
 }
 
+
+/* =====================================================================
+   Accounts, private saves and the community feed.
+   Storage: PostgreSQL when DATABASE_URL is set, else data/hooptrax_users.json (see service/accounts-store.js).
+   Sessions: HS256 JWT in an HTTP-only, SameSite=Lax cookie; JWT_SECRET env (falls back to data/.session-secret).
+   ===================================================================== */
+import { openStore, publicItem, publicUser, TakenError } from "./service/accounts-store.js";
+import { COOKIE, hashPassword, checkPassword, burnPasswordCheck, signJwt, verifyJwt, readCookie, sessionCookie, sameOrigin, validateSignup, validateItem, createLimiter, cleanText, TEAM_CODES } from "./service/auth.js";
+import { randomBytes } from "node:crypto";
+let accounts = null;
+async function acct() {
+  return (accounts ||= openStore({ file: process.env.ACCOUNTS_FILE || join(ROOT, "data", "hooptrax_users.json") }).then((s) => { log(`[accounts] storage: ${s.kind}`); return s; }).catch((e) => { accounts = null; throw e; }));
+}
+let jwtSecret = process.env.JWT_SECRET || null;
+async function secret() {
+  if (jwtSecret) return jwtSecret;
+  const f = join(ROOT, "data", ".session-secret");
+  try { jwtSecret = (await readFile(f, "utf8")).trim(); } catch {}
+  if (!jwtSecret || jwtSecret.length < 32) {
+    jwtSecret = randomBytes(32).toString("hex");
+    try { await mkdir(join(ROOT, "data"), { recursive: true }); await writeFile(f, jwtSecret, { mode: 0o600 }); } catch {}
+    log("[accounts] JWT_SECRET not set: generated one in data/.session-secret (sessions reset whenever that file is lost)");
+  }
+  return jwtSecret;
+}
+const authLimiter = createLimiter({ max: 12, windowMs: 10 * 60e3 });        // per IP: signup + login attempts
+const failLimiter = createLimiter({ max: 8, windowMs: 15 * 60e3 });         // per account: failed passwords
+const writeLimiter = createLimiter({ max: 60, windowMs: 10 * 60e3 });       // per user: saves, likes, edits
+const clientIp = (req) => String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+async function currentUser(req) {
+  const p = verifyJwt(readCookie(req, COOKIE), await secret());
+  if (!p?.sub) return null;
+  return (await acct()).getUser(p.sub);
+}
+async function startSession(req, res, user) {
+  res.setHeader("set-cookie", sessionCookie(req, signJwt({ sub: user.id }, await secret())));
+}
+async function readJson(req, res, max = 64 * 1024) {
+  if (!sameOrigin(req)) { json(res, 403, { error: "Cross-site request blocked" }); return null; }
+  try { return JSON.parse(await readBody(req, max)); } catch { json(res, 400, { error: "Send JSON" }); return null; }
+}
+const noStore = (res) => res.setHeader("cache-control", "no-store");
+
+async function authRoute(req, res, m) {
+  noStore(res);
+  const action = m[1];
+  if (action === "me") {
+    const u = await currentUser(req).catch(() => null);
+    return json(res, 200, { data: { user: publicUser(u), counts: u ? await (await acct()).counts(u.id) : null } });
+  }
+  if (req.method !== "POST") { res.writeHead(405); return res.end(); }
+  if (action === "logout") { res.setHeader("set-cookie", sessionCookie(req, "", { clear: true })); return json(res, 200, { data: { ok: true } }); }
+  const body = await readJson(req, res, 4096); if (!body) return;
+  if (!authLimiter.hit(clientIp(req))) return json(res, 429, { error: "Too many attempts. Try again in a few minutes." });
+  const store = await acct();
+  if (action === "signup") {
+    const v = validateSignup(body);
+    if (!v.ok) return json(res, 400, { error: Object.values(v.errors)[0], fields: v.errors });
+    try {
+      const user = await store.createUser({ username: v.value.username, email: v.value.email, passwordHash: await hashPassword(v.value.password), favoriteTeam: v.value.favoriteTeam });
+      await startSession(req, res, user);
+      return json(res, 201, { data: { user: publicUser(user), counts: { public: 0, private: 0 } } });
+    } catch (e) {
+      if (e instanceof TakenError || e.code === "taken") return json(res, 409, { error: e.field === "email" ? "An account with that email already exists. Log in instead." : "That username is taken", fields: { [e.field]: "taken" } });
+      throw e;
+    }
+  }
+  if (action === "login") {
+    const login = cleanText(body.login, 254), pw = String(body.password || "");
+    if (!login || !pw) return json(res, 400, { error: "Enter your email or username and password" });
+    const key = `acct:${login.toLowerCase()}`;
+    if (failLimiter.count(key) >= 8) return json(res, 429, { error: "Too many failed attempts. Try again in 15 minutes." });
+    const user = await store.findUserByLogin(login);
+    const ok = user ? await checkPassword(pw, user.passwordHash) : (await burnPasswordCheck(pw), false);
+    if (!ok) { failLimiter.hit(key); return json(res, 401, { error: "Wrong email/username or password" }); }
+    failLimiter.reset(key);
+    await startSession(req, res, user);
+    return json(res, 200, { data: { user: publicUser(user), counts: await store.counts(user.id) } });
+  }
+  return json(res, 404, { error: "Unknown auth action" });
+}
+
+async function meRoute(req, res, m) {
+  noStore(res);
+  const user = await currentUser(req); if (!user) return json(res, 401, { error: "Log in first" });
+  const store = await acct();
+  if (m[1] === "items") {
+    const vis = ["public", "private"].includes(m[2] || "") ? m[2] : null;
+    const items = await store.listItems({ userId: user.id, visibility: vis });
+    return json(res, 200, { data: { items: items.map((it) => publicItem(it, user.id)) } });
+  }
+  if (req.method !== "POST") return json(res, 200, { data: { user: publicUser(user), counts: await store.counts(user.id) } });
+  const body = await readJson(req, res, 4096); if (!body) return;
+  const patch = {};
+  if ("favoriteTeam" in body) patch.favoriteTeam = TEAM_CODES.has(body.favoriteTeam) ? body.favoriteTeam : null;
+  if ("bio" in body) patch.bio = cleanText(body.bio, 160);
+  return json(res, 200, { data: { user: publicUser(await store.updateUser(user.id, patch)) } });
+}
+
+async function itemsRoute(req, res, m) {
+  noStore(res);
+  const store = await acct();
+  const id = m[1], action = m[2];
+  const user = await currentUser(req).catch(() => null);
+  if (!id) {                                              // POST /api/items → save
+    if (req.method !== "POST") { res.writeHead(405); return res.end(); }
+    if (!user) return json(res, 401, { error: "Create a free Hooptrax account to save privately or post to the community" });
+    const body = await readJson(req, res); if (!body) return;
+    if (!writeLimiter.hit(user.id)) return json(res, 429, { error: "Slow down a little and try again" });
+    const v = validateItem(body); if (v.error) return json(res, 400, { error: v.error });
+    const it = await store.createItem({ userId: user.id, username: user.username, favoriteTeam: user.favoriteTeam || null, type: v.value.type, title: v.value.title, payloadJson: v.value.payload, visibility: v.value.visibility });
+    return json(res, 201, { data: { item: publicItem(it, user.id) } });
+  }
+  const it = await store.getItem(id);
+  const mine = it && user && it.userId === user.id;
+  if (!it || (it.visibility !== "public" && !mine)) return json(res, 404, { error: "Not found" });
+  if (req.method === "GET" && !action) return json(res, 200, { data: { item: publicItem(it, user?.id) } });
+  if (req.method !== "POST") { res.writeHead(405); return res.end(); }
+  if (!user) return json(res, 401, { error: "Create a free Hooptrax account to upvote posts" });
+  const body = await readJson(req, res, 2048); if (!body) return;
+  if (!writeLimiter.hit(user.id)) return json(res, 429, { error: "Slow down a little and try again" });
+  if (action === "like") { const r = await store.toggleLike(id, user.id); return r ? json(res, 200, { data: r }) : json(res, 404, { error: "Not found" }); }
+  if (!mine) return json(res, 403, { error: "Only the owner can change this" });
+  if (action === "delete") { await store.deleteItem(id, user.id); return json(res, 200, { data: { ok: true } }); }
+  const patch = {};
+  if (body.visibility === "public" || body.visibility === "private") patch.visibility = body.visibility;
+  if (typeof body.title === "string") patch.title = cleanText(body.title, 140);
+  const up = await store.updateItem(id, user.id, patch);
+  return json(res, 200, { data: { item: publicItem(up, user.id) } });
+}
+
+async function feedRoute(req, res, m, q) {
+  noStore(res);
+  const store = await acct();
+  const type = ["trade", "draft"].includes(q.get("type")) ? q.get("type") : null;
+  const sort = q.get("sort") === "top" ? "top" : "new";
+  const offset = Math.max(0, Math.min(5000, Number(q.get("offset")) || 0));
+  const user = await currentUser(req).catch(() => null);
+  const rows = await store.listFeed({ type, sort, limit: 25, offset });
+  return json(res, 200, { data: { items: rows.map((it) => publicItem(it, user?.id)), next: rows.length === 25 ? offset + 25 : null, storage: store.kind } });
+}
+
 const routes = [
   [/^\/api\/nba-chat$/, chatRoute],
+  [/^\/api\/auth\/(signup|login|logout|me)$/, authRoute],
+  [/^\/api\/me(?:\/(items)(?:\/(public|private))?)?$/, meRoute],
+  [/^\/api\/items(?:\/([A-Za-z0-9_-]{6,24})(?:\/(like|delete|update))?)?$/, itemsRoute],
+  [/^\/api\/feed$/, feedRoute],
   [/^\/api\/trending-trades$/, trendingRoute],
   [/^\/api\/trade-adds$/, tradeAddsRoute],
   [/^\/api\/polls$/, pollsRoute],
@@ -411,10 +592,13 @@ async function serveStatic(req, res, pathname) {
 
 export const server = createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
-  if (req.method !== "GET" && req.method !== "HEAD" && !(req.method === "POST" && (url.pathname === "/api/polls" || url.pathname === "/api/nba-chat" || url.pathname === "/api/trade-adds"))) { res.writeHead(405); return res.end(); }
+  if (req.method !== "GET" && req.method !== "HEAD" && !(req.method === "POST" && url.pathname.startsWith("/api/"))) { res.writeHead(405); return res.end(); }
   for (const [re, handler] of routes) {
     const m = re.exec(url.pathname);
-    if (m) return handler(req, res, m, url.searchParams);
+    if (m) return Promise.resolve().then(() => handler(req, res, m, url.searchParams)).catch((e) => {
+      log("[route error]", url.pathname, e?.message || e);
+      if (!res.headersSent) json(res, 500, { error: "Something went wrong. Try again." }); else res.end();
+    });
   }
   if (url.pathname.startsWith("/api/")) return json(res, 404, { error: "Unknown endpoint" });
   // Live is the home hub. "/" → /live.html, unless the URL carries a deep link for the Trade Machine

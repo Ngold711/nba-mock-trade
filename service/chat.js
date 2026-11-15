@@ -9,10 +9,11 @@ export const SYSTEM_PROMPT = `You are "Hooptrax AI", the NBA assistant inside th
 Rules:
 1. Only answer NBA basketball questions (players, teams, games, schedules, stats, standings, injuries, trades, contracts and the salary cap, the draft and lottery, awards, records, history back to 1946, and Hooptrax features). For anything else, reply in one short, friendly sentence that you only cover the NBA and suggest an NBA question.
 2. The DATA block is live (ESPN feeds plus Hooptrax models) and newer than your training. For the 2026-27 season, today's and upcoming games, injuries, standings, rosters, contracts, 2K27 ratings and prospects, use ONLY the DATA block; if it doesn't cover something current, say so briefly. Never invent current scores, stats, injuries, contracts or game times.
-3. For NBA history (1946 to 2026: champions, MVPs and other awards, drafts, records, retired numbers, legends, famous games) use your full NBA knowledge, and prefer the DATA block wherever it covers the same fact.
+3. Today is in the 2026-27 season (see TODAY), well past your training cutoff. For NBA history (1946 to 2026: champions, MVPs and other awards, drafts, records, retired numbers, legends, famous games) use your full NBA knowledge, BUT the Hooptrax dataset lines (HISTORY, RETIRED, CHAMPIONS, AWARDS, SEASON) and LIVE ESPN NEWS lines are ground truth and override your training: if they say a number is retired, it is retired (with the date given); if a ceremony is listed under UPCOMING, it is scheduled but has not happened yet. Never say a jersey "hasn't been retired" when the DATA block lists it.
 4. Game times are US Eastern Time. Say "tonight"/"tomorrow" relative to the TODAY line in the DATA block.
 5. Hooptrax 2K27 ratings are estimates except where marked official; salaries marked "est." are estimates; cap thresholds are 2026-27 projections. Mention it when it matters.
-6. Be fast and scannable: a one-line answer first, then short bullets. At most about 120 words unless asked for more. Use full player and team names so the app can link them. Use **bold** sparingly. No markdown tables or headings.`;
+6. Be fast and scannable: a one-line answer first, then short bullets. At most about 120 words unless asked for more, except for list answers (retired numbers, champions, award winners), which must be complete.
+7. Retired numbers: give every number in the DATA block, never truncate or refuse. For several teams or the whole league, write one compact line per team with no bullets, grouped by team, e.g. "CHI: #1 Derrick Rose, #4 Jerry Sloan, #10 Bob Love, #23 Michael Jordan, #33 Scottie Pippen", and note that #6 (Bill Russell) is retired league-wide. Use full player and team names so the app can link them. Use **bold** sparingly. No markdown tables or headings.`;
 
 const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
 const CODE_OF = { GS: "GSW", NO: "NOP", NY: "NYK", SA: "SAS", UTAH: "UTA", WSH: "WAS" };
@@ -113,6 +114,26 @@ const gameLine = (g) => {
   return `${g.away?.abbr} @ ${g.home?.abbr} ${sc}${g.broadcast ? ` (${g.broadcast})` : ""}`;
 };
 
+/* ---------------------------------------------------------- retired numbers (nba_history.json) */
+export const isRetiredQ = (q) => /\bretir(e|ed|es|ing|ement|ements)\b|\bjerseys?\b|\brafters\b|\bnumbers?\b.*\b(hang|hanging|honou?r)/i.test(String(q || ""));
+const shortDate = (d) => (d ? String(d).slice(0, 7) : "");
+/** One compact row: "CHI: #1 Derrick Rose (2026-01), #4 Jerry Sloan, …  UPCOMING: …" */
+export function retiredLine(code, f, { detail = false } = {}) {
+  const list = (f?.retired || []).map((r) => `#${r.num} ${r.name}${r.retiredOn ? ` (${detail ? r.retiredOn : shortDate(r.retiredOn)})` : ""}${detail && r.hof ? " HOF" : ""}`);
+  const up = (f?.upcomingRetirements || []).map((u) => `#${u.num} ${u.name} (NOT retired yet; ceremony scheduled ${u.date})`);
+  return `${code}: ${list.join(", ") || "none"}${up.length ? ` | UPCOMING: ${up.join(", ")}` : ""}`;
+}
+/** Every franchise that retired (or will retire) a player's number. */
+export function retiredBy(history, name) {
+  const k = norm(name), out = [];
+  for (const [code, f] of Object.entries(history?.franchises || {})) {
+    for (const r of f.retired || []) if (norm(r.name) === k) out.push({ code, ...r });
+    for (const u of f.upcomingRetirements || []) if (norm(u.name) === k) out.push({ code, ...u, upcoming: true });
+  }
+  if (norm("Bill Russell") === k) out.push({ code: "NBA", num: "6", retiredOn: "2022-08" });
+  return out;
+}
+
 /** Facts for the model, targeted at the question. */
 export function buildContext(question, d, idx, now = Date.now()) {
   const ent = findEntities(question, idx);
@@ -165,7 +186,8 @@ export function buildContext(question, d, idx, now = Date.now()) {
     const roster = (d.league?.players || []).filter((p) => p.teamAbbr === t.abbr);
     const payroll = roster.reduce((s, p) => s + resolveSalary(p, { book: d.book, stats: statsById.get(p.id)?.stats, cba: d.book?.cba }).salary, 0);
     out.push(`TEAM ${t.name} (${t.abbr}): ${st || "—"}; payroll ~${money(payroll)} (${d.book?.cba ? TIERS[teamTier(payroll, d.book.cba)] : ""}); roster: ${roster.map((p) => p.name).join(", ")}.`);
-    if (f) out.push(`HISTORY ${t.name}: ${f.titles.length} titles${f.titles.length ? ` (${f.titles.map((x) => x.year).join(", ")})` : ""}; retired numbers: ${f.retired.map((r) => `#${r.num} ${r.name}`).join(", ") || "none"}.`);
+    if (f) out.push(`HISTORY ${t.name}: ${f.titles.length} titles${f.titles.length ? ` (${f.titles.map((x) => `${x.year}${x.fmvp ? ` FMVP ${x.fmvp}` : ""}`).join(", ")})` : ""}.`);
+    if (f) out.push(retiredLine(t.code, f, { detail: true }));
   }
   for (const y of ent.years) {
     const c = d.history?.champions?.find((x) => x.year === y);
@@ -177,8 +199,19 @@ export function buildContext(question, d, idx, now = Date.now()) {
     for (const [c, l] of d.history.careerCategories) out.push(`CAREER ${l.toUpperCase()} TOP 10: ${d.history.careerLeaders[c].slice(0, 10).map((r) => `${r.name} ${r.total}`).join(", ")}`);
   }
   if (/draft|prospect|2027|2028|2029|mock/i.test(question) && d.prospects) for (const y of ["2027", "2028", "2029"]) out.push(`${y} BIG BOARD TOP 10: ${(d.prospects[y] || []).slice(0, 10).map((p) => `${p.rank}. ${p.name} (${p.position}, ${p.school || p.type})`).join("; ")}`);
-  if (/champion|title|finals|ring/i.test(question) && d.history) out.push(`RECENT CHAMPIONS: ${d.history.champions.slice(0, 12).map((c) => `${c.year} ${c.champion}${c.fmvp ? ` (FMVP ${c.fmvp})` : ""}`).join("; ")}`);
   if (/mvp|rookie|defensive|sixth|improved|coach of/i.test(question) && d.history) for (const k of ["mvp", "roy", "dpoy", "smoy", "mip", "coy"]) out.push(`${k.toUpperCase()} last 8: ${(d.history.awards[k] || []).slice(0, 8).map((a) => `${a.year} ${a.name}`).join("; ")}`);
+  if (isRetiredQ(question) && d.history) {
+    if (!ent.teams.length || /\b(all|every|each|league|nba|teams)\b/i.test(question)) {
+      out.push(`RETIRED NUMBERS, ALL 30 TEAMS (Hooptrax dataset, audited Nov 2026; #6 Bill Russell retired league-wide in 2022):`);
+      for (const [code, f] of Object.entries(d.history.franchises)) out.push(retiredLine(code, f));
+    }
+    for (const p of ent.players) {
+      const hits = retiredBy(d.history, p.name);
+      out.push(hits.length ? `RETIRED ${p.name}: ${hits.map((h) => `${h.code} #${h.num}${h.retiredOn ? ` (retired ${h.retiredOn})` : ""}${h.upcoming ? ` NOT RETIRED YET (ceremony scheduled ${h.date})` : ""}`).join("; ")}` : `RETIRED ${p.name}: not in the Hooptrax retired-number list as of Nov 2026`);
+    }
+  }
+  if (/\b(champion|champions|title|titles|finals|won it all)\b/i.test(question) && !ent.years.length && d.history) out.push(`CHAMPIONS (all, newest first): ${d.history.champions.map((c) => `${c.year} ${c.champion}${c.fmvp ? ` (FMVP ${c.fmvp})` : ""}`).join("; ")}`);
+  if (/\bmvp\b/i.test(question) && !/finals mvp/i.test(question) && !ent.years.length && d.history) out.push(`MVP (all, newest first): ${(d.history.awards.mvp || []).map((a) => `${a.year} ${a.name}`).join("; ")}`);
   if (/cap|apron|tax|salary|contract|payroll/i.test(question) && d.book?.cba) { const c = d.book.cba; out.push(`2026-27 CAP (projected): cap ${money(c.salaryCap)}, tax ${money(c.taxLine)}, 1st apron ${money(c.firstApron)}, 2nd apron ${money(c.secondApron)}.`); }
   return { text: out.join("\n"), entities: ent, intents };
 }
@@ -210,6 +243,17 @@ export function localAnswer(question, d, idx, now = Date.now()) {
       const known = (d.schedule || []).some((x) => x.date === ymd);
       const scoped = ent.teams.length ? games.filter((g) => ent.teams.some((t) => t.abbr === g.home?.abbr || t.abbr === g.away?.abbr)) : games;
       L.push(!known ? `${dayLabel(ymd)} is outside the 14-day schedule window I keep cached.` : scoped.length ? [`**${dayLabel(ymd)} — ${scoped.length} game${scoped.length > 1 ? "s" : ""} (ET):**`, ...scoped.map((g) => `• ${gameLine(g)}`)].join("\n") : `No games on ${dayLabel(ymd)}.`);
+    }
+  }
+  if (isRetiredQ(q) && d.history && (!ent.teams.length || /\b(all|every|each|league|teams)\b/i.test(q))) {
+    if (ent.players.length && !/\b(all|every|each|league|teams)\b/i.test(q)) {
+      for (const p of ent.players) {
+        const hits = retiredBy(d.history, p.name);
+        L.push(hits.length ? `**${p.name}**: ${hits.map((h) => `${h.code === "NBA" ? "league-wide" : h.code} #${h.num}${h.upcoming ? ` not retired yet: ceremony scheduled ${h.date}` : h.retiredOn ? ` (retired ${h.retiredOn})` : ""}`).join(" · ")}` : `**${p.name}**: no retired number on file as of Nov 2026.`);
+      }
+    } else {
+      L.push("**Retired numbers, all 30 teams** (#6 Bill Russell is retired league-wide):");
+      L.push(Object.entries(d.history.franchises).map(([code, f]) => retiredLine(code, f)).join("\n"));
     }
   }
   if (has(/\b(lottery|odds|tank|worst record)\b/i) && d.lottery) {
@@ -262,7 +306,7 @@ export function localAnswer(question, d, idx, now = Date.now()) {
     const st = standingOf(t.abbr), f = d.history?.franchises?.[t.code];
     const roster = (d.league?.players || []).filter((p) => p.teamAbbr === t.abbr);
     const lines = [`**${t.name}**${st ? ` — ${st.wins}-${st.losses}, #${st.seed} in the ${st.conf}${st.streak ? `, ${st.streak}` : ""}` : ""}`];
-    if (has(/retired|jersey|number/i) && f) lines.push(f.retired.length ? `Retired numbers: ${f.retired.map((r) => `#${r.num} ${r.name}`).join(", ")}` : "No retired numbers.");
+    if (isRetiredQ(q) && f) lines.push(retiredLine(t.code, f));
     if (has(/title|champion|ring|finals|history/i) && f) lines.push(f.titles.length ? `${f.titles.length} NBA title${f.titles.length > 1 ? "s" : ""}: ${f.titles.map((x) => x.year).join(", ")}` : "No NBA titles yet.");
     if (has(/salary|cap|payroll|apron|tax/i)) {
       const payroll = roster.reduce((s, p) => s + resolveSalary(p, { book: d.book, stats: statsById.get(p.id)?.stats, cba: d.book?.cba }).salary, 0);
@@ -334,7 +378,9 @@ export function cardsFor(question, d, idx, entities, now = Date.now()) {
   }
   const intents = intentsOf(question), asked = datesAsked(question, now), all = windowGames(d);
   let games = [];
-  if (ent.teams.length) {
+  const historyOnly = (isRetiredQ(question) || intents.has("history")) && !intents.has("schedule") && !intents.has("scores") && !asked.length;
+  if (historyOnly) games = [];
+  else if (ent.teams.length) {
     for (const t of ent.teams) {
       const mine = all.filter((g) => g.home?.abbr === t.abbr || g.away?.abbr === t.abbr);
       const live = mine.find((g) => g.status?.state === "in");

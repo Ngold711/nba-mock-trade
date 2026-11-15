@@ -6,6 +6,8 @@ import { resolveSalary, teamTier, TIERS, money } from "../service/trade.js";
 import { ATTRS } from "../service/ratings.js";
 import { advanced, inMode, MODES } from "../service/advanced.js";
 import { loadImage, roundRect, drawAvatar, fitText, fontsReady, openImageSheet } from "./card.js";
+const fmtMonth = (d) => { const [y, m] = String(d).split("-"); return m ? `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][+m - 1]} ${y}` : y; };
+const fmtDay = (d) => { const t = new Date(`${d}T12:00:00Z`); return isNaN(t) ? d : t.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }); };
 
 const CODE_TO_ESPN = { GSW: "GS", NOP: "NO", NYK: "NY", SAS: "SA", UTA: "UTAH", WAS: "WSH" };
 const f1 = (x) => (x == null || !Number.isFinite(+x) ? "—" : Number(x).toFixed(1));
@@ -153,15 +155,16 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
     const losses = f.finalsLosses.length ? `<p class="meter-note">Finals runner-up: ${f.finalsLosses.map((l) => `${l.year} (${esc(l.opponent)}, ${esc(l.series)})`).join(" · ")}</p>` : "";
     const jerseys = f.retired.length ? `<div class="jersey-grid">${f.retired.map((r) => `<div class="jersey" style="--c:${c}">
         <svg viewBox="0 0 60 64" aria-hidden="true"><path d="M18 4h24l4 6 10 4-4 16-7-2v34H15V28l-7 2-4-16 10-4z" fill="var(--c)" stroke="rgba(255,255,255,.35)" stroke-width="1.2"/><path d="M24 4c1.5 5 10.5 5 12 0" fill="none" stroke="rgba(255,255,255,.45)" stroke-width="1.2"/></svg>
-        <span class="jn num">${esc(r.num)}</span><b>${esc(r.name)}</b><small>${esc(r.years)}</small>${r.hof ? '<span class="hof">HOF</span>' : ""}</div>`).join("")}</div>`
+        <span class="jn num">${esc(r.num)}</span><b>${esc(r.name)}</b><small>${esc(r.years)}${r.retiredOn ? `<br>Retired ${esc(fmtMonth(r.retiredOn))}` : ""}</small>${r.hof ? '<span class="hof">HOF</span>' : ""}</div>`).join("")}</div>`
       : `<div class="empty">No retired numbers.</div>`;
+    const upcoming = (f.upcomingRetirements || []).length ? `<p class="meter-note up-next">Coming up: ${f.upcomingRetirements.map((u) => `<b>#${esc(u.num)} ${esc(u.name)}</b> (${esc(fmtDay(u.date))})`).join(" · ")}</p>` : "";
     const L = f.leaders || {};
     const leaders = `<div class="fl-grid">${[["points", "Points"], ["rebounds", "Rebounds"], ["assists", "Assists"], ["steals", "Steals"], ["blocks", "Blocks"], ["games", "Games"]].map(([k, l]) => `<div class="fl"><b>${l}</b><ol>${(L[k] || []).map((n) => `<li>${esc(n)}</li>`).join("")}</ol></div>`).join("")}</div>`;
     return `<div class="sheet-sub">Championship banners · ${f.titles.length}</div>${banners}${losses}
-      <div class="sheet-sub">Retired numbers · ${f.retired.length}</div>${jerseys}
+      <div class="sheet-sub">Retired numbers · ${f.retired.length}</div>${jerseys}${upcoming}
       <p class="meter-note">League-wide: #6 retired for Bill Russell (2022). HOF = Naismith Hall of Fame.</p>
       <div class="sheet-sub">Franchise all-time leaders (top 5)</div>${leaders}
-      <p class="meter-note">Titles and Finals MVPs are checked against ESPN. Retired numbers, years and franchise leader rankings are editorial and not yet verified against official records; fix them in nba_history.json.</p>`;
+      <p class="meter-note">Titles and Finals MVPs are checked against ESPN. Retired numbers were audited against team announcements in Nov 2026; franchise leader rankings are editorial. Ask Hooptrax reads the same nba_history.json.</p>`;
   }
   const skel = (n) => `<ul class="list">${Array.from({ length: n }, () => `<li><div class="sk-row"><div class="sk c"></div><div class="sk-l"><div class="sk t"></div><div class="sk t s"></div></div><div class="sk n"></div></div></li>`).join("")}</ul>`;
 
