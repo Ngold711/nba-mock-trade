@@ -34,6 +34,8 @@ export const TTL = {
   teamstats: 60 * MIN,
   sos: 60 * MIN,
   bio: 24 * 60 * MIN,
+  search: 24 * 60 * MIN,
+  career: 12 * 60 * MIN,
 };
 const MAX_BACKOFF = 5 * MIN;
 
@@ -83,6 +85,8 @@ export const POLICIES = {
   teamstats: () => TTL.teamstats,
   sos: () => TTL.sos,
   bio: () => TTL.bio,
+  search: () => TTL.search,
+  career: () => TTL.career,
 };
 
 const keyOf = (resource, params = {}) =>

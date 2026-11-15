@@ -9,6 +9,13 @@ import { createStore } from "./service/store.js";
 import { setResolver } from "./service/espn.js";
 
 const ROOT = fileURLToPath(new URL(".", import.meta.url));
+// .env (local only, git-ignored): KEY=VALUE lines; real environment variables win.
+try {
+  for (const line of (await readFile(join(ROOT, ".env"), "utf8")).split(/\r?\n/)) {
+    const m = /^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line);
+    if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+  }
+} catch {}
 const PORT = Number(process.env.PORT) || 8787;
 const HOST = process.env.HOST || "127.0.0.1";
 const QUIET = process.env.QUIET === "1";
@@ -115,7 +122,80 @@ async function pollsRoute(req, res, m, q) {
   return json(res, 200, { data: pollView(poll) });
 }
 
+/* Ask Hooptrax: Gemini (free tier) grounded in the live cache, with a zero-key local engine fallback. */
+import { SYSTEM_PROMPT, buildIndex, buildContext, localAnswer, chipsFor } from "./service/chat.js";
+import { projectLottery, lotteryTable, DEFAULT_FORMAT } from "./service/draft.js";
+const GEMINI_MODELS = (process.env.GEMINI_MODELS || "gemini-flash-latest,gemini-2.5-flash,gemini-3-flash-preview,gemini-3.5-flash").split(",").map((x) => x.trim()).filter(Boolean);
+const AI_PER_HOUR = 15;
+const aiHits = new Map();                    // ip -> timestamps (ms) of AI calls in the last hour
+let staticData = null;
+async function chatData() {
+  staticData ||= Promise.all([readFile(join(ROOT, "nba_history.json"), "utf8"), readFile(join(ROOT, "prospects.json"), "utf8"), readFile(join(ROOT, "salaries_2026_27.json"), "utf8")])
+    .then(([h, p, b]) => ({ history: JSON.parse(h), prospects: JSON.parse(p), book: JSON.parse(b) })).catch(() => ({}));
+  const names = ["scoreboard", "standings", "injuries", "transactions", "ratings", "league", "players"];
+  const got = await Promise.allSettled(names.map((n) => store.get(n)));
+  const d = { ...(await staticData) };
+  names.forEach((n, i) => { d[n === "players" ? "stats" : n] = got[i].status === "fulfilled" ? got[i].value.data : null; });
+  if (d.standings) {
+    try {
+      const proj = projectLottery(d.standings, DEFAULT_FORMAT, () => 0.5);
+      const table = lotteryTable(DEFAULT_FORMAT, { balls: proj.balls, order: proj.order, ties: proj.lottery.map((t) => t.tie) });
+      d.lottery = table.map((r) => ({ ...r, team: proj.lottery[r.seed - 1]?.team }));
+    } catch {}
+  }
+  d.index = buildIndex(d);
+  return d;
+}
+async function askGemini(question, history, contextText) {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return { error: "no-key" };
+  const contents = [...history.slice(-6).map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: String(m.text || "").slice(0, 1500) }] })),
+    { role: "user", parts: [{ text: `DATA (live, ${new Date().toISOString()}):\n${contextText}\n\nQUESTION: ${question}` }] }];
+  let last = "unavailable";
+  for (const model of GEMINI_MODELS) {
+    try {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+        method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": key },
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }, contents, generationConfig: { temperature: 0.3, maxOutputTokens: 4096 } }),
+        signal: AbortSignal.timeout(20000),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { last = `${r.status} ${j?.error?.status || ""}`; if (r.status === 400 && /API key/i.test(j?.error?.message || "")) return { error: "bad-key" }; continue; }
+      const cand = j.candidates?.[0];
+      const text = (cand?.content?.parts || []).filter((p) => !p.thought).map((p) => p.text || "").join("").trim();
+      if (text && cand?.finishReason !== "MAX_TOKENS") return { text, model };
+      if (text) return { text: text + " …", model };
+      last = "empty";
+    } catch (e) { last = e.name === "TimeoutError" ? "timeout" : "network"; }
+  }
+  return { error: last };
+}
+async function chatRoute(req, res) {
+  if (req.method !== "POST") { res.writeHead(405); return res.end(); }
+  let body;
+  try { body = JSON.parse(await readBody(req, 16 * 1024)); } catch { return json(res, 400, { error: "Send JSON: { message, history }" }); }
+  const question = String(body?.message || "").trim().slice(0, 500);
+  if (!question) return json(res, 400, { error: "Empty message" });
+  const history = Array.isArray(body?.history) ? body.history.filter((m) => m && typeof m.text === "string").slice(-6) : [];
+  const d = await chatData();
+  const ctx = buildContext(question, d, d.index);
+  const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+  const now = Date.now(), hits = (aiHits.get(ip) || []).filter((t) => now - t < 3600e3);
+  let answer = null, source = "local", note = "";
+  if (hits.length >= AI_PER_HOUR) note = "AI limit reached for this hour; answering from live Hooptrax data.";
+  else if (process.env.GEMINI_API_KEY) {
+    hits.push(now); aiHits.set(ip, hits);
+    if (aiHits.size > 5000) aiHits.delete(aiHits.keys().next().value);
+    const g = await askGemini(question, history, ctx.text);
+    if (g.text) { answer = g.text; source = `gemini:${g.model}`; }
+    else note = g.error === "bad-key" ? "AI key rejected; answering from live Hooptrax data." : "AI is busy right now; answering from live Hooptrax data.";
+  }
+  if (!answer) { const l = localAnswer(question, d, d.index); answer = l.text; }
+  json(res, 200, { data: { answer, source, note, chips: chipsFor(answer, d.index, ctx.entities), aiRemaining: Math.max(0, AI_PER_HOUR - hits.length) } });
+}
+
 const routes = [
+  [/^\/api\/nba-chat$/, chatRoute],
   [/^\/api\/polls$/, pollsRoute],
   [/^\/api\/proxy-image$/, proxyImage],
   [/^\/api\/health$/, (req, res) => json(res, 200, { ok: true, uptime: process.uptime(), cache: store.status() })],
@@ -159,6 +239,12 @@ const routes = [
   [/^\/api\/team-stats$/, (req, res) => serve(res, "teamstats", {})],
   [/^\/api\/sos$/, (req, res) => serve(res, "sos", {})],
   [/^\/api\/bio\/(\d{1,12})$/, (req, res, m) => serve(res, "bio", { id: m[1] })],
+  [/^\/api\/career\/(\d{1,12})$/, (req, res, m) => serve(res, "career", { id: m[1] })],
+  [/^\/api\/search$/, (req, res, m, q) => {
+    const term = String(q.get("q") || "").trim().slice(0, 40);
+    if (term.length < 2 || !/^[\p{L}\p{N} .'-]+$/u.test(term)) return json(res, 400, { error: "q must be 2–40 letters" });
+    return serve(res, "search", { q: term.toLowerCase() });
+  }],
   [/^\/api\/schedule\/([A-Za-z0-9]{1,5})$/, async (req, res, m) => {
     let id;
     try { id = await resolveTeam(m[1]); } catch (err) { return json(res, 502, { error: `Couldn't load teams: ${err.message}` }); }
@@ -191,7 +277,7 @@ async function serveStatic(req, res, pathname) {
 
 export const server = createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
-  if (req.method !== "GET" && req.method !== "HEAD" && !(req.method === "POST" && url.pathname === "/api/polls")) { res.writeHead(405); return res.end(); }
+  if (req.method !== "GET" && req.method !== "HEAD" && !(req.method === "POST" && (url.pathname === "/api/polls" || url.pathname === "/api/nba-chat"))) { res.writeHead(405); return res.end(); }
   for (const [re, handler] of routes) {
     const m = re.exec(url.pathname);
     if (m) return handler(req, res, m, url.searchParams);

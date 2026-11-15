@@ -31,6 +31,7 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
     stats: () => get("stats", async () => (await (await getClient()).get("players", {})).data),
     standings: () => get("standings", async () => (await (await getClient()).get("standings", {})).data),
     teamstats: () => get("teamstats", async () => (await (await getClient()).get("teamstats", {})).data),
+    history: () => get("history", () => fetch("nba_history.json").then((r) => r.json())),
   };
   const ratingOf = (ratings, id) => ratings?.players?.find((p) => p.id === String(id)) || null;
 
@@ -41,7 +42,7 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
     const code = toCode(input);
     const look = teamLook(code);
     const espnAbbr = CODE_TO_ESPN[code] || code;
-    const S = { roster: null, err: null, standing: null, lottery: null, inv: null, book: null, ratings: null, stats: null, schedule: null, schedErr: null, eff: null };
+    const S = { roster: null, err: null, standing: null, lottery: null, inv: null, book: null, ratings: null, stats: null, schedule: null, schedErr: null, eff: null, history: null };
     const draw = (body) => {
       const st = S.standing;
       const head = `<div class="hub-head" style="--c:${look.color}">${teamLogo(look, { size: "3.25rem" })}
@@ -50,11 +51,12 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
         ${S.eff ? `<div class="hub-meta eff-badges">${[["ortg", "ORtg"], ["drtg", "DRtg"], ["net", "Net"], ["pace", "Pace"]].map(([k, l]) => `<span class="pill" title="${l} ${S.eff[k]}">#${S.eff.ranks?.[k] ?? "–"} ${l} <b class="num">${k === "net" && S.eff[k] > 0 ? "+" : ""}${S.eff[k]}</b></span>`).join("")}</div>` : ""}
         ${S.lottery ? `<div class="hub-meta"><span class="pill lot">3-2-1 lottery seed ${S.lottery.seed} · ${(S.lottery.p1 * 100).toFixed(1)}% for #1</span></div>` : ""}
         ${S.roster?.coach ? `<div class="hub-meta">Coach ${esc(S.roster.coach)}</div>` : ""}</div></div>
-        <div class="seg vault-tabs" role="tablist" style="--n:3"><span class="thumb" style="transform:translateX(${["roster", "picks", "schedule"].indexOf(vaultTab) * 100}%)"></span>
-          ${[["roster", "Roster & Cap"], ["picks", "Draft Picks"], ["schedule", "Schedule"]].map(([k, l]) => `<button type="button" role="tab" data-vtab="${k}" aria-pressed="${vaultTab === k}">${l}</button>`).join("")}</div>`;
+        <div class="seg vault-tabs" role="tablist" style="--n:4"><span class="thumb" style="transform:translateX(${["roster", "picks", "schedule", "history"].indexOf(vaultTab) * 100}%)"></span>
+          ${[["roster", "Roster & Cap"], ["picks", "Picks"], ["schedule", "Schedule"], ["history", "History & #s"]].map(([k, l]) => `<button type="button" role="tab" data-vtab="${k}" aria-pressed="${vaultTab === k}">${l}</button>`).join("")}</div>`;
       let tab = "";
       if (vaultTab === "roster") tab = rosterTab(S, look);
       else if (vaultTab === "picks") tab = picksTab(S, code);
+      else if (vaultTab === "history") tab = historyTab(S, code, look);
       else tab = scheduleTab(S);
       body.innerHTML = head + `<div class="vault-body">${tab}</div>
         <div class="hub-actions"><a class="btn primary press" href="index.html#t=${encodeURIComponent(code + ",_")}">Load Team in Trade Machine</a><a class="btn ghost press" href="draft.html">Draft board</a></div>`;
@@ -67,6 +69,7 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
     pickConfig().then((cfg) => { S.inv = pickInventory(code, cfg); refresh(); });
     data.book().then((b) => { S.book = b; refresh(); }).catch(() => {});
     data.teamstats().then((t) => { S.eff = t.efficiency?.[espnAbbr] || null; refresh(); }).catch(() => {});
+    data.history().then((h) => { S.history = h; refresh(); }).catch(() => { S.history = { franchises: {} }; refresh(); });
     data.ratings().then((r) => { S.ratings = r; refresh(); }).catch(() => {});
     data.stats().then((s) => { S.stats = new Map(s.players.map((p) => [p.id, p.stats])); refresh(); }).catch(() => {});
     c.get("roster", { team: look.espn || espnAbbr }).then(({ data: d }) => { S.roster = d; refresh(); }).catch((e) => { S.err = e.message; refresh(); });
@@ -138,6 +141,28 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
     return `<div class="sheet-sub">Upcoming</div><ul class="list">${next.map(row).join("") || '<li class="empty">No games scheduled.</li>'}</ul>
       <div class="sheet-sub">Recent results</div><ul class="list">${done.map(row).join("") || '<li class="empty">No games played yet.</li>'}</ul>`;
   }
+  function historyTab(S, code, look) {
+    if (!S.history) return skel(4);
+    const f = S.history.franchises?.[code];
+    if (!f) return `<div class="empty">No history on file for this franchise.</div>`;
+    const c = look.color || "#334155";
+    const banners = f.titles.length ? `<div class="banner-wall">${f.titles.map((t) => `<div class="banner" style="--c:${c}" title="${esc(t.as)} def. ${esc(t.opponent)} ${esc(t.series)}${t.fmvp ? ` · Finals MVP ${esc(t.fmvp)}` : ""}">
+        <b class="num">${t.year}</b><span>CHAMPIONS</span><small>def. ${esc(t.opponent)}<br>${esc(t.series)}</small>${t.fmvp ? `<em>FMVP ${esc(t.fmvp.split(" ").slice(-1)[0])}</em>` : ""}</div>`).join("")}</div>
+        <ul class="list title-list">${f.titles.map((t) => `<li class="tl"><b class="num">${t.year}</b><span>${esc(t.as)} def. ${esc(t.opponent)} <span class="num">${esc(t.series)}</span>${t.fmvp ? ` · Finals MVP <b>${esc(t.fmvp)}</b>` : ""}</span></li>`).join("")}</ul>`
+      : `<div class="empty">No NBA championships yet.</div>`;
+    const losses = f.finalsLosses.length ? `<p class="meter-note">Finals runner-up: ${f.finalsLosses.map((l) => `${l.year} (${esc(l.opponent)}, ${esc(l.series)})`).join(" · ")}</p>` : "";
+    const jerseys = f.retired.length ? `<div class="jersey-grid">${f.retired.map((r) => `<div class="jersey" style="--c:${c}">
+        <svg viewBox="0 0 60 64" aria-hidden="true"><path d="M18 4h24l4 6 10 4-4 16-7-2v34H15V28l-7 2-4-16 10-4z" fill="var(--c)" stroke="rgba(255,255,255,.35)" stroke-width="1.2"/><path d="M24 4c1.5 5 10.5 5 12 0" fill="none" stroke="rgba(255,255,255,.45)" stroke-width="1.2"/></svg>
+        <span class="jn num">${esc(r.num)}</span><b>${esc(r.name)}</b><small>${esc(r.years)}</small>${r.hof ? '<span class="hof">HOF</span>' : ""}</div>`).join("")}</div>`
+      : `<div class="empty">No retired numbers.</div>`;
+    const L = f.leaders || {};
+    const leaders = `<div class="fl-grid">${[["points", "Points"], ["rebounds", "Rebounds"], ["assists", "Assists"], ["steals", "Steals"], ["blocks", "Blocks"], ["games", "Games"]].map(([k, l]) => `<div class="fl"><b>${l}</b><ol>${(L[k] || []).map((n) => `<li>${esc(n)}</li>`).join("")}</ol></div>`).join("")}</div>`;
+    return `<div class="sheet-sub">Championship banners · ${f.titles.length}</div>${banners}${losses}
+      <div class="sheet-sub">Retired numbers · ${f.retired.length}</div>${jerseys}
+      <p class="meter-note">League-wide: #6 retired for Bill Russell (2022). HOF = Naismith Hall of Fame.</p>
+      <div class="sheet-sub">Franchise all-time leaders (top 5)</div>${leaders}
+      <p class="meter-note">Titles and Finals MVPs are checked against ESPN. Retired numbers, years and franchise leader rankings are editorial and not yet verified against official records; fix them in nba_history.json.</p>`;
+  }
   const skel = (n) => `<ul class="list">${Array.from({ length: n }, () => `<li><div class="sk-row"><div class="sk c"></div><div class="sk-l"><div class="sk t"></div><div class="sk t s"></div></div><div class="sk n"></div></div></li>`).join("")}</ul>`;
 
   /* =================================================================== Player Quick-View */
@@ -154,7 +179,7 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
       const slug = String(name).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
       const tradeHref = code && window.NBA_DATA.teams[code] ? `index.html#t=${encodeURIComponent(code + ",_")}&a=${encodeURIComponent(`${code}:${slug}>_`)}` : "index.html";
       const b = S.bio;
-      const draftTxt = b?.draft?.year ? `${b.draft.year} · Rd ${b.draft.round}, Pick ${b.draft.pick}${b.draft.overall ? ` (#${b.draft.overall} overall)` : ""}${b.draft.team ? ` · ${esc(b.draft.team)}` : ""}` : b ? "Undrafted" : null;
+      const draftTxt = b?.draft?.year ? `${b.draft.year} · Round ${b.draft.round} · #${b.draft.overall} overall${b.draft.team ? ` · ${esc(b.draft.team)}` : ""}` : b ? "Undrafted" : null;
       const bioGrid = b ? `<div class="bio-grid">
           <div><span>Draft</span><b>${draftTxt}</b></div>
           <div><span>${b.college ? "College" : "From"}</span><b>${esc(b.college || b.country || b.birthPlace || "—")}</b></div>
@@ -198,7 +223,18 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
     const [lg, st, rt, bk] = await Promise.allSettled([data.league(), data.stats(), data.ratings(), data.book()]);
     const r = lg.status === "fulfilled" ? lg.value.players.find((x) => x.id === String(id)) : null;
     const s = st.status === "fulfilled" ? st.value.players.find((x) => x.id === String(id)) : null;
-    if (!r && !s) return null;
+    if (!r && !s) {
+      // Legend or inactive player: career averages from ESPN (plus the history index for name/span).
+      const h = await data.history().catch(() => null);
+      const leg = h?.legends?.find((x) => x.id === String(id));
+      const c = await (await getClient()).get("career", { id: String(id) }).then((x) => x.data).catch(() => null);
+      if (!leg && !c) return null;
+      const stats = c ? { ...c } : { gp: leg.gp, min: leg.min, pts: leg.pts, reb: leg.reb, ast: leg.ast, stl: leg.stl, blk: leg.blk, fgPct: leg.fgPct, threePct: leg.threePct, ftPct: leg.ftPct };
+      if (leg && leg.reb != null) stats.reb = leg.reb;               // pre-1974 rebounds from official totals
+      const span = leg?.from && leg?.to ? `${leg.from}–${leg.to}` : c?.from ? `${c.from - 1}–${c.to}` : "";
+      return { id: String(id), name: leg?.name || c?.name || "Player", headshot: leg?.headshot || `https://a.espncdn.com/i/headshots/nba/players/full/${id}.png`, initials: (leg?.name || "").split(" ").map((w) => w[0]).join("").slice(0, 2),
+        teamAbbr: span ? `Career ${span}` : "Career", position: leg?.position || "", age: null, height: leg?.height || "", experience: null, stats, rating: null, salary: null, legend: true, career: true };
+    }
     const base = { ...(s || {}), ...(r || {}) };
     const book = bk.status === "fulfilled" ? bk.value : null;
     return {
@@ -226,16 +262,21 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
     }).join("");
   }
   async function openCompare(idA, idB = null) {
-    const S = { A: null, B: null, q: "", list: [] };
+    const S = { A: null, B: null, q: "", list: [], remote: {} };
     const draw = (body) => {
       const A = S.A, B = S.B;
-      const head = (p, side) => p ? `<div class="cmp-p">${avatar(p, { size: "3.6rem", color: "#64748B" })}<b>${esc(p.name)}</b><span>${esc(p.teamAbbr)}${p.rating ? ` · ${ovrBadge(p.rating)}` : ""}</span>${side === "B" ? `<button class="link" type="button" data-change>Change</button>` : ""}</div>`
+      const head = (p, side) => p ? `<div class="cmp-p">${avatar(p, { size: "3.6rem", color: "#64748B" })}<b>${esc(p.name)}</b><span>${esc(p.teamAbbr)}${p.rating ? ` · ${ovrBadge(p.rating)}` : p.legend ? ' · <span class="pill lgd">Legend</span>' : ""}</span>${side === "B" ? `<button class="link" type="button" data-change>Change</button>` : ""}</div>`
         : `<div class="cmp-p empty-p"><div class="sk c" style="width:3.6rem;height:3.6rem;border-radius:99px"></div><b>${side === "B" ? "Pick a player" : "Loading…"}</b></div>`;
-      const results = S.q.trim().length >= 2 ? S.list.filter((p) => p.id !== A?.id && `${p.name} ${p.teamAbbr}`.toLowerCase().includes(S.q.trim().toLowerCase())).slice(0, 8) : [];
+      const qq = S.q.trim().toLowerCase();
+      const local = qq.length >= 2 ? S.list.filter((p) => p.id !== A?.id && `${p.name} ${p.teamAbbr || ""}`.toLowerCase().includes(qq)).slice(0, 8) : [];
+      const remote = (S.remote[qq] || []).filter((p) => p.id !== A?.id && !local.some((l) => l.id === p.id)).slice(0, 6);
+      const results = [...local, ...remote];
+      if (qq.length >= 3 && local.length < 4 && !(qq in S.remote)) { S.remote[qq] = []; getClient().then((c) => c.get("search", { q: qq })).then(({ data: d }) => { S.remote[qq] = d.map((x) => ({ ...x, teamAbbr: x.team || "NBA", position: "ESPN" })); if (sheet.isOpen) draw(body); }).catch(() => {}); }
       body.innerHTML = `<div class="cmp-head">${head(A, "A")}<span class="cmp-vs">VS</span>${head(B, "B")}</div>
         ${!B ? `<input class="search" id="cmpSearch" type="search" placeholder="Search any NBA player" autocomplete="off" value="${esc(S.q)}" style="font-size:16px" aria-label="Search a player to compare" />
-          <ul class="list cmp-results">${results.map((p) => `<li><button class="row" type="button" data-pick="${esc(p.id)}">${avatar(p, { size: "2.25rem", color: "#64748B" })}<span class="meta"><span class="nm">${esc(p.name)}</span><span class="sub">${esc(p.teamAbbr)} · ${esc(p.position || "")}</span></span></button></li>`).join("")}</ul>` : ""}
-        ${A ? `<div class="sheet-sub roster-sub"><span>2026–27 season · ${MODES.find(([k]) => k === statMode)[1]}</span>${modeSeg()}</div><div class="cmp-tbl">${cmpRows(A, B, STAT_ROWS, { digits: statMode === "totals" ? 0 : 1 })}</div>
+          <ul class="list cmp-results">${results.map((p) => `<li><button class="row" type="button" data-pick="${esc(p.id)}">${avatar(p, { size: "2.25rem", color: "#64748B" })}<span class="meta"><span class="nm">${esc(p.name)}${p.legend ? ' <span class="pill lgd">Legend</span>' : ""}</span><span class="sub">${esc(p.teamAbbr)}${p.position ? ` · ${esc(p.position)}` : ""}</span></span></button></li>`).join("")}</ul>
+          <p class="meter-note">Search active players and NBA legends. Legends compare on career averages.</p>` : ""}
+        ${A ? `<div class="sheet-sub roster-sub"><span>${A.career || B?.career ? "2026–27 / career averages for legends" : "2026–27 season"} · ${MODES.find(([k]) => k === statMode)[1]}</span>${modeSeg()}</div><div class="cmp-tbl">${cmpRows(A, B, STAT_ROWS, { digits: statMode === "totals" ? 0 : 1 })}</div>
           <div class="sheet-sub">Advanced</div><div class="cmp-tbl">${cmpRows(A, B, ADV_ROWS, { digits: 1 })}</div>
           <div class="sheet-sub">NBA 2K27 ratings</div><div class="cmp-tbl">${cmpRows(A, B, RATING_ROWS, { digits: 0 })}</div>
           <div class="sheet-sub">Contract & profile</div><div class="cmp-tbl">${cmpRows(A, B, PROFILE_ROWS, { numeric: false })}</div>` : skel(4)}
@@ -246,7 +287,11 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
         s.addEventListener("input", () => { S.q = s.value; const pos = s.selectionStart; draw(body); const n = body.querySelector("#cmpSearch"); n.focus(); n.setSelectionRange(pos, pos); });
         if (!S.q) setTimeout(() => s.focus({ preventScroll: true }), 50);
       }
-      body.querySelectorAll("[data-pick]").forEach((b) => b.addEventListener("click", async () => { S.B = await profileOf(b.dataset.pick); S.q = ""; draw(body); }));
+      body.querySelectorAll("[data-pick]").forEach((b) => b.addEventListener("click", async () => {
+        const prof = await profileOf(b.dataset.pick);
+        if (!prof) { toast("ESPN has no NBA career stats for that player"); return; }
+        S.B = prof; S.q = ""; draw(body);
+      }));
       body.querySelector("[data-change]")?.addEventListener("click", () => { S.B = null; draw(body); });
       bindMode(body, () => draw(body));
       body.querySelector("[data-swap]")?.addEventListener("click", () => { [S.A, S.B] = [S.B, S.A]; draw(body); });
@@ -256,8 +301,10 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
       });
     };
     sheet.open({ title: "Compare Players", render: draw });
-    const [a, b, lg] = await Promise.all([profileOf(idA), idB ? profileOf(idB) : null, data.league().catch(() => null)]);
-    S.A = a; S.B = b; S.list = lg?.players || [];
+    const [a, b, lg, hist] = await Promise.all([profileOf(idA), idB ? profileOf(idB) : null, data.league().catch(() => null), data.history().catch(() => null)]);
+    const activeIds = new Set((lg?.players || []).map((p) => p.id));
+    const legends = (hist?.legends || []).filter((l) => !activeIds.has(l.id)).map((l) => ({ id: l.id, name: l.name, teamAbbr: `${l.from ?? ""}–${l.to ?? ""}`, position: l.position, headshot: l.headshot, legend: true }));
+    S.A = a; S.B = b; S.list = [...(lg?.players || []), ...legends];
     if (sheet.isOpen) sheet.refresh();
   }
 

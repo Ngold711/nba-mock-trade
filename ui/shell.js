@@ -11,6 +11,7 @@ import { mountLiveWire } from "./ticker.js";
 import { pickInventory, toCode } from "../service/draft.js";
 import { logoMark, wordmark, HooptraxWatermark } from "./brand.js";
 import { mountVault } from "./vault.js";
+import { mountChat } from "./chat.js";
 
 const ICON = {
   live: '<path d="M2 12h3.5l2.5-6 4 12 3-9 2 3H22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
@@ -48,7 +49,8 @@ export function mountShell({ active = "live" } = {}) {
       <nav class="topnav" aria-label="Tools">${TABS.map(tabLink).join("")}</nav>
       <div class="bar-right">
         <button class="status-pill" type="button" id="statusPill" aria-label="${hasWire ? "Live data status. Open LiveWire." : "Live data status. Go to Live."}"><span class="pulse" id="pulse"></span><span id="sync">Live Sync</span></button>
-        <button class="teams-btn" type="button" id="teamsBtn" aria-haspopup="dialog">${svg("teams")}<span>30 Teams</span></button>
+        <button class="ai-btn" type="button" id="aiBtn" aria-haspopup="dialog" aria-label="Ask Hooptrax AI"><span class="spark" aria-hidden="true">✦</span><span class="ai-l">Ask AI</span></button>
+        <button class="teams-btn" type="button" id="teamsBtn" aria-haspopup="dialog" aria-label="30 Teams">${svg("teams")}<span>30 Teams</span></button>
         <button class="theme-btn" type="button" id="themeBtn" aria-label="Switch to light mode"><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
       </div>
     </div>`;
@@ -166,6 +168,8 @@ export function mountShell({ active = "live" } = {}) {
 
   const vault = mountVault({ sheet, getClient: () => (client ? Promise.resolve(client) : createClient()), teamLook, ensureData, pickConfig, toast: (m) => toastFn(m) });
   const { openTeam, openPlayer, openCompare } = vault;
+  const chat = mountChat({ getClient: () => (client ? Promise.resolve(client) : createClient()) });
+  document.getElementById("aiBtn").addEventListener("click", () => (chat.isOpen ? chat.close() : chat.open()));
 
   // Popovers (<details class="pop">): close on outside tap, Escape, or after choosing an item.
   document.addEventListener("click", (e) => {
@@ -182,7 +186,7 @@ export function mountShell({ active = "live" } = {}) {
   }, true);
 
   instance = {
-    openTeam, openPlayer, openCompare, openDrawer, closeDrawer,
+    openTeam, openPlayer, openCompare, openDrawer, closeDrawer, chat,
     setWireHandler(fn) { wireHandler = fn; },
     get wire() { return wire; },
     setStatus(kind, text) {

@@ -290,3 +290,34 @@ light/dark `theme-color` tags. On iPhone: Share → Add to Home Screen.
   held from other teams.
 - **Prospect stats:** Per Game | Per 40 | Efficiency (TS%, eFG%, AST/TO) in the picker (Nov 14 snapshot) and the scouting drawer
   (live ESPN college stats, now including FGA/FTA/3PA from the athlete stats endpoint).
+
+## History hub + Ask Hooptrax (round 4)
+
+### `nba_history.json`
+Built by an offline generator that cross-checks editorial data against ESPN:
+- **ESPN-verified:** career leaders (top 25 in points, rebounds, assists, steals, blocks and 3PM, from ESPN career totals; live for
+  active players), single-season leaders since 1975–76, every player award and Finals MVP (checked against each player's ESPN award
+  record; about 97% confirmed, `verified: false` on the rest), #1 picks and draft steals (ESPN draft records), and the 2026 Finals,
+  awards and #1 pick (read from ESPN).
+- **Editorial (no reachable feed):** Coach of the Year, retired numbers and years, franchise top-5 leaders (names only), official
+  pre-1974 rebound totals, career figures for about 20 legends whose ESPN profiles have no stats (marked `editorial`), and lottery notes.
+
+### UI
+- **Team Vault → History & #s:** championship banner wall (year, opponent, series, Finals MVP), Finals losses, a retired-jersey
+  gallery in team colors with HOF badges, and franchise top-5 leaders.
+- **Awards → History:** all-time leaders (career or single season), a searchable and filterable Awards & Champions timeline
+  (1947–2026), and draft history (2026 lottery picks, #1 picks since 1985, notable steals).
+- **Compare** searches active players, the legends index, and ESPN's athlete search (`/api/search`). Legends compare on ESPN career
+  averages (`/api/career/:id`).
+
+### Ask Hooptrax (`/api/nba-chat`, `service/chat.js`, `ui/chat.js`)
+- An "✦ Ask AI" pill in the header opens a slide-over chat with dynamic starter prompts, a 16px input, and player and team chips that
+  open Quick-View or the Team Vault.
+- **Gemini (free tier):** set `GEMINI_API_KEY` (locally in `.env`, which is git-ignored; on Render under Environment). Models are tried
+  in order from `GEMINI_MODELS` (default `gemini-flash-latest, gemini-2.5-flash, gemini-3-flash-preview, gemini-3.5-flash`) with
+  20 s timeouts. Each question gets a targeted DATA block: today's games, standings, the 3-2-1 projection, injuries, moves,
+  2K27 ratings, and the players, teams and years mentioned (stats, salary, injuries, awards, titles, retired numbers).
+  The system prompt restricts answers to the NBA and to the provided data.
+- **Zero-key local engine:** with no key, after errors, or over the limit (15 AI calls per hour per IP), answers come straight from the
+  live cache and `nba_history.json`: scores, standings, injuries, lottery, prospects, 2K27, salary and cap, retired numbers,
+  champions, award winners and career leaders. Off-topic questions are declined.

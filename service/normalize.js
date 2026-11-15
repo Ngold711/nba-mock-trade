@@ -480,7 +480,7 @@ export function normalizeBio(json) {
   return {
     id: str(get(a, "id"), ""),
     name: str(get(a, "displayName"), ""),
-    draft: m ? { year: +m[1], round, pick, overall: round && pick ? (round - 1) * 30 + pick : null, team: m[4] || "", text: draftTxt } : { text: draftTxt || "Undrafted" },
+    draft: m ? { year: +m[1], round, pick, overall: pick, team: m[4] || "", text: draftTxt } : { text: draftTxt || "Undrafted" },   // ESPN "Pk" is already the overall pick
     college: str(get(a, "college.name") || get(a, "college.shortName"), ""),
     birthPlace: str(get(a, "displayBirthPlace"), ""),
     country: str(get(a, "birthPlace.country") || String(get(a, "displayBirthPlace", "")).split(",").pop(), "").trim(),
@@ -504,4 +504,28 @@ export function collegeSplits(json, season) {
   const pair = (n) => { const x = String(at(n) ?? "").split("-").map(Number); return x.length === 2 && x.every(Number.isFinite) ? x : [null, null]; };
   const [fgm, fga] = pair("avgFieldGoalsMade-avgFieldGoalsAttempted"), [tpm, tpa] = pair("avgThreePointFieldGoalsMade-avgThreePointFieldGoalsAttempted"), [ftm, fta] = pair("avgFreeThrowsMade-avgFreeThrowsAttempted");
   return { season: str(get(row, "season.displayName"), ""), fgm, fga, tpm, tpa, ftm, fta, oreb: num(at("avgOffensiveRebounds"), null), dreb: num(at("avgDefensiveRebounds"), null), tov: num(at("avgTurnovers"), null), pf: num(at("avgFouls"), null) };
+}
+
+/* ----------------------------------------------------- legends: search + career */
+/** ESPN site search → NBA players only. */
+export function normalizeSearch(json) {
+  return arr(get(json, "results")).flatMap((r) => arr(get(r, "contents"))).filter((c) => /l:46~a:\d+/.test(str(get(c, "uid"))))
+    .map((c) => { const id = /a:(\d+)/.exec(str(get(c, "uid")))[1]; return { id, name: str(get(c, "displayName"), ""), team: str(get(c, "subtitle"), ""), headshot: `${HEADSHOT_BASE}/${id}.png` }; });
+}
+/** Career averages + totals from ESPN's athlete stats (works for legends and active players). */
+export function normalizeCareer(json) {
+  const cats = arr(get(json, "categories"));
+  const avg = cats.find((c) => get(c, "name") === "averages"), tot = cats.find((c) => get(c, "name") === "totals");
+  if (!avg) return null;
+  const A = (k) => { const i = arr(avg.names).indexOf(k); return i < 0 ? null : num(arr(avg.totals)[i], null); };
+  const P = (k) => { const i = arr(avg.names).indexOf(k); const v = i < 0 ? "" : str(arr(avg.totals)[i]); const x = v.split("-").map(Number); return x.length === 2 ? x : [null, null]; };
+  const T = (k) => { if (!tot) return null; const i = arr(tot.names).indexOf(k); return i < 0 ? null : arr(tot.totals)[i]; };
+  const [fgm, fga] = P("avgFieldGoalsMade-avgFieldGoalsAttempted"), [tpm, tpa] = P("avgThreePointFieldGoalsMade-avgThreePointFieldGoalsAttempted"), [ftm, fta] = P("avgFreeThrowsMade-avgFreeThrowsAttempted");
+  const years = arr(avg.statistics).map((s) => num(get(s, "season.year"), null)).filter(Boolean);
+  return {
+    gp: A("gamesPlayed"), min: A("avgMinutes"), pts: A("avgPoints"), reb: A("avgRebounds"), ast: A("avgAssists"), stl: A("avgSteals"), blk: A("avgBlocks"), tov: A("avgTurnovers"),
+    fgm, fga, tpm, tpa, ftm, fta, fgPct: A("fieldGoalPct"), threePct: A("threePointFieldGoalPct"), ftPct: A("freeThrowPct"),
+    totals: { pts: num(T("points"), null), reb: num(T("totalRebounds"), null), ast: num(T("assists"), null) },
+    from: years.length ? Math.min(...years) : null, to: years.length ? Math.max(...years) : null,
+  };
 }

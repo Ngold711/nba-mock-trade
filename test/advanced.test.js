@@ -69,7 +69,7 @@ test("pick ownership grid", () => {
 test("bio draft pedigree and college shooting splits", () => {
   const b = normalizeBio({ athlete: { id: "1", displayName: "Luka Doncic", displayDraft: "2018: Rd 1, Pk 3 (ATL)", displayBirthPlace: "Ljubljana, Slovenia", displayHeight: "6' 8\"", age: 27, displayExperience: "9th Season" } });
   assert.deepEqual([b.draft.year, b.draft.pick, b.draft.overall, b.draft.team, b.country], [2018, 3, 3, "ATL", "Slovenia"]);
-  assert.equal(normalizeBio({ athlete: { displayDraft: "2020: Rd 2, Pk 5 (NY)" } }).draft.overall, 35);
+  assert.equal(normalizeBio({ athlete: { displayDraft: "2014: Rd 2, Pk 41 (DEN)" } }).draft.overall, 41);   // Jokic: ESPN Pk is overall
   assert.equal(normalizeBio({ athlete: {} }).draft.text, "Undrafted");
   const sp = collegeSplits({ categories: [{ name: "averages", names: ["avgFieldGoalsMade-avgFieldGoalsAttempted", "avgThreePointFieldGoalsMade-avgThreePointFieldGoalsAttempted", "avgFreeThrowsMade-avgFreeThrowsAttempted", "avgTurnovers"],
     statistics: [{ season: { displayName: "2026-27" }, stats: ["5.0-10.3", "1.7-4.0", "3.7-5.7", "2.3"] }] }] }, "2026-27");

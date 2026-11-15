@@ -3,7 +3,7 @@ import {
   normalizeScoreboard, normalizeSummary, normalizeRoster, normalizeInjuries,
   normalizeStandings, normalizeTransactions, normalizeTeams,
   normalizeCollegeOverview, collegeBioFromRoster, collegeHeadshot,
-  normalizeNews, normalizePlayerStats, normalizeHonors, normalizeSchedule, normalizeBio, collegeSplits,
+  normalizeNews, normalizePlayerStats, normalizeHonors, normalizeSchedule, normalizeBio, collegeSplits, normalizeSearch, normalizeCareer,
 } from "./normalize.js";
 
 const SITE = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba";
@@ -28,6 +28,8 @@ export const ENDPOINTS = {
   collegeStats: ({ id }) => `${NCAA_ATHLETE}/${encodeURIComponent(id)}/stats`,
   bio: ({ id }) => `https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/${encodeURIComponent(id)}`,
   teamStats: ({ team }) => `${SITE}/teams/${encodeURIComponent(team)}/statistics`,
+  search: ({ q }) => `https://site.web.api.espn.com/apis/search/v2?query=${encodeURIComponent(q)}&type=player&limit=15`,
+  career: ({ id }) => `https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/${encodeURIComponent(id)}/stats`,
   collegeRoster: ({ team }) => `${NCAA_SITE}/teams/${encodeURIComponent(team)}/roster`,
 };
 
@@ -44,6 +46,8 @@ export const NORMALIZERS = {
   players: normalizePlayerStats,
   schedule: normalizeSchedule,
   bio: normalizeBio,
+  search: normalizeSearch,
+  career: normalizeCareer,
 };
 
 export class FetchError extends Error {
