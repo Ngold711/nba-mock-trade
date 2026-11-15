@@ -518,3 +518,24 @@ Built by an offline generator that cross-checks editorial data against ESPN:
 - **Multi-role profiles:** a role switcher (Player Career | Coaching Career | Front Office / GM | Ownership) covers MJ, Bird, Riley, West, Kerr, Ainge, Rivers, Redick, Russell and Phil Jackson.
 - **30 Teams Vault:** each team shows its Head Coach, Basketball Ops lead and Owner. Linked names open profiles.
 - **ⓘ popovers:** on screens ≤900px they become a fixed bottom sheet with 16px gutters and close when you tap outside or press Escape.
+
+## Round 12: Archive (search-first), complete people search, mystery Arcade cards
+
+- **Archive tab** (`archive.html`; `reference.html` now redirects here, keeping `?role=` and `?q=`).
+  - The bar reads Live · GM Lab · **Archive** · Arcade, with an archive-box icon.
+  - A Spotlight-style search is the hero: 16px input, ✕ clear button, focused automatically on desktop, `/` focuses it, Escape clears it.
+  - Role pills: All · Players · Coaches · Front Office · Owners.
+  - The emoji browse cards are gone. Three text pills (All-Time Leaders, Champions & Awards, Retired Jerseys) open the same sheets as before.
+- **Directory under the search** (when the search is empty):
+  - All or Players: *Trending & Legends* from `GET /api/archive/featured`, i.e. this season's top scorers plus all-time legends, with headshots, team badges and per-game stats.
+  - Coaches, Front Office or Owners: the full 30-team directory, with team logo, name, title, live team record or "since" year, and a `?` on unconfirmed names. Every row opens a profile.
+- **Search coverage** (`/api/players/search`):
+  - ESPN's NBA athlete search (`type=player&sport=basketball&league=nba&limit=25`) always runs in parallel with the local roster and legends caches. Results are merged, deduplicated and ranked.
+  - With few local matches, a cold ESPN lookup gets up to 4.5s. A timed-out answer is sent `no-store`, so it's never cached.
+  - `service/people.js` `directory()` builds a profile for every current head coach (live from ESPN rosters), every president/GM and every owner group in `nba_people.json`. All 30 teams × 3 roles are searchable and linked.
+  - `nba_people.json` now holds 108 editorial people, including 75+ notable all-time coaches, executives and owners. Career W–L is given only for finished careers.
+- **Wikipedia fallback** (`service/wiki.js`): when a coach, executive or owner isn't in the archive, the server asks Wikipedia's REST search and summary API. If that comes back empty (for example, rate-limited), the browser asks Wikipedia directly; it allows cross-origin requests.
+  - Results show as bio cards: description, summary, the NBA teams the summary names, the span of years and the championship lines. Everything is labelled "From Wikipedia" and links to the article.
+  - List, season and surname pages are dropped. Set `HOOPTRAX_WIKI=0` to turn off the server-side lookup.
+- **Arcade:** the four placeholder games are replaced by frosted mystery cards: blurred silhouette bars (`filter: blur(4px)`), a centered `?` and a COMING SOON pill.
+- **Ask Hooptrax clearance:** every main view gets `pb-28`-style bottom padding (7rem, plus the tab bar on phones), so the floating pill never covers the last card or button.

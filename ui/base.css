@@ -891,7 +891,50 @@ button.fo-c { cursor: pointer; box-shadow: inset 0 0 0 1px color-mix(in srgb, va
 @media (min-width: 640px) and (max-width: 900px) { .pop[open] > .pop-body { width: min(32rem, calc(100vw - 32px)); } }
 /* hub pages get the standard side gutters; every page leaves room under the floating Ask Hooptrax pill */
 .hub-page { width: min(100%, 64rem); margin: 0 auto; padding: 0.5rem max(1rem, env(safe-area-inset-right)) 1.5rem max(1rem, env(safe-area-inset-left)); box-sizing: border-box; }
-@media (max-width: 767px) { body.has-shell.has-orb { padding-bottom: calc(var(--tabbar-h) + 4.75rem); } }
-@media (min-width: 768px) { body.has-orb { padding-bottom: 5rem; } }
+/* pb-28: 7rem under every main view (plus the tab bar on phones) so the Ask Hooptrax pill never covers the last card or button */
+body.has-shell, body.has-orb, body.has-shell.has-orb { padding-bottom: calc(var(--tabbar-h, 0px) + 7rem); }
 .enc-roles button[aria-selected="true"] { background: var(--thumb, var(--surface)); color: var(--label); box-shadow: 0 1px 3px rgba(0,0,0,.18), 0 0 0 0.5px rgba(0,0,0,.04); border-radius: 0.5rem; }
 .enc-roles button { color: var(--label-2); font-weight: 650; }
+
+/* ---------- Archive (search-first) ---------- */
+.archive .large-title { margin-bottom: 0.25rem; }
+.archive .ref-search { padding-top: 0.5rem; }
+.archive .ref-field { min-height: 50px; border-radius: 0.95rem; padding: 0 0.6rem 0 0.95rem; box-shadow: inset 0 0 0 0.5px var(--sep); }
+.archive .ref-field:focus-within { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.archive .ref-field svg { width: 1.15rem; height: 1.15rem; }
+.archive .ref-field input { font-size: 16px; min-height: 48px; }
+.ref-field input::-webkit-search-cancel-button { -webkit-appearance: none; display: none; }
+.ref-clear { flex: none; width: 1.6rem; height: 1.6rem; border: 0; border-radius: 99px; background: var(--label-3); color: var(--bg); font: 800 0.7rem/1 system-ui, sans-serif; display: grid; place-items: center; cursor: pointer; }
+.ref-clear[hidden] { display: none; }
+.ref-links { display: flex; gap: 0.4rem; overflow-x: auto; scrollbar-width: none; margin: 0.15rem -1rem 0.9rem; padding: 0 1rem; }
+.ref-links::-webkit-scrollbar { display: none; }
+.ref-links button { flex: none; border: 0; border-radius: 999px; min-height: 34px; padding: 0 0.9rem; background: transparent; color: var(--accent); font: inherit; font-size: 0.875rem; font-weight: 600; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); cursor: pointer; white-space: nowrap; }
+#refDir[hidden] { display: none !important; }
+.dir-list { list-style: none; margin: 0 0 0.5rem; padding: 0.15rem 0; border-radius: 1rem; background: var(--surface); box-shadow: inset 0 0 0 0.5px var(--sep); }
+.dir-list > li + li .dir-row { box-shadow: inset 0 0.5px 0 var(--sep); }
+.dir-row { display: flex; align-items: center; gap: 0.75rem; width: 100%; min-height: 56px; padding: 0.5rem 0.85rem; border: 0; background: none; color: var(--label); font: inherit; text-align: left; cursor: pointer; }
+.dir-row[disabled] { cursor: default; opacity: 0.85; }
+.dir-face { position: relative; flex: none; width: 2.6rem; height: 2.6rem; border-radius: 99px; overflow: hidden; background: var(--fill); display: grid; place-items: center; font: 800 0.75rem/1 var(--font-mono, ui-monospace); color: var(--label-3); }
+.dir-face img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.dir-logo { flex: none; width: 2.25rem; height: 2.25rem; object-fit: contain; }
+.dir-who { flex: 1; min-width: 0; display: grid; gap: 0.1rem; }
+.dir-who b { font-size: 0.975rem; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dir-who small { display: flex; align-items: center; gap: 0.3rem; color: var(--label-2); font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dir-badge { width: 1rem; height: 1rem; object-fit: contain; }
+.dir-stat { flex: none; display: grid; justify-items: end; gap: 0.1rem; }
+.dir-stat b { font: 700 1rem/1 var(--font-mono, ui-monospace); font-variant-numeric: tabular-nums; }
+.dir-stat small { color: var(--label-3); font-size: 0.6875rem; white-space: nowrap; }
+.dir-row .chev { flex: none; color: var(--label-3); font-size: 1.2rem; }
+@media (max-width: 380px) { .dir-stat small { display: none; } }
+.enc-tag.wiki { background: rgba(148,163,184,.18); color: var(--label-2); }
+
+/* ---------- Arcade mystery cards ---------- */
+.soon.mystery { min-height: 7.5rem; place-items: center; overflow: hidden; isolation: isolate;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 10%, var(--surface)), var(--surface)); }
+.m-silhouette { position: absolute; inset: 1rem 1rem auto; display: grid; gap: 0.45rem; filter: blur(4px); opacity: 0.55; z-index: -1; }
+.m-silhouette i { display: block; height: 0.7rem; border-radius: 99px; background: var(--label-3); }
+.m-silhouette i:nth-child(1) { width: 2.4rem; height: 2.4rem; border-radius: 0.7rem; }
+.m-silhouette i:nth-child(2) { width: 75%; } .m-silhouette i:nth-child(3) { width: 50%; }
+.soon.mystery::after { content: ""; position: absolute; inset: 0; z-index: -1; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.mq { font: 900 2.4rem/1 var(--font-mono, ui-monospace); color: var(--label-2); text-shadow: 0 2px 14px color-mix(in srgb, var(--accent) 45%, transparent); }
+.soon.mystery .soon-tag { position: static; justify-self: center; margin-top: 0.35rem; padding: 0.3rem 0.55rem; border-radius: 99px; }

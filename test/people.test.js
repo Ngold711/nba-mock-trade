@@ -69,3 +69,26 @@ test("front offices join the live ESPN head coach", () => {
   assert.equal(fo.find((t) => t.team === "GSW").coach.person, "steve-kerr");
   assert.equal(fo.find((t) => t.team === "ATL").coach, null);            // no ESPN coach → nothing invented
 });
+
+import { directory } from "../service/people.js";
+test("directory: every current coach (live ESPN), president/GM and owner gets a searchable, linked profile", () => {
+  const league = { teams: Object.fromEntries(CODES.map((c) => [({ GSW: "GS", NOP: "NO", NYK: "NY", SAS: "SA", UTA: "UTAH", WAS: "WSH" })[c] || c, { coach: c === "BOS" ? "Joe Mazzulla" : c === "IND" ? "Rick Carlisle" : `Coach ${c}` }])) };
+  const d = directory(P, league);
+  for (const c of CODES) {
+    assert.ok(d.link[c].coach, `${c} coach linked`); assert.ok(d.link[c].owner, `${c} owner linked`);
+    assert.ok(d.link[c].president || d.link[c].gm, `${c} front office linked`);
+  }
+  const ids = d.people.map((p) => p.id); assert.equal(new Set(ids).size, ids.length, "unique ids");
+  assert.equal(d.people.find((p) => p.id === "rick-carlisle").coach.current, "IND");
+  assert.equal(d.people.find((p) => p.id === "doc-rivers").coach.current, null, "current job re-derived from ESPN");
+  assert.equal(searchPeople("coach atl", d.people, { role: "coach" })[0].team, "ATL");
+  assert.ok(searchPeople("bobby webster", d.people, { role: "exec" })[0].unverified);
+  const fo = frontOffices(P, league);
+  assert.ok(fo.every((t) => t.coach.person && t.owner.person && (t.president || t.gm).person));
+});
+test("archive covers 75+ notable all-time coaches, executives and owners", () => {
+  const notable = P.people.filter((p) => p.roles.some((r) => r !== "player"));
+  assert.ok(notable.length >= 100, `${notable.length}`);
+  for (const id of ["phil-jackson", "red-auerbach", "gregg-popovich", "pat-riley", "jerry-west", "bob-myers", "sam-presti", "masai-ujiri", "daryl-morey", "rc-buford", "danny-ainge", "don-nelson", "lenny-wilkens", "george-karl", "jerry-sloan", "rick-carlisle", "doc-rivers", "mike-dantoni", "rudy-tomjanovich", "chuck-daly", "hubie-brown", "jerry-buss", "mark-cuban", "steve-ballmer", "joe-lacob", "micky-arison", "peter-holt", "wyc-grousbeck"])
+    assert.ok(P.people.some((p) => p.id === id), id);
+});

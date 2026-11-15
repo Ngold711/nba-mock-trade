@@ -8,7 +8,7 @@ const CODE_OF = { GS: "GSW", NO: "NOP", NY: "NYK", SA: "SAS", UTAH: "UTA", WSH: 
 export const ROLE_LABEL = { player: "Player Career", coach: "Coaching Career", exec: "Front Office / GM", owner: "Ownership" };
 export const ROLES = ["player", "coach", "exec", "owner"];
 
-const yrs = (s) => (s.to == null ? `${s.from}–present` : s.from === s.to ? `${s.from}` : `${s.from}–${s.to}`);
+const yrs = (s) => (s.from == null ? (s.to == null ? "Current" : `–${s.to}`) : s.to == null ? `${s.from}–present` : s.from === s.to ? `${s.from}` : `${s.from}–${s.to}`);
 export const stintYears = yrs;
 
 /** Search people by name (optionally one role). */
@@ -20,7 +20,50 @@ export function searchPeople(q, people, { role = null, limit = 12 } = {}) {
 }
 export function summary(p) {
   const team = p.coach?.current || p.exec?.stints?.find((x) => x.to == null)?.team || p.owner?.teams?.find((x) => x.to == null)?.team || "";
-  return { kind: "person", id: p.id, name: p.name, roles: p.roles, playerId: p.playerId || null, team, years: "" };
+  return { kind: "person", id: p.id, name: p.name, roles: p.roles, playerId: p.playerId || null, team, years: "", ...(p.meta?.verified === false ? { unverified: true } : {}) };
+}
+
+const slug = (s) => norm(s).replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+/**
+ * The full people directory: the editorial archive plus a generated profile for every current head coach
+ * (live from ESPN rosters), president/GM and owner who has no editorial entry, so all 30 teams × 3 roles are
+ * searchable and tappable. Current coaching jobs are re-derived from ESPN when the feed has coaches.
+ * Returns { people, link } where link[code] = { coach, president, gm, owner } person ids.
+ */
+export function directory(data, league = null) {
+  const base = data?.people || [];
+  const espnCoach = (code) => league?.teams?.[ESPN_OF[code] || code]?.coach || "";
+  const live = Object.keys(data?.teams || {}).some((c) => espnCoach(c));
+  const people = base.map((p) => (p.coach && live ? { ...p, coach: { ...p.coach, current: null } } : p));
+  const byName = new Map(people.map((p, i) => [norm(p.name), i]));
+  const ids = new Set(people.map((p) => p.id));
+  const fresh = (name, code) => { let id = slug(name) || `person-${code.toLowerCase()}`; if (ids.has(id)) id = `${id}-${code.toLowerCase()}`.slice(0, 40); ids.add(id); return id; };
+  const link = {};
+  for (const [code, t] of Object.entries(data?.teams || {})) {
+    const L = (link[code] = { coach: null, president: null, gm: null, owner: null });
+    const cn = espnCoach(code);
+    if (cn) {
+      const i = byName.get(norm(cn));
+      if (i != null && people[i].coach) { people[i] = { ...people[i], coach: { ...people[i].coach, current: code } }; L.coach = people[i].id; }
+      else if (i != null) { people[i] = { ...people[i], roles: [...people[i].roles, "coach"], coach: { stints: [{ team: code, from: null, to: null }], titles: [], current: code } }; L.coach = people[i].id; }
+      else {
+        const p = { id: fresh(cn, code), name: cn, roles: ["coach"], coach: { stints: [{ team: code, from: null, to: null }], titles: [], current: code }, meta: { generated: true, verified: true, source: "ESPN (live)" } };
+        people.push(p); byName.set(norm(cn), people.length - 1); L.coach = p.id;
+      }
+    }
+    for (const r of ["president", "gm", "owner"]) {
+      const x = t[r]; if (!x?.name) continue;
+      if (x.person && ids.has(x.person)) { L[r] = x.person; continue; }
+      const i = byName.get(norm(x.name));
+      if (i != null) { L[r] = people[i].id; continue; }
+      const meta = { generated: true, verified: !!x.verified, source: x.source || "", note: x.note || "" };
+      const p = r === "owner"
+        ? { id: fresh(x.name, code), name: x.name, roles: ["owner"], owner: { teams: [{ team: code, from: x.since ?? null, to: null, note: x.note || "" }], titles: [] }, meta }
+        : { id: fresh(x.name, code), name: x.name, roles: ["exec"], exec: { stints: [{ team: code, title: x.title || (r === "gm" ? "General Manager" : "Basketball Operations"), from: x.since ?? null, to: null }], titles: [] }, meta };
+      people.push(p); byName.set(norm(x.name), people.length - 1); L[r] = p.id;
+    }
+  }
+  return { people, link };
 }
 
 /** Index: playerId → person (for multi-role players opened from player search). */
@@ -49,21 +92,23 @@ export function personProfile(p, { standings = null, league = null, history = nu
   const player = p.roles.includes("player") ? { playerId: p.playerId || null, span: p.player?.span || "", note: p.player?.note || "", career: leg ? { gp: leg.gp, pts: leg.pts, reb: leg.reb, ast: leg.ast, totals: leg.totals } : null } : null;
   const coy = p.coach?.coy?.length ? p.coach.coy : (history?.awards?.coy || []).filter((a) => norm(a.name) === norm(p.name)).map((a) => a.year);
   if (coach && !coach.coy.length && coy.length) coach.coy = coy;
-  return { id: p.id, name: p.name, roles: p.roles, headshot: p.playerId ? `https://a.espncdn.com/i/headshots/nba/players/full/${p.playerId}.png` : null, player, coach, exec, owner };
+  return { id: p.id, name: p.name, roles: p.roles, meta: p.meta || null, headshot: p.playerId ? `https://a.espncdn.com/i/headshots/nba/players/full/${p.playerId}.png` : null, player, coach, exec, owner };
 }
 
-/** The 30 current front offices: head coach from ESPN (live), president/GM/owner from nba_people.json. */
-export function frontOffices(data, league) {
-  const people = new Map((data?.people || []).map((p) => [p.id, p]));
+/** The 30 current front offices: head coach from ESPN (live), president/GM/owner from nba_people.json; every name links to a profile. */
+export function frontOffices(data, league, standings = null) {
+  const dir = directory(data, league);
+  const rec = {};
+  for (const c of standings?.conferences || []) for (const t of c.teams || []) if (t.team?.abbr) rec[CODE_OF[t.team.abbr] || t.team.abbr] = { w: t.wins, l: t.losses, seed: t.seed, conf: c.abbr || c.name };
   return Object.entries(data?.teams || {}).map(([code, t]) => {
     const espn = league?.teams?.[ESPN_OF[code] || code];
     const coachName = espn?.coach || "";
-    const coachPerson = (data?.people || []).find((p) => p.coach?.current === code || norm(p.name) === norm(coachName));
-    const role = (x) => (x ? { name: x.name, title: x.title || "", verified: !!x.verified, source: x.source || "", note: x.note || "", since: x.since || null, person: x.person && people.has(x.person) ? x.person : null } : null);
+    const L = dir.link[code] || {};
+    const role = (x, r) => (x ? { name: x.name, title: x.title || "", verified: !!x.verified, source: x.source || "", note: x.note || "", since: x.since ?? null, person: L[r] || null } : null);
     return {
-      team: code, name: espn?.displayName || code, logo: espn?.logo || null, color: espn?.color || null,
-      coach: coachName ? { name: coachName, verified: true, source: "ESPN (live)", person: coachPerson && norm(coachPerson.name) === norm(coachName) ? coachPerson.id : null } : null,
-      president: role(t.president), gm: role(t.gm), owner: role(t.owner),
+      team: code, name: espn?.displayName || code, logo: espn?.logo || null, color: espn?.color || null, record: rec[code] || null,
+      coach: coachName ? { name: coachName, verified: true, source: "ESPN (live)", person: L.coach || null } : null,
+      president: role(t.president, "president"), gm: role(t.gm, "gm"), owner: role(t.owner, "owner"),
     };
   }).sort((a, b) => a.name.localeCompare(b.name));
 }

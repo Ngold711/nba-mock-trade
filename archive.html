@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Archive · Hooptrax</title>
+<meta name="description" content="The Hooptrax NBA encyclopedia: every player, coach, executive and owner from 1946 to 2026, career leaders, champions, awards and retired jerseys." />
+<meta name="theme-color" content="#0B0E14" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#F8FAFC" media="(prefers-color-scheme: light)" />
+<meta name="color-scheme" content="dark light" />
+<script>/* Privacy: purge pre-account history (the old global AI chat list and un-scoped trades, mock drafts and ballots). Personal work is now stored per user (ui/scoped.js); guests keep nothing. */(function(){var R=/^(hooptrax_ai_threads|hooptrax_ai_active|chat:v1|trade:workspace:v1|draft:v2:\d{4}|draft:simcount:\d{4}|awards:ballot|awards:ballot:v2|awards:picks)$/;[function(){return localStorage},function(){return sessionStorage}].forEach(function(f){try{var s=f();for(var i=s.length-1;i>=0;i--){var k=s.key(i);if(k&&R.test(k))s.removeItem(k)}}catch(e){}})})();</script>
+<script>/* theme before first paint: dark default, light optional (localStorage "htx:theme") */(function(){var t="dark";try{t=localStorage.getItem("htx:theme")==="light"?"light":"dark"}catch(e){}document.documentElement.setAttribute("data-theme",t);var c=t==="light"?"#F8FAFC":"#0B0E14";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c)})})();</script>
+<link rel="manifest" href="public/manifest.json" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Hooptrax" />
+<link rel="icon" href="public/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="public/favicon-32.png" type="image/png" sizes="32x32" />
+<link rel="apple-touch-icon" href="public/apple-touch-icon.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="public/apple-touch-icon.png" />
+<meta property="og:site_name" content="Hooptrax" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Archive · Hooptrax" />
+<meta property="og:description" content="The Hooptrax NBA encyclopedia: every player, coach, executive and owner from 1946 to 2026, career leaders, champions, awards and retired jerseys." />
+<meta property="og:url" content="https://hooptrax.com/archive.html" />
+<meta property="og:image" content="https://hooptrax.com/public/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Hooptrax: live NBA trade machine, 3-2-1 lottery simulator and draft hub" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Archive · Hooptrax" />
+<meta name="twitter:description" content="The Hooptrax NBA encyclopedia: every player, coach, executive and owner from 1946 to 2026, career leaders, champions, awards and retired jerseys." />
+<meta name="twitter:image" content="https://hooptrax.com/public/og-image.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
+<link rel="stylesheet" href="ui/base.css" />
+<style>
+
+</style>
+</head>
+<body>
+<header class="bar" id="bar"></header>
+<main class="hub-page archive">
+  <h1 class="large-title">Archive</h1>
+  <div class="ref-search">
+    <label class="ref-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M15.5 15.5 20 20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      <input id="refQ" type="search" enterkeyhint="search" placeholder="Every player, coach, GM and owner" autocomplete="off" autocapitalize="words" spellcheck="false" aria-label="Search the NBA archive" />
+      <button class="ref-clear" id="refClear" type="button" aria-label="Clear search" hidden>✕</button></label>
+    <div class="ref-filters" role="tablist" aria-label="Filter">
+      <button type="button" role="tab" data-role="" aria-selected="true">All</button><button type="button" role="tab" data-role="player" aria-selected="false">Players</button><button type="button" role="tab" data-role="coach" aria-selected="false">Coaches</button><button type="button" role="tab" data-role="exec" aria-selected="false">Front Office</button><button type="button" role="tab" data-role="owner" aria-selected="false">Owners</button>
+    </div>
+  </div>
+  <nav class="ref-links" aria-label="Browse the archive">
+    <button class="press" type="button" data-browse="leaders">All-Time Leaders</button><button class="press" type="button" data-browse="awards">Champions &amp; Awards</button><button class="press" type="button" data-browse="retired">Retired Jerseys</button>
+  </nav>
+  <ul class="list enc-results ref-results" id="refResults" hidden></ul>
+  <section id="refDir" aria-live="polite"></section>
+</main>
+<script src="data.js"></script>
+<script type="module">
+import { mountShell } from "./ui/shell.js";
+import { resultRow } from "./ui/encyclopedia.js";
+import { renderHistory } from "./ui/history.js";
+import { createSheet } from "./ui/motion.js";
+const shell = mountShell({ active: "archive" });
+const sheet = createSheet();
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const ESPN = { GSW: "gs", NOP: "no", NYK: "ny", SAS: "sa", UTA: "utah", WAS: "wsh" };
+const logo = (code) => `https://a.espncdn.com/i/teamlogos/nba/500/${ESPN[code] || String(code).toLowerCase()}.png`;
+const ROLE_WORD = { player: "players", coach: "coaches", exec: "front-office executives", owner: "owners" };
+const params = new URLSearchParams(location.search);
+let role = ["player", "coach", "exec", "owner"].includes(params.get("role")) ? params.get("role") : "", seq = 0, t = 0;
+
+/* ---------- search ---------- */
+const q = $("#refQ"), clear = $("#refClear"), res = $("#refResults"), dir = $("#refDir");
+let wikiMod = null;
+const browserWiki = (term, r) => (wikiMod ||= import("./service/wiki.js")).then((m) => m.wikiLookup(term, { role: r })).catch(() => []);
+async function search() {
+  const term = q.value.trim();
+  clear.hidden = !term;
+  if (term.length < 2) { res.hidden = true; dir.hidden = false; return; }
+  res.hidden = false; dir.hidden = true;
+  const my = ++seq;
+  res.innerHTML = `<li class="empty">Searching…</li>`;
+  try {
+    const r = await fetch(`/api/players/search?q=${encodeURIComponent(term)}${role ? `&role=${role}` : ""}`); const j = await r.json();
+    if (my !== seq) return;
+    let list = j.data?.players || [];
+    const knownPerson = list.some((p) => p.kind === "person" || p.kind === "wiki" || String(p.name).toLowerCase() === term.toLowerCase());
+    // the server's Wikipedia lookup can be rate-limited; ask Wikipedia from the browser before giving up
+    if ((role && role !== "player" && !list.length) || (!role && !knownPerson && list.length < 3)) {
+      res.innerHTML = list.map(resultRow).join("") + `<li class="empty">Checking Wikipedia…</li>`;
+      const names = new Set(list.map((p) => String(p.name).toLowerCase()));
+      const extra = (await browserWiki(term, role && role !== "player" ? role : null)).filter((c) => (role ? true : c.role !== "player") && !names.has(c.name.toLowerCase()));
+      if (my !== seq) return;
+      list = [...list, ...extra];
+    }
+    res.innerHTML = list.length ? list.map(resultRow).join("") : `<li class="empty">No ${role ? ROLE_WORD[role] : "one"} matching “${esc(term)}” in the archive, ESPN or Wikipedia.</li>`;
+  } catch { if (my === seq) res.innerHTML = `<li class="empty">Search is unavailable right now.</li>`; }
+}
+q.addEventListener("input", () => { clearTimeout(t); t = setTimeout(search, 160); });
+q.addEventListener("keydown", (e) => { if (e.key === "Escape" && q.value) { q.value = ""; search(); } });
+clear.addEventListener("click", () => { q.value = ""; search(); q.focus(); });
+document.addEventListener("keydown", (e) => { if (e.key === "/" && document.activeElement !== q && !sheet.isOpen && !/input|textarea|select/i.test(document.activeElement?.tagName || "")) { e.preventDefault(); q.focus(); } });
+function setRole(r) {
+  role = r;
+  document.querySelectorAll(".ref-filters [data-role]").forEach((x) => x.setAttribute("aria-selected", String(x.dataset.role === r)));
+  const u = new URL(location.href); r ? u.searchParams.set("role", r) : u.searchParams.delete("role"); history.replaceState(null, "", u);
+  renderDir(); search();
+}
+document.querySelectorAll(".ref-filters [data-role]").forEach((b) => b.addEventListener("click", () => setRole(b.dataset.role)));
+
+/* ---------- directory below the search ---------- */
+let featuredP = null, officesP = null;
+const featured = () => (featuredP ||= fetch("/api/archive/featured").then((r) => r.json()).then((j) => j.data).catch(() => { featuredP = null; return null; }));
+const offices = () => (officesP ||= fetch("/api/front-offices").then((r) => r.json()).then((j) => j.data).catch(() => { officesP = null; return null; }));
+const face = (src, name) => `<span class="dir-face">${src ? `<img src="${esc(src)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}<span>${esc(String(name).split(" ").map((w) => w[0]).slice(0, 2).join(""))}</span></span>`;
+const sk = (n) => `<ul class="dir-list">${Array.from({ length: n }, () => `<li class="dir-row"><span class="sk" style="width:2.5rem;height:2.5rem;border-radius:99px"></span><span class="sk" style="height:1rem;flex:1"></span></li>`).join("")}</ul>`;
+async function renderDir() {
+  const r = role;
+  if (!r || r === "player") {
+    dir.innerHTML = `<h2 class="group-h">Trending &amp; Legends</h2>${sk(6)}`;
+    const d = await featured(); if (role !== r) return;
+    if (!d) { dir.innerHTML = `<p class="empty">The directory is unavailable right now. Search still works.</p>`; return; }
+    const season = d.trending[0]?.season;
+    dir.innerHTML = `${d.trending.length ? `<h2 class="group-h">Trending · ${season ? `${season - 1}–${String(season).slice(2)}` : "this season"} scoring leaders</h2>
+      <ul class="dir-list">${d.trending.map((p) => `<li><button class="dir-row press" type="button" data-enc="${esc(p.id)}">${face(p.headshot, p.name)}
+        <span class="dir-who"><b>${esc(p.name)}</b><small><img class="dir-badge" src="${esc(p.teamLogo || logo(p.team))}" alt="" width="16" height="16" loading="lazy" referrerpolicy="no-referrer">${esc(p.team)}</small></span>
+        <span class="dir-stat"><b>${p.line.pts ?? "–"}</b><small>${p.line.reb ?? "–"} REB · ${p.line.ast ?? "–"} AST</small></span></button></li>`).join("")}</ul>` : ""}
+      <h2 class="group-h">Legends</h2>
+      <ul class="dir-list">${d.legends.map((p) => `<li><button class="dir-row press" type="button" data-enc="${esc(p.id)}">${face(p.headshot, p.name)}
+        <span class="dir-who"><b>${esc(p.name)}</b><small>${esc(p.span)}${p.mvp ? ` · ${p.mvp}× MVP` : ""}</small></span>
+        <span class="dir-stat"><b>${p.line.pts ?? "–"}</b><small>${p.line.reb ?? "–"} REB · ${p.line.ast ?? "–"} AST</small></span></button></li>`).join("")}</ul>
+      <p class="enc-note">Stat columns are points per game, then rebounds and assists. Search finds every NBA player since 1946.</p>`;
+    return;
+  }
+  const TITLE = { coach: "Head Coaches", exec: "Front Offices", owner: "Owners & Governors" };
+  dir.innerHTML = `<h2 class="group-h">${TITLE[r]} · all 30 teams</h2>${sk(8)}`;
+  const d = await offices(); if (role !== r) return;
+  if (!d) { dir.innerHTML = `<p class="empty">The directory is unavailable right now. Search still works.</p>`; return; }
+  const rows = [];
+  for (const tm of d.teams) {
+    const rec = tm.record ? `${tm.record.w}–${tm.record.l}` : "";
+    if (r === "coach" && tm.coach) rows.push({ tm, x: tm.coach, title: "Head Coach", right: rec, rightSub: rec ? "this season" : "" });
+    if (r === "exec") for (const x of [tm.president, tm.gm]) if (x) rows.push({ tm, x, title: x.title || "Basketball Operations", right: x.since ? `${x.since}` : "", rightSub: x.since ? "since" : "" });
+    if (r === "owner" && tm.owner) rows.push({ tm, x: tm.owner, title: tm.owner.note || "Owner / Governor", right: tm.owner.since ? `${tm.owner.since}` : "", rightSub: tm.owner.since ? "since" : "" });
+  }
+  dir.innerHTML = `<h2 class="group-h">${TITLE[r]} · all 30 teams</h2>
+    <ul class="dir-list">${rows.map(({ tm, x, title, right, rightSub }) => `<li><button class="dir-row press" type="button" ${x.person ? `data-person="${esc(x.person)}" data-role-pref="${r}"` : "disabled"}>
+      <img class="dir-logo" src="${esc(tm.logo || logo(tm.team))}" alt="" width="36" height="36" loading="lazy" referrerpolicy="no-referrer">
+      <span class="dir-who"><b>${esc(x.name)}${x.verified ? "" : ' <span class="unv" title="Not confirmed for 2026–27">?</span>'}</b><small>${esc(title)} · ${esc(tm.name)}</small></span>
+      ${right ? `<span class="dir-stat"><b>${esc(right)}</b><small>${esc(rightSub)}</small></span>` : ""}<span class="chev" aria-hidden="true">›</span></button></li>`).join("")}</ul>
+    <p class="enc-note">${r === "coach" ? "Head coaches and records are live from ESPN." : `Names marked <span class="unv">?</span> weren't confirmed against 2026–27 reporting.`}</p>`;
+}
+
+/* ---------- taps ---------- */
+document.addEventListener("click", (e) => {
+  if (e.target.closest(".sheet")) return;
+  const p = e.target.closest("main [data-enc]"); if (p) { shell.encyclopedia.openProfile(p.dataset.enc); return; }
+  const x = e.target.closest("main [data-person]"); if (x) { shell.encyclopedia.openPerson(x.dataset.person, { role: x.dataset.rolePref || null }); return; }
+  const w = e.target.closest("main [data-wiki]"); if (w) { shell.encyclopedia.openWiki(w.dataset.wiki); return; }
+  const b = e.target.closest("main [data-browse]"); if (b) browseOpen(b.dataset.browse);
+});
+let historyP = null;
+const historyData = () => (historyP ||= fetch("nba_history.json").then((r) => r.json()));
+async function browseOpen(kind) {
+  if (kind === "leaders" || kind === "awards") {
+    sheet.open({ title: kind === "leaders" ? "All-Time Leaders" : "Champions & Awards", render(body) { body.classList.add("ref-sheet"); renderHistory(body, { history: null }); } });
+    const h = await historyData(); if (sheet.isOpen) renderHistory(sheet.body, { history: h, tab: kind });
+    return;
+  }
+  if (kind === "retired") {
+    const h = await historyData();
+    const names = window.NBA_DATA?.teams || {};
+    sheet.open({ title: "Retired Jerseys", render(body) {
+      body.innerHTML = `<p class="enc-note" style="margin-top:0">League-wide: #6 Bill Russell (2022). Audited against team announcements, Nov 2026.</p><ul class="pp-list">${Object.entries(h.franchises).sort((a, b) => a[0].localeCompare(b[0])).map(([code, f]) => `<li class="pp-row rj"><img src="${logo(code)}" alt="" width="28" height="28" loading="lazy" referrerpolicy="no-referrer"><span class="pp-who"><b>${esc(names[code] ? `${names[code].city} ${names[code].name}` : code)}</b><small>${f.retired.map((r) => `#${esc(r.num)} ${esc(r.name)}`).join(" · ") || "No retired numbers"}${(f.upcomingRetirements || []).length ? ` <span class="up">· Coming: ${f.upcomingRetirements.map((u) => `#${esc(u.num)} ${esc(u.name)} (${esc(u.date)})`).join(", ")}</span>` : ""}</small></span><button class="link" type="button" data-team-hub="${code}">Vault ›</button></li>`).join("")}</ul>`;
+    } });
+  }
+}
+
+/* ---------- start ---------- */
+if (params.get("q")) q.value = params.get("q");
+setRole(role);
+// Spotlight-style: ready to type on desktop (phones keep the keyboard down until the field is tapped)
+if (matchMedia("(pointer: fine)").matches && !params.has("nofocus")) q.focus({ preventScroll: true });
+</script>
+</body>
+</html>

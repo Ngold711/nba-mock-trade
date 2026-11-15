@@ -17,7 +17,7 @@ import { mountEncyclopedia } from "./encyclopedia.js";
 
 const ICON = {
   gmlab: '<path d="M9 3h6M10 3v6.2L5.2 17.4A2.4 2.4 0 0 0 7.3 21h9.4a2.4 2.4 0 0 0 2.1-3.6L14 9.2V3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.5 15h9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
-  reference: '<path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5v-15zM5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 7.5h6M9 11h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+  archive: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><rect x="3" y="4" width="18" height="5" rx="1.3"/><path d="M5 9v9.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V9M10 13h4"/></g>',
   arcade: '<rect x="2.5" y="7" width="19" height="11" rx="5.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7.5 10.5v4M5.5 12.5h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="15.5" cy="11.3" r="1.1" fill="currentColor"/><circle cx="17.8" cy="13.7" r="1.1" fill="currentColor"/>',
   live: '<path d="M2 12h3.5l2.5-6 4 12 3-9 2 3H22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
   trade: '<path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
@@ -29,7 +29,7 @@ const ICON = {
 const svg = (k, cls = "ic") => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICON[k]}</svg>`;
 // Four sections. Tools live inside a section and show an iOS-style back link to their hub.
 export const TABS = [
-  ["live", "Live", "live.html"], ["gmlab", "GM Lab", "gmlab.html"], ["reference", "Reference", "reference.html"], ["arcade", "Arcade", "arcade.html"],
+  ["live", "Live", "live.html"], ["gmlab", "GM Lab", "gmlab.html"], ["archive", "Archive", "archive.html"], ["arcade", "Arcade", "arcade.html"],
 ];
 const SECTION_OF = { trade: "gmlab", draft: "gmlab", awards: "gmlab", mcconnell: "arcade" };
 const BACK_TO = { gmlab: ["GM Lab", "gmlab.html"], arcade: ["Arcade", "arcade.html"] };

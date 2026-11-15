@@ -29,7 +29,7 @@ export const ENDPOINTS = {
   collegeStats: ({ id }) => `${NCAA_ATHLETE}/${encodeURIComponent(id)}/stats`,
   bio: ({ id }) => `https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/${encodeURIComponent(id)}`,
   teamStats: ({ team }) => `${SITE}/teams/${encodeURIComponent(team)}/statistics`,
-  search: ({ q }) => `https://site.web.api.espn.com/apis/search/v2?query=${encodeURIComponent(q)}&type=player&limit=15`,
+  search: ({ q }) => `https://site.web.api.espn.com/apis/search/v2?query=${encodeURIComponent(q)}&type=player&sport=basketball&league=nba&limit=25`,
   career: ({ id }) => `https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/${encodeURIComponent(id)}/stats`,
   seasons: ({ id }) => `https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/${encodeURIComponent(id)}/stats`,
   gamelog: ({ id }) => `https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/${encodeURIComponent(id)}/gamelog`,

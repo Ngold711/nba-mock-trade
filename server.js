@@ -545,9 +545,16 @@ async function feedRoute(req, res, m, q) {
    Player Encyclopedia: search (active rosters + all-time legends + ESPN) and the full profile.
    ===================================================================== */
 import { searchLocal, mergeSearch, trophies } from "./service/player.js";
-import { searchPeople, personProfile, frontOffices, byPlayerId } from "./service/people.js";
+import { searchPeople, personProfile, frontOffices, byPlayerId, directory } from "./service/people.js";
+import { wikiLookup } from "./service/wiki.js";
 let peopleData = null;
 const loadPeople = () => (peopleData ||= readFile(join(ROOT, "nba_people.json"), "utf8").then(JSON.parse).catch(() => ({ teams: {}, people: [] })));
+/** Editorial archive + a profile for every current coach (live ESPN), president/GM and owner. */
+async function peopleDirectory() {
+  const [pd, league] = await Promise.all([loadPeople(), store.get("league").then((r) => r.data).catch(() => null)]);
+  return { pd, league, ...directory(pd, league) };
+}
+const WIKI_ON = process.env.HOOPTRAX_WIKI !== "0";
 import { retiredBy } from "./service/chat.js";
 import { resolveSalary as salaryOf } from "./service/trade.js";
 const timeout = (p, ms, fallback) => Promise.race([p, new Promise((r) => setTimeout(() => r(fallback), ms))]);
@@ -555,44 +562,78 @@ async function playerSearchRoute(req, res, m, q) {
   const term = String(q.get("q") || "").trim();
   if (term.length < 2 || term.length > 40) return json(res, 400, { error: "Search needs 2–40 characters" });
   const role = ["player", "coach", "exec", "owner"].includes(q.get("role")) ? q.get("role") : null;     // null = everyone
-  const pd = await loadPeople();
+  const dir = await peopleDirectory();
   res.setHeader("cache-control", "public, max-age=300");
-  if (role && role !== "player") {                     // Coaches / GMs & Execs / Owners: the people archive only
-    return json(res, 200, { data: { players: searchPeople(term, pd.people, { role }).map(({ score, ...p }) => p) } });
+  const wiki = (r) => (WIKI_ON ? wikiLookup(term, { role: r }) : Promise.resolve([]));
+  if (role && role !== "player") {                     // Coaches / Front Office / Owners: the directory, then Wikipedia
+    const hits = searchPeople(term, dir.people, { role, limit: 20 }).map(({ score, ...p }) => p);
+    const extra = hits.length ? [] : await timeout(wiki(role), 3000, []);
+    return json(res, 200, { data: { players: [...hits, ...extra] } });
   }
-  const [league, d, stats] = await Promise.all([store.get("league").then((r) => r.data).catch(() => null), chatData().catch(() => ({})), store.get("players").then((r) => r.data).catch(() => null)]);
+  // ESPN's NBA athlete search (every player, 1946–today) always runs alongside our caches; never wait long for it
+  const TIMED_OUT = Symbol("timeout");
+  const espnP = store.get("search", { q: term.toLowerCase() }).then((r) => r.data).catch(() => []);
+  const [league, d, stats] = await Promise.all([Promise.resolve(dir.league), chatData().catch(() => ({})), store.get("players").then((r) => r.data).catch(() => null)]);
   const ppg = new Map((stats?.players || []).map((p) => [String(p.id), p.stats?.pts || 0]));
   const active = (league?.players || []).map((p) => ({ ...p, ppg: ppg.get(String(p.id)) || 0 }));
-  const roleOf = byPlayerId(pd.people);
+  const roleOf = byPlayerId(dir.people);
   const tag = (p) => (roleOf.has(String(p.id)) ? { ...p, roles: roleOf.get(String(p.id)).roles, personId: roleOf.get(String(p.id)).id } : p);
-  const local = searchLocal(term, { active, legends: d.history?.legends || [] }, 12);
-  // ESPN's athlete search fills in anyone our caches don't know (deep benches, older players); never wait long for it
-  const remote = local.length >= 8 ? [] : await timeout(store.get("search", { q: term.toLowerCase() }).then((r) => r.data).catch(() => []), 1500, []);
-  const pplHits = role === "player" ? [] : searchPeople(term, pd.people);
+  const local = searchLocal(term, { active, legends: d.history?.legends || [] }, 20);
+  // with few local matches, give a cold ESPN lookup more time; never let a timed-out answer be cached
+  let remote = await timeout(espnP, local.length >= 5 ? 1500 : 4500, TIMED_OUT);
+  if (remote === TIMED_OUT) { remote = []; res.setHeader("cache-control", "no-store"); }
+  const pplHits = role === "player" ? [] : searchPeople(term, dir.people, { limit: 12 });
   const pplNames = new Set(pplHits.map((p) => p.name.toLowerCase()));
+  // ESPN results: keep exact or partial name matches, ranked below our own close matches
+  const k = term.toLowerCase();
+  const remoteScore = (name) => { const n = String(name).toLowerCase(); return n === k ? 90 : n.startsWith(k) ? 70 : n.split(" ").some((w) => w.startsWith(k)) ? 55 : 30; };
   // drop ESPN "athlete" duplicates of people we profile ourselves (e.g. Popovich), unless it's their real player id
-  const players = mergeSearch(local, remote, 12).filter((p) => local.some((l) => l.id === p.id) || !pplNames.has(String(p.name).toLowerCase()) || roleOf.has(String(p.id)))
-    .map((p) => ({ ...tag(p), score: local.find((l) => l.id === p.id)?.score ?? 30 }));
-  // people not already shown as a player result (Auerbach, Popovich, Presti, owners, and players we lack stats for, like Riley)
+  const players = mergeSearch(local, remote, 25).filter((p) => local.some((l) => l.id === p.id) || !pplNames.has(String(p.name).toLowerCase()) || roleOf.has(String(p.id)))
+    .map((p) => ({ ...tag(p), score: local.find((l) => l.id === p.id)?.score ?? remoteScore(p.name) }));
   const shown = new Set(players.map((p) => String(p.id)));
   const people = pplHits.filter((p) => !p.playerId || !shown.has(String(p.playerId)));
-  const out = [...players, ...people].sort((a, b) => b.score - a.score).slice(0, 12).map(({ score, ...p }) => p);
+  let out = [...players, ...people].sort((a, b) => b.score - a.score).slice(0, 20).map(({ score, ...p }) => p);
+  if (!role && !people.length && out.length < 3 && !out.some((p) => String(p.name).toLowerCase() === k)) {      // nobody we know by that name: try Wikipedia for coaches/executives/owners
+    const names = new Set(out.map((p) => p.name.toLowerCase()));
+    out = [...out, ...(await timeout(wiki(null), 3000, [])).filter((c) => c.role !== "player" && !names.has(c.name.toLowerCase()))];
+  }
   return json(res, 200, { data: { players: out } });
 }
 /** ESPN's displayDOB is day/month/year ("17/2/1963") → "Feb 17, 1963". */
 const fmtDob = (d) => { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(d || "")); return m ? new Date(Date.UTC(+m[3], +m[2] - 1, +m[1])).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : String(d || ""); };
 async function personRoute(req, res, m) {
-  const pd = await loadPeople();
-  const p = pd.people.find((x) => x.id === m[1]);
+  const dir = await peopleDirectory();
+  const p = dir.people.find((x) => x.id === m[1]);
   if (!p) return json(res, 404, { error: "No profile with that id" });
-  const [standings, league, d] = await Promise.all([store.get("standings").then((r) => r.data).catch(() => null), store.get("league").then((r) => r.data).catch(() => null), chatData().catch(() => ({}))]);
+  const [standings, d] = await Promise.all([store.get("standings").then((r) => r.data).catch(() => null), chatData().catch(() => ({}))]);
+  const league = dir.league;
   res.setHeader("cache-control", "no-cache");
   return json(res, 200, { data: personProfile(p, { standings, league, history: d.history }) });
 }
 async function frontOfficesRoute(req, res) {
-  const [pd, league] = await Promise.all([loadPeople(), store.get("league").then((r) => r.data).catch(() => null)]);
+  const [pd, league, standings] = await Promise.all([loadPeople(), store.get("league").then((r) => r.data).catch(() => null), store.get("standings").then((r) => r.data).catch(() => null)]);
   res.setHeader("cache-control", "public, max-age=300");
-  return json(res, 200, { data: { asOf: pd.asOf, about: pd.about, teams: frontOffices(pd, league) } });
+  return json(res, 200, { data: { asOf: pd.asOf, about: pd.about, teams: frontOffices(pd, league, standings) } });
+}
+/** Archive landing list: this season's trending scorers + all-time legends (real headshots, team badges, stats). */
+const LEGEND_IDS = ["1035", "4145", "2334", "2335", "4152", "4142", "110", "215", "614", "619"];
+async function archiveFeaturedRoute(req, res) {
+  const [league, stats, d] = await Promise.all([store.get("league").then((r) => r.data).catch(() => null), store.get("players").then((r) => r.data).catch(() => null), chatData().catch(() => ({}))]);
+  const code = (a) => ({ GS: "GSW", NO: "NOP", NY: "NYK", SA: "SAS", UTAH: "UTA", WSH: "WAS" })[a] || a;
+  const r1 = (x) => (x == null ? null : Math.round(x * 10) / 10);
+  const trending = (stats?.players || []).filter((p) => (p.stats?.gp || 0) >= 3).sort((a, b) => (b.stats?.pts || 0) - (a.stats?.pts || 0)).slice(0, 8).map((p) => {
+    const team = league?.teams?.[p.teamAbbr];
+    return { id: String(p.id), name: p.name, team: code(p.teamAbbr), teamLogo: team?.logo || null, headshot: p.headshot || `https://a.espncdn.com/i/headshots/nba/players/full/${p.id}.png`,
+      line: { pts: r1(p.stats.pts), reb: r1(p.stats.reb), ast: r1(p.stats.ast) }, season: stats?.season || null };
+  });
+  const legends = d.history?.legends || [];
+  const byId = new Map(legends.map((l) => [String(l.id), l]));
+  const picked = LEGEND_IDS.map((id) => byId.get(id)).filter(Boolean);
+  const rest = legends.filter((l) => !l.active && !LEGEND_IDS.includes(String(l.id))).sort((a, b) => (b.honors?.mvp || 0) - (a.honors?.mvp || 0) || (b.totals?.pts || 0) - (a.totals?.pts || 0));
+  const legendRows = [...picked, ...rest].slice(0, 10).map((l) => ({ id: String(l.id), name: l.name, span: l.from && l.to ? `${l.from}–${l.active ? "now" : l.to}` : "", headshot: l.headshot,
+    line: { pts: l.pts, reb: l.reb, ast: l.ast }, mvp: l.honors?.mvp || 0 }));
+  res.setHeader("cache-control", "public, max-age=300");
+  return json(res, 200, { data: { trending, legends: legendRows } });
 }
 async function playerFullRoute(req, res, m) {
   const id = m[1];
@@ -648,6 +689,7 @@ const routes = [
   [/^\/api\/players\/(\d{1,12})\/full$/, playerFullRoute],
   [/^\/api\/people\/([a-z0-9-]{3,40})$/, personRoute],
   [/^\/api\/front-offices$/, frontOfficesRoute],
+  [/^\/api\/archive\/featured$/, archiveFeaturedRoute],
   [/^\/api\/ai-threads(?:\/([A-Za-z0-9_-]{5,40})(?:\/(delete))?)?$/, aiThreadsRoute],
   // spec names: /api/saved-items (your own items; POST saves) and /api/profile (your profile). Both require a session.
   [/^\/api\/saved-items(?:\/(public|private))?$/, (req, res, m, q) => (req.method === "POST" ? itemsRoute(req, res, [m[0]]) : meRoute(req, res, [m[0], "items", m[1] || q.get("visibility") || undefined]))],

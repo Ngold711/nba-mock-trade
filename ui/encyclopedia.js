@@ -15,13 +15,22 @@ const ROLE_TAG = { player: "Player", coach: "Coach", exec: "Exec", owner: "Owner
 /** Segmented role switcher (Player Career | Coaching Career | Front Office / GM | Ownership). */
 const rolesBar = (roles, current) => (roles?.length > 1 ? `<div class="seg enc-roles" role="tablist" aria-label="Career" style="--n:${roles.length}">${roles.map((r) => `<button type="button" role="tab" data-role="${r}" aria-selected="${r === current}">${ROLE_LABEL[r]}</button>`).join("")}</div>` : "");
 /** One search-result row (player or person). */
+const wikiCards = new Map();   // id → Wikipedia bio card from the last searches
+const WIKI_ROLE = { coach: "Coach", exec: "Front Office", owner: "Owner", player: "Player" };
 export function resultRow(p) {
+  if (p.kind === "wiki") {
+    wikiCards.set(p.id, p);
+    return `<li><button class="row press" type="button" data-wiki="${esc(p.id)}">
+    ${avatar({ name: p.name, headshot: p.thumb }, { size: "2.6rem", color: "#475569" })}
+    <span class="meta"><span class="nm">${esc(p.name)}</span><span class="sub">${esc(p.description || "NBA")}</span></span>
+    <span class="enc-tag wiki">${esc(WIKI_ROLE[p.role] || "Bio")} · W</span></button></li>`;
+  }
   const isPerson = p.kind === "person";
   const tag = isPerson ? p.roles.map((r) => ROLE_TAG[r]).join(" · ") : p.roles ? p.roles.map((r) => ROLE_TAG[r]).join(" · ") : p.active ? "Active" : p.active === false ? "Legend" : "NBA";
   const sub = isPerson ? (p.team ? `${esc(p.team)} · ` : "") + p.roles.map((r) => ROLE_LABEL[r].replace(" Career", "")).join(", ") : p.active ? `${esc(p.team)}${p.position ? ` · ${esc(p.position)}` : ""}` : p.years ? esc(p.years) : esc(p.team || "NBA");
   return `<li><button class="row press" type="button" ${isPerson ? `data-person="${esc(p.id)}"` : `data-enc="${esc(p.id)}"`}>
     ${avatar({ name: p.name, headshot: p.headshot || (p.playerId ? `https://a.espncdn.com/i/headshots/nba/players/full/${p.playerId}.png` : null) }, { size: "2.6rem", color: "#475569" })}
-    <span class="meta"><span class="nm">${esc(p.name)}</span><span class="sub">${sub}</span></span>
+    <span class="meta"><span class="nm">${esc(p.name)}${p.unverified ? ' <span class="unv" title="Not confirmed for 2026–27">?</span>' : ""}</span><span class="sub">${sub}</span></span>
     <span class="enc-tag ${isPerson || p.roles ? "role" : p.active ? "act" : "leg"}">${tag}</span></button></li>`;
 }
 const yearsTxt = (ys) => (ys.length > 6 ? `${ys.slice(0, 3).join(", ")} … ${ys.slice(-2).join(", ")}` : ys.join(", "));
@@ -57,7 +66,7 @@ export function mountEncyclopedia({ sheet, openCompare = () => {}, toast = () =>
       },
     });
     if (initial) { const s = document.getElementById("sheetSearch"); if (s) { s.value = initial; sheet.refresh(); } }
-    sheet.body.onclick = (e) => { const b = e.target.closest("[data-enc]"); if (b) return openProfile(b.dataset.enc); const pp = e.target.closest("[data-person]"); if (pp) openPerson(pp.dataset.person); };
+    sheet.body.onclick = (e) => { const b = e.target.closest("[data-enc]"); if (b) return openProfile(b.dataset.enc); const pp = e.target.closest("[data-person]"); if (pp) return openPerson(pp.dataset.person); const w = e.target.closest("[data-wiki]"); if (w) openWiki(w.dataset.wiki); };
   }
 
   /* ---------- profile ---------- */
@@ -227,9 +236,28 @@ export function mountEncyclopedia({ sheet, openCompare = () => {}, toast = () =>
       body.innerHTML = `<div class="enc-hero"><div class="enc-face">${avatar({ name: p.name, headshot: p.headshot }, { size: "5rem", color: "#475569", full: true })}</div>
           <div class="enc-id"><h3>${esc(p.name)}</h3><div class="enc-sub">${p.roles.map((r) => `<span class="enc-team role">${ROLE_TAG[r]}</span>`).join("")}</div></div></div>
         ${rolesBar(p.roles, S.role)}${personSection(p, S.role)}
+        ${p.meta?.generated ? `<p class="enc-note">${p.meta.verified ? "Directory entry" : 'Directory entry, <span class="unv">?</span> not confirmed against 2026–27 reporting'}${p.meta.source ? ` · Source: ${esc(p.meta.source)}` : ""}${p.meta.note ? ` · ${esc(p.meta.note)}` : ""}. Full career history isn't in the archive yet.</p>` : ""}
         <p class="enc-note">Coaching, front-office and ownership details are editorial (nba_people.json); current head coaches and records come live from ESPN.</p>`;
     }
   }
 
-  return { openSearch, openProfile, openPerson };
+  /** Bio card for a Wikipedia fallback result: everything shown is quoted or read from the Wikipedia summary. */
+  function openWiki(id) {
+    const c = wikiCards.get(id); if (!c) return;
+    const f = c.facts || {};
+    sheet.open({
+      title: "Profile",
+      render(body) {
+        body.innerHTML = `<div class="enc-hero"><div class="enc-face">${avatar({ name: c.name, headshot: c.thumb }, { size: "5rem", color: "#475569", full: true })}</div>
+          <div class="enc-id"><h3>${esc(c.name)}</h3><div class="enc-sub">${c.role ? `<span class="enc-team role">${esc(WIKI_ROLE[c.role])}</span>` : ""}<span class="enc-team">${esc(c.description || "")}</span></div></div></div>
+          <div class="enc-facts">${f.span ? `<div class="enc-fact"><small>Years mentioned</small><b>${esc(f.span)}</b></div>` : ""}<div class="enc-fact"><small>NBA teams named</small><b>${(f.teams || []).length}</b></div></div>
+          ${(f.teams || []).length ? `<h4 class="pp-h">Teams</h4><ul class="pp-list">${f.teams.map((t) => `<li class="pp-row"><img src="https://a.espncdn.com/i/teamlogos/nba/500/${({ GSW: "gs", NOP: "no", NYK: "ny", SAS: "sa", UTA: "utah", WAS: "wsh" })[t.code] || t.code.toLowerCase()}.png" alt="" width="28" height="28" loading="lazy" referrerpolicy="no-referrer"><span class="pp-who"><b>${esc(t.name)}</b></span></li>`).join("")}</ul>` : ""}
+          ${f.titles ? `<h4 class="pp-h">Championships</h4><p class="pp-lede">${esc(f.titles)}</p>` : ""}
+          <h4 class="pp-h">Bio</h4><p class="pp-lede">${esc(c.extract)}</p>
+          <p class="enc-note">From Wikipedia, not yet in the Hooptrax archive. Teams and years are read from the summary text. <a href="${esc(c.url)}" target="_blank" rel="noopener">Read on Wikipedia ›</a></p>`;
+      },
+    });
+  }
+
+  return { openSearch, openProfile, openPerson, openWiki };
 }
