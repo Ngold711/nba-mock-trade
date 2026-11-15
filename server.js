@@ -389,6 +389,7 @@ async function secret() {
 const authLimiter = createLimiter({ max: 12, windowMs: 10 * 60e3 });        // per IP: signup + login attempts
 const failLimiter = createLimiter({ max: 8, windowMs: 15 * 60e3 });         // per account: failed passwords
 const writeLimiter = createLimiter({ max: 60, windowMs: 10 * 60e3 });       // per user: saves, likes, edits
+const threadLimiter = createLimiter({ max: 300, windowMs: 10 * 60e3 });     // per user: AI chat history writes
 const clientIp = (req) => String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
 async function currentUser(req) {
   const p = verifyJwt(readCookie(req, COOKIE), await secret());
@@ -492,6 +493,42 @@ async function itemsRoute(req, res, m) {
   return json(res, 200, { data: { item: publicItem(up, user.id) } });
 }
 
+/** Auth middleware: resolves the session user or answers 401. Every per-user query below filters by user.id. */
+const requireUser = (handler) => async (req, res, m, q) => {
+  noStore(res);
+  const user = await currentUser(req).catch(() => null);
+  if (!user) return json(res, 401, { error: "Log in first" });
+  return handler(req, res, m, q, user);
+};
+
+/* Ask Hooptrax history for signed-in users (guests keep chats in page memory only). */
+const THREAD_ID = /^[A-Za-z0-9_-]{6,40}$/;
+function cleanThread(t) {
+  if (!t || !THREAD_ID.test(String(t.id || ""))) return null;
+  const msgs = (Array.isArray(t.messages) ? t.messages : []).slice(-80).map((m) => ({
+    role: m?.role === "assistant" ? "assistant" : "user",
+    text: String(m?.text || "").slice(0, 8000),
+    ...(m?.role === "assistant" ? { chips: Array.isArray(m.chips) ? m.chips.slice(0, 16) : [], cards: Array.isArray(m.cards) ? m.cards.slice(0, 8) : [], source: String(m.source || "").slice(0, 60), note: String(m.note || "").slice(0, 200) } : {}),
+  })).filter((m) => m.text);
+  if (!msgs.length) return null;
+  const out = { id: t.id, title: cleanText(t.title, 80) || "New chat", messages: msgs, updatedAt: Math.min(Date.now(), Number(t.updatedAt) || Date.now()) };
+  return JSON.stringify(out).length <= 256 * 1024 ? out : null;
+}
+const aiThreadsRoute = requireUser(async (req, res, m, q, user) => {
+  const store = await acct();
+  const [, id, action] = m;
+  if (req.method === "GET" && !id) return json(res, 200, { data: { threads: await store.listThreads(user.id) } });
+  if (req.method !== "POST") { res.writeHead(405); return res.end(); }
+  const body = await readJson(req, res, 300 * 1024); if (body == null) return;
+  if (!threadLimiter.hit(user.id)) return json(res, 429, { error: "Slow down a little and try again" });
+  if (id === "clear") return json(res, 200, { data: { deleted: await store.clearThreads(user.id) } });
+  if (id && action === "delete") return json(res, 200, { data: { ok: await store.deleteThread(id, user.id) } });
+  if (id) return json(res, 404, { error: "Unknown action" });
+  const t = cleanThread(body); if (!t) return json(res, 400, { error: "Invalid conversation" });
+  const saved = await store.upsertThread(user.id, t);
+  return saved ? json(res, 200, { data: { id: saved.id } }) : json(res, 409, { error: "Conversation id already in use" });
+});
+
 async function feedRoute(req, res, m, q) {
   noStore(res);
   const store = await acct();
@@ -509,6 +546,10 @@ const routes = [
   [/^\/api\/me(?:\/(items)(?:\/(public|private))?)?$/, meRoute],
   [/^\/api\/items(?:\/([A-Za-z0-9_-]{6,24})(?:\/(like|delete|update))?)?$/, itemsRoute],
   [/^\/api\/feed$/, feedRoute],
+  [/^\/api\/ai-threads(?:\/([A-Za-z0-9_-]{5,40})(?:\/(delete))?)?$/, aiThreadsRoute],
+  // spec names: /api/saved-items (your own items; POST saves) and /api/profile (your profile). Both require a session.
+  [/^\/api\/saved-items(?:\/(public|private))?$/, (req, res, m, q) => (req.method === "POST" ? itemsRoute(req, res, [m[0]]) : meRoute(req, res, [m[0], "items", m[1] || q.get("visibility") || undefined]))],
+  [/^\/api\/profile$/, (req, res, m) => meRoute(req, res, [m[0]])],
   [/^\/api\/trending-trades$/, trendingRoute],
   [/^\/api\/trade-adds$/, tradeAddsRoute],
   [/^\/api\/polls$/, pollsRoute],

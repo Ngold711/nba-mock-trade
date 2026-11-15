@@ -114,6 +114,51 @@ test("save privately vs save & post, feed filters, likes, visibility toggle, del
   assert.equal((await client().call(`/api/items/${pub.id}`)).body.data.item.favoriteTeam, "GSW");
 });
 
+test("AI chat history is per account: list, upsert, delete, clear; other users can't read or overwrite it", async () => {
+  const a = client(), b = client(), g = client();
+  await a.call("/api/auth/signup", { method: "POST", body: { email: "ai1@x.co", username: "ai_one", password: "password123" } });
+  await b.call("/api/auth/signup", { method: "POST", body: { email: "ai2@x.co", username: "ai_two", password: "password123" } });
+  const th = { id: "thrA123456", title: "Who won MVP in 1996", updatedAt: Date.now(), messages: [{ role: "user", text: "Who won MVP in 1996?" }, { role: "assistant", text: "Michael Jordan.", chips: [], cards: [], source: "gemini" }] };
+  for (const path of ["/api/ai-threads", "/api/saved-items", "/api/saved-items/private", "/api/profile", "/api/me/items/private"]) assert.equal((await g.call(path)).status, 401, path);
+  assert.equal((await g.call("/api/ai-threads", { method: "POST", body: th })).status, 401);
+  assert.equal((await a.call("/api/ai-threads", { method: "POST", body: th })).status, 200);
+  assert.deepEqual((await a.call("/api/ai-threads")).body.data.threads.map((t) => t.title), ["Who won MVP in 1996"]);
+  assert.deepEqual((await b.call("/api/ai-threads")).body.data.threads, []);                      // B sees nothing of A's
+  assert.equal((await b.call("/api/ai-threads", { method: "POST", body: { ...th, title: "hijack" } })).status, 409);   // same id, other owner
+  assert.equal((await a.call("/api/ai-threads")).body.data.threads[0].title, "Who won MVP in 1996");
+  assert.equal((await b.call(`/api/ai-threads/${th.id}/delete`, { method: "POST", body: {} })).body.data.ok, false);
+  assert.equal((await b.call("/api/ai-threads/clear", { method: "POST", body: {} })).body.data.deleted, 0);
+  assert.equal((await a.call("/api/ai-threads")).body.data.threads.length, 1);
+  assert.equal((await a.call("/api/ai-threads", { method: "POST", body: { id: "bad id!", messages: [] } })).status, 400);
+  assert.equal((await a.call("/api/ai-threads", { method: "POST", body: th, headers: { origin: "https://evil.example" } })).status, 403);
+  assert.equal((await a.call(`/api/ai-threads/${th.id}/delete`, { method: "POST", body: {} })).body.data.ok, true);
+  assert.deepEqual((await a.call("/api/ai-threads")).body.data.threads, []);
+  // spec routes: /api/saved-items and /api/profile are scoped to the session user
+  const it = (await a.call("/api/saved-items", { method: "POST", body: { type: "trade", visibility: "private", payload: TRADE } })).body.data.item;
+  assert.deepEqual((await a.call("/api/saved-items/private")).body.data.items.map((x) => x.id), [it.id]);
+  assert.deepEqual((await b.call("/api/saved-items/private")).body.data.items, []);
+  assert.equal((await b.call(`/api/items/${it.id}`)).status, 404);
+  assert.equal((await a.call("/api/profile")).body.data.user.username, "ai_one");
+  assert.equal((await a.call("/api/profile")).body.data.user.email, undefined);
+});
+
+test("orphaned (pre-account / unowned) items and threads are purged on start-up", async () => {
+  const { writeFileSync } = await import("node:fs");
+  const f = join(dir, "legacy.json");
+  writeFileSync(f, JSON.stringify({
+    users: [{ id: "u1", username: "owner", email: "o@x.co", passwordHash: "h", createdAt: "2026-01-01T00:00:00.000Z" }],
+    items: [{ id: "keep1", userId: "u1", type: "trade", visibility: "private", payloadJson: {} }, { id: "old1", userId: null, type: "trade", visibility: "public", payloadJson: {} }, { id: "old2", type: "draft", visibility: "public", payloadJson: {} }, { id: "old3", userId: "ghost", type: "draft", visibility: "public", payloadJson: {} }],
+    threads: [{ id: "t-keep", userId: "u1", title: "mine", messages: [{ role: "user", text: "hi" }], updatedAt: 1 }, { id: "t-old", userId: null, title: "legacy", messages: [], updatedAt: 1 }],
+  }));
+  const s = createJsonStore(f); await s.init();
+  assert.deepEqual((await s.listItems({ userId: "u1" })).map((x) => x.id), ["keep1"]);
+  assert.equal((await s.listFeed({})).length, 0);
+  assert.deepEqual((await s.listThreads("u1")).map((t) => t.id), ["t-keep"]);
+  await s.flushNow();
+  const raw = JSON.parse(readFileSync(f, "utf8"));
+  assert.deepEqual(raw.items.map((x) => x.id), ["keep1"]); assert.deepEqual(raw.threads.map((x) => x.id), ["t-keep"]);
+});
+
 test("payload validation", () => {
   assert.ok(validateItem({ type: "trade", payload: TRADE }).value);
   assert.match(validateItem({ type: "trade", payload: { ...TRADE, teams: ["LAL", "XXX"] } }).error, /teams/);
@@ -142,6 +187,15 @@ async function contract(store) {
   assert.equal((await store.getItem(it.id)).favoriteTeam, "NYK");
   assert.equal(await store.deleteItem(it.id, v.id), false);
   assert.equal(await store.deleteItem(it.id, u.id), true);
+  // AI threads: owner-only
+  const t = { id: "pgthread01", title: "t", messages: [{ role: "user", text: "q" }], updatedAt: Date.now() };
+  assert.ok(await store.upsertThread(u.id, t));
+  assert.equal(await store.upsertThread(v.id, { ...t, title: "hijack" }), null);
+  assert.deepEqual((await store.listThreads(u.id)).map((x) => x.title), ["t"]);
+  assert.deepEqual(await store.listThreads(v.id), []);
+  assert.equal(await store.deleteThread(t.id, v.id), false);
+  assert.equal(await store.clearThreads(u.id), 1);
+  assert.deepEqual(await store.purgeOrphans(), { items: 0, threads: 0 });
 }
 test("store contract: JSON file", async () => { await contract(createJsonStore(join(dir, "contract.json"))); });
 test("store contract: PostgreSQL", { skip: !process.env.PG_TEST_URL && "set PG_TEST_URL to run" }, async () => {

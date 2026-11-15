@@ -6,6 +6,7 @@
 // signed in" so the guest clean-up script in each page's <head> knows not to wipe a member's work.
 import { createSheet, createToast, dismissOnBackdrop } from "./motion.js";
 import { esc } from "./avatar.js";
+import { currentUid, adoptGuestWork, clearUserCache, resetGuestMemory } from "./scoped.js";
 
 export const TEAM_NAMES = {
   ATL: "Atlanta Hawks", BOS: "Boston Celtics", BKN: "Brooklyn Nets", CHA: "Charlotte Hornets", CHI: "Chicago Bulls", CLE: "Cleveland Cavaliers",
@@ -24,7 +25,26 @@ export const ago = (iso, now = Date.now()) => {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 };
 const GUEST_MSG = "Create a free Hooptrax account to save privately or post to the community";
-const flag = { set(u) { try { u ? localStorage.setItem("htx:acct", u) : localStorage.removeItem("htx:acct"); } catch {} } };
+// Session hints for synchronous start-up (written only after the server confirms the session): "htx:uid" picks the
+// per-user storage scope in ui/scoped.js; "htx:acct" is the display name.
+const flag = {
+  set(u) {
+    try {
+      if (u) { localStorage.setItem("htx:acct", u.username); localStorage.setItem("htx:uid", u.id); }
+      else { localStorage.removeItem("htx:acct"); localStorage.removeItem("htx:uid"); }
+    } catch {}
+  },
+};
+/** The page loaded with one identity's data but the server says another (expired session, other tab logged in/out):
+ *  fix the hint and reload once so nothing from the wrong scope stays on screen. */
+function syncScope(user) {
+  const want = user?.id || null, had = currentUid();
+  if (want === had) { try { sessionStorage.removeItem("htx:sync"); } catch {} return false; }
+  flag.set(user);
+  let tried = null; try { tried = sessionStorage.getItem("htx:sync"); sessionStorage.setItem("htx:sync", String(want)); } catch {}
+  if (tried === String(want)) return false;              // storage blocked: don't loop
+  location.reload(); return true;
+}
 
 async function api(path, { method = "GET", body } = {}) {
   const r = await fetch(path, { method, credentials: "same-origin", headers: body ? { "content-type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined });
@@ -55,7 +75,7 @@ const listeners = new Set();
 const emit = () => listeners.forEach((fn) => { try { fn(me); } catch {} });
 let readyP = null;
 export function refreshMe() {
-  readyP = api("/api/auth/me").then((d) => { me = d.user; counts = d.counts; flag.set(me?.username); loaded = true; emit(); return me; })
+  readyP = api("/api/auth/me").then((d) => { me = d.user; counts = d.counts; if (syncScope(me)) return me; loaded = true; emit(); return me; })
     .catch(() => { loaded = true; emit(); return me; });
   return readyP;
 }
@@ -111,7 +131,10 @@ export function openAuth({ mode = "signup", message = "", then = null } = {}) {
         err.hidden = true; go.disabled = true; go.textContent = m === "signup" ? "Creating…" : "Logging in…";
         try {
           const d = await api(`/api/auth/${m}`, { method: "POST", body: data });
-          me = d.user; counts = d.counts; flag.set(me.username); emit();
+          me = d.user; counts = d.counts; flag.set(me);
+          const carried = adoptGuestWork(me.id);   // the guest's in-progress trade / draft / ballot moves into this account
+          if (!carried && !then) { try { sessionStorage.setItem("htx:gate", "member"); } catch {} location.reload(); return; }   // load this account's own work
+          emit();
           sessionStorage.setItem("htx:gate", "member");
           closeGate(); S().close();
           T(m === "signup" ? `Welcome to Hooptrax, @${me.username}` : `Signed in as @${me.username}`);
@@ -207,7 +230,7 @@ export function openProfile({ tab = "public" } = {}) {
       body = b; draw();
       b.onclick = async (e) => {
         const t = e.target;
-        if (t.closest("[data-logout]")) { await api("/api/auth/logout", { method: "POST", body: {} }).catch(() => {}); me = null; counts = null; flag.set(null); emit(); S().close(); T("Logged out. You're browsing as a guest."); return; }
+        if (t.closest("[data-logout]")) { await logout(); return; }
         const tb = t.closest("[data-tab]"); if (tb && tb.dataset.tab !== view) { view = tb.dataset.tab; load(); return; }
         const row = t.closest("[data-item]"); if (row) { detail = items.find((x) => x.id === row.dataset.item); armed = null; draw(); b.scrollTop = 0; return; }
         if (t.closest("[data-back]")) { detail = null; draw(); return; }
@@ -231,6 +254,17 @@ export function openProfile({ tab = "public" } = {}) {
   });
 }
 
+/** Log out: end the session, remove this user's cached work from the device, and restart the page clean. */
+export async function logout() {
+  const id = me?.id;
+  await api("/api/auth/logout", { method: "POST", body: {} }).catch(() => {});
+  if (id) clearUserCache(id);
+  me = null; counts = null; flag.set(null); resetGuestMemory();
+  try { sessionStorage.setItem("htx:gate", "guest"); } catch {}
+  location.reload();
+}
+account.logout = logout;
+
 /* ---------- welcome gate ---------- */
 let gate = null;
 function closeGate() { if (!gate) return; gate.classList.remove("in"); const g = gate; gate = null; setTimeout(() => g.remove(), 220); }
@@ -245,10 +279,14 @@ function showGate() {
       <p>Save trades and mock drafts to your private vault, post them to the community, and upvote the best.</p>
       <button class="btn primary press gate-go" type="button" data-gate="account">Create Free Account / Log In</button>
       <button class="btn ghost press" type="button" data-gate="guest">Continue as Guest</button>
-      <small>Guests get every tool. Trades, drafts and ballots aren't kept between visits.</small></div>`;
+      <small>Guests get every tool, but nothing is saved: AI chats, trades, drafts and ballots clear when you refresh or leave.</small></div>`;
   document.body.append(gate);
   requestAnimationFrame(() => gate?.classList.add("in"));
-  const guest = () => { try { sessionStorage.setItem("htx:gate", "guest"); } catch {} closeGate(); };
+  const guest = () => {
+    try { sessionStorage.setItem("htx:gate", "guest"); } catch {}
+    resetGuestMemory(); dispatchEvent(new CustomEvent("htx:reset"));   // start the guest session with nothing kept
+    closeGate();
+  };
   dismissOnBackdrop(gate, guest, { isOpen: () => !!gate });
   gate.addEventListener("click", (e) => {
     const b = e.target.closest("[data-gate]"); if (!b) return;

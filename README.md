@@ -447,3 +447,26 @@ Built by an offline generator that cross-checks editorial data against ESPN:
   - Champion and MVP questions get the full lists.
   - The system prompt makes that data ground truth over the model's training. League-wide answers aren't truncated (`maxOutputTokens` 4096).
 - **Live check:** for jersey, Hall of Fame or honors questions that name a player or team, `liveVerify()` scans recent ESPN NBA news (the league feed plus that team's feed, 1.5 s budget) and adds matching headlines as `LIVE ESPN NEWS`.
+
+## Round 9: privacy and data isolation
+
+**Legacy purge**
+- On every page, the first script deletes pre-account history from `localStorage` and `sessionStorage`: the old global AI chat list `hooptrax_ai_threads`, plus `hooptrax_ai_active`, `chat:v1` and the un-scoped `trade:workspace:v1`, `draft:v2:<year>`, `draft:simcount:<year>`, `awards:ballot(:v2)` and `awards:picks` keys.
+- Those keys are never written any more, so nothing comes back.
+- On the server, both storage adapters delete saved items and AI threads that have no owner (`userId` null or unknown) at start-up (`purgeOrphans()`).
+
+**Guest mode keeps nothing**
+- Personal work goes through `ui/scoped.js`. For guests it lives only in an in-memory Map, never in `localStorage`, and a refresh, a new tab or "Continue as Guest" wipes it.
+- Guest AI chats live only in the chat module's memory.
+
+**Members**
+- Trade workspace, mock drafts and ballots are stored under `<key>::u:<userId>`, so two accounts on one device never share them.
+- AI chat history is stored server-side in `ai_threads`, per user, newest 50 kept, behind `GET|POST /api/ai-threads`, `POST /api/ai-threads/:id/delete` and `POST /api/ai-threads/clear`.
+- `/api/ai-threads`, `/api/saved-items` and `/api/profile` all require a session (401 otherwise), and every query filters by the session user's id.
+- A thread id that belongs to someone else is never overwritten (409).
+
+**Switching identity**
+- **Log out:** ends the session, deletes that user's cached keys from the device, wipes memory and reloads clean.
+- **Signing in:** loads that account's own data. A guest's in-progress trade, draft or ballot moves into the new account; the guest chat is dropped.
+- **"Continue as Guest":** wipes guest memory and chats.
+- **Mismatched session:** if the page's stored user id disagrees with the server (expired session, logout in another tab, a forged hint), the page fixes the hint and reloads once.

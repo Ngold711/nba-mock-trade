@@ -22,8 +22,8 @@ export class TakenError extends Error { constructor(field) { super(`${field} tak
 
 /* ------------------------------------------------------------------ JSON file */
 export function createJsonStore(file) {
-  let db = { users: [], items: [] }, loaded = null, timer = null, writing = Promise.resolve();
-  const load = () => (loaded ||= readFile(file, "utf8").then((t) => { const j = JSON.parse(t); db = { users: j.users || [], items: j.items || [] }; }).catch(() => {}));
+  let db = { users: [], items: [], threads: [] }, loaded = null, timer = null, writing = Promise.resolve();
+  const load = () => (loaded ||= readFile(file, "utf8").then((t) => { const j = JSON.parse(t); db = { users: j.users || [], items: j.items || [], threads: j.threads || [] }; }).catch(() => {}));
   const flush = () => {
     clearTimeout(timer);
     timer = setTimeout(() => {
@@ -39,7 +39,29 @@ export function createJsonStore(file) {
   const sortNew = (a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0);
   return {
     kind: "json",
-    async init() { await load(); },
+    async init() { await load(); const r = await this.purgeOrphans(); if (r.items || r.threads) flush(); },
+    /** Remove saved items / AI threads with no owner (pre-account data or deleted users). */
+    async purgeOrphans() {
+      await load();
+      const ids = new Set(db.users.map((u) => u.id));
+      const ni = db.items.length, nt = db.threads.length;
+      db.items = db.items.filter((x) => x.userId && ids.has(x.userId));
+      db.threads = db.threads.filter((x) => x.userId && ids.has(x.userId));
+      return { items: ni - db.items.length, threads: nt - db.threads.length };
+    },
+    async listThreads(userId) { await load(); return db.threads.filter((t) => t.userId === userId).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 50); },
+    async upsertThread(userId, t) {
+      await load();
+      const ex = db.threads.find((x) => x.id === t.id);
+      if (ex && ex.userId !== userId) return null;                      // someone else's id: never touch it
+      const row = { id: t.id, userId, title: t.title, messages: t.messages, updatedAt: t.updatedAt || Date.now() };
+      if (ex) Object.assign(ex, row); else db.threads.push(row);
+      const mine = db.threads.filter((x) => x.userId === userId).sort((a, b) => b.updatedAt - a.updatedAt);
+      if (mine.length > 50) { const drop = new Set(mine.slice(50).map((x) => x.id)); db.threads = db.threads.filter((x) => !drop.has(x.id)); }
+      flush(); return row;
+    },
+    async deleteThread(id, userId) { await load(); const n = db.threads.length; db.threads = db.threads.filter((x) => !(x.id === id && x.userId === userId)); if (n !== db.threads.length) flush(); return n !== db.threads.length; },
+    async clearThreads(userId) { await load(); const n = db.threads.length; db.threads = db.threads.filter((x) => x.userId !== userId); flush(); return n - db.threads.length; },
     async flushNow() { clearTimeout(timer); const snapshot = JSON.stringify(db); await mkdir(dirname(file), { recursive: true }); await writeFile(file, snapshot); },
     async createUser({ username, email, passwordHash, favoriteTeam = null }) {
       await load();
@@ -125,6 +147,14 @@ CREATE TABLE IF NOT EXISTS saved_items (
 CREATE INDEX IF NOT EXISTS saved_items_user ON saved_items (user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS saved_items_feed ON saved_items (visibility, created_at DESC);
 CREATE INDEX IF NOT EXISTS saved_items_top ON saved_items (visibility, likes_count DESC, created_at DESC);
+CREATE TABLE IF NOT EXISTS ai_threads (
+  id text PRIMARY KEY,
+  user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title text NOT NULL DEFAULT '',
+  messages_json jsonb NOT NULL DEFAULT '[]',
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS ai_threads_user ON ai_threads (user_id, updated_at DESC);
 `;
 const userRow = (r) => r && { id: r.id, username: r.username, email: r.email, passwordHash: r.password_hash, favoriteTeam: r.favorite_team, bio: r.bio, createdAt: new Date(r.created_at).toISOString() };
 const itemRow = (r) => r && {
@@ -144,7 +174,28 @@ export async function createPgStore(url, { Pool } = {}) {
   return {
     kind: "postgres",
     pool,
-    async init() { await q(SCHEMA); },
+    async init() { await q(SCHEMA); await this.purgeOrphans(); },
+    /** Remove saved items / AI threads with no owner (pre-account data). The FKs keep new orphans from appearing. */
+    async purgeOrphans() {
+      const a = await q("DELETE FROM saved_items WHERE user_id IS NULL OR user_id NOT IN (SELECT id FROM users)");
+      const b = await q("DELETE FROM ai_threads WHERE user_id IS NULL OR user_id NOT IN (SELECT id FROM users)");
+      return { items: a.rowCount, threads: b.rowCount };
+    },
+    async listThreads(userId) {
+      const { rows } = await q("SELECT id, title, messages_json, updated_at FROM ai_threads WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 50", [userId]);
+      return rows.map((r) => ({ id: r.id, userId, title: r.title, messages: r.messages_json, updatedAt: new Date(r.updated_at).getTime() }));
+    },
+    async upsertThread(userId, t) {
+      // ON CONFLICT … WHERE: an id that belongs to another user is never overwritten (returns no row)
+      const { rows } = await q(`INSERT INTO ai_threads (id, user_id, title, messages_json, updated_at) VALUES ($1, $2, $3, $4, to_timestamp($5 / 1000.0))
+        ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, messages_json = EXCLUDED.messages_json, updated_at = EXCLUDED.updated_at
+        WHERE ai_threads.user_id = EXCLUDED.user_id RETURNING id`, [t.id, userId, t.title, JSON.stringify(t.messages), t.updatedAt || Date.now()]);
+      if (!rows[0]) return null;
+      await q("DELETE FROM ai_threads WHERE user_id = $1 AND id NOT IN (SELECT id FROM ai_threads WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 50)", [userId]);
+      return { ...t, userId };
+    },
+    async deleteThread(id, userId) { const r = await q("DELETE FROM ai_threads WHERE id = $1 AND user_id = $2", [id, userId]); return r.rowCount > 0; },
+    async clearThreads(userId) { const r = await q("DELETE FROM ai_threads WHERE user_id = $1", [userId]); return r.rowCount; },
     async flushNow() {},
     async close() { await pool.end(); },
     async createUser({ username, email, passwordHash, favoriteTeam = null }) {

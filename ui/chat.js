@@ -3,20 +3,49 @@
 // local data engine). Player/team names become chips and the server attaches compact stat cards; both open
 // Quick-View / Team Vault through the shell's global [data-player] / [data-team-hub] delegation.
 //
-// Conversations: localStorage "hooptrax_ai_threads" = [{ id, title, updatedAt, messages[] }], newest first.
+// Conversations [{ id, title, updatedAt, messages[] }], newest first, are private to whoever is using the app:
+//   signed in → stored server-side per account (/api/ai-threads, filtered by the session user); nothing on disk here
+//   guest     → kept in this page's memory only: a refresh, a new tab or "Continue as Guest" wipes them.
+// Signing in, signing out or switching accounts resets the chat to that account's own history.
 // Closing the sheet (✕, backdrop tap, swipe down) saves the conversation to History and resets: the next tap on
 // the orb always opens a brand-new blank chat. An answer still streaming when the sheet closes finishes in the
 // background and is saved to its own thread.
 import { esc, avatar, teamLogo } from "./avatar.js";
 import { reduceMotion, dismissOnBackdrop } from "./motion.js";
+import { account } from "./account.js";
 
-const STORE = "hooptrax_ai_threads";
 const MAX_THREADS = 50, MAX_MSGS = 80;
 
-const ls = {
-  read() { try { const v = JSON.parse(localStorage.getItem(STORE) || "[]"); return Array.isArray(v) ? v : []; } catch { return []; } },
-  write(list) { try { localStorage.setItem(STORE, JSON.stringify(list.slice(0, MAX_THREADS))); } catch {} },
-};
+/** Thread repository for the current identity (an account, or the in-memory guest). */
+function createRepo() {
+  let list = [], owner, loading = null;
+  const timers = new Map();
+  const post = (path, body, keepalive = false) => fetch(path, { method: "POST", credentials: "same-origin", keepalive, headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).catch(() => {});
+  const send = (th) => { timers.delete(th.id); if (account.user && account.user.id === owner) post("/api/ai-threads", th); };
+  return {
+    get list() { return [...list].sort((a, b) => b.updatedAt - a.updatedAt); },
+    get owner() { return owner; },
+    /** Load the signed-in user's threads (guests: start empty). Re-runs only when the identity changes. */
+    ensure() {
+      const id = account.user?.id || null;
+      if (owner === id && loading) return loading;
+      if (owner === id) return Promise.resolve();
+      owner = id; list = [];
+      loading = !id ? Promise.resolve() : fetch("/api/ai-threads", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null))
+        .then((j) => { if (j && owner === id) list = j.data.threads || []; }).catch(() => {});
+      return loading;
+    },
+    put(th) {
+      list = [th, ...list.filter((t) => t.id !== th.id)].slice(0, MAX_THREADS);
+      if (!account.user || account.user.id !== owner) return;                   // guest: memory only
+      clearTimeout(timers.get(th.id)); timers.set(th.id, setTimeout(() => send(th), 400));
+    },
+    flush() { for (const [id, t] of timers) { clearTimeout(t); const th = list.find((x) => x.id === id); if (th && account.user?.id === owner) post("/api/ai-threads", th, true); } timers.clear(); },
+    remove(id) { list = list.filter((t) => t.id !== id); clearTimeout(timers.get(id)); timers.delete(id); if (account.user && account.user.id === owner) post(`/api/ai-threads/${encodeURIComponent(id)}/delete`, {}); },
+    clear() { list = []; timers.forEach(clearTimeout); timers.clear(); if (account.user && account.user.id === owner) post("/api/ai-threads/clear", {}); },
+    reset() { list = []; owner = undefined; loading = null; timers.forEach(clearTimeout); timers.clear(); },
+  };
+}
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const titleOf = (q) => { const t = String(q).replace(/\s+/g, " ").trim().replace(/[?.!]+$/, ""); return t.length > 48 ? t.slice(0, 46).replace(/\s+\S*$/, "") + "…" : t || "New chat"; };
 export function ago(ts, now = Date.now()) {
@@ -128,7 +157,7 @@ export function mountChat({ getClient }) {
   const hist = $(".chat-hist"), histList = $(".hist-list");
 
   /* ---------- threads ---------- */
-  let threads = ls.read();
+  const repo = createRepo();
   let cur = null;                           // the open thread { id, title, updatedAt, messages }
   const pending = new Set();                // ids of threads with an answer still streaming
   const deleted = new Set();
@@ -138,9 +167,17 @@ export function mountChat({ getClient }) {
     if (!th?.messages.length || deleted.has(th.id)) return;
     th.updatedAt = Date.now();
     th.messages = th.messages.slice(-MAX_MSGS);
-    threads = [th, ...ls.read().filter((t) => t.id !== th.id)];
-    ls.write(threads);
+    repo.put(th);
   }
+  addEventListener("pagehide", () => repo.flush());
+  /** Identity changed (sign in, sign out, switch account, Continue as Guest): drop everything in memory. */
+  function resetAll() {
+    repo.reset(); pending.clear(); deleted.clear(); cur = null;
+    if (!panel.hidden) { cur = blank(); showHist(false); paint(); paintStarters(); repo.ensure(); }
+  }
+  let lastUser = account.user?.id || null;
+  account.onChange((u) => { const id = u?.id || null; if (id !== lastUser) { lastUser = id; resetAll(); } });
+  addEventListener("htx:reset", resetAll);
 
   /* ---------- paint ---------- */
   const srcLabel = (m) => (m.source?.startsWith("gemini") ? "Hooptrax AI · live data" : "Hooptrax data engine") + (m.note ? ` · ${m.note}` : "");
@@ -175,25 +212,25 @@ export function mountChat({ getClient }) {
 
   /* ---------- history drawer ---------- */
   function paintHist() {
-    threads = ls.read().sort((a, b) => b.updatedAt - a.updatedAt);
+    const threads = repo.list;
     histList.innerHTML = threads.length
       ? threads.map((t) => `<div class="hist-row${cur && t.id === cur.id ? " cur" : ""}">
           <button class="hist-open press" type="button" data-open="${esc(t.id)}"><b>${esc(t.title)}</b><small>${esc(ago(t.updatedAt))} · ${t.messages.length} message${t.messages.length === 1 ? "" : "s"}</small></button>
           <button class="hist-del press" type="button" data-del="${esc(t.id)}" aria-label="Delete “${esc(t.title)}”">🗑</button></div>`).join("")
-      : `<div class="hist-empty">No saved conversations yet.</div>`;
+      : `<div class="hist-empty">${account.user ? "No saved conversations yet." : "Guest chats aren't saved. Sign in to keep your conversations."}</div>`;
     $("[data-clear-all]").hidden = !threads.length;
     $("[data-clear-all]").textContent = "Clear All History"; delete $("[data-clear-all]").dataset.armed;
   }
   function showHist(on) {
     hist.hidden = !on; $("[data-hist]").setAttribute("aria-expanded", String(on));
-    if (on) { paintHist(); requestAnimationFrame(() => hist.classList.add("in")); } else hist.classList.remove("in");
+    if (on) { paintHist(); repo.ensure().then(() => { if (!hist.hidden) paintHist(); }); requestAnimationFrame(() => hist.classList.add("in")); } else hist.classList.remove("in");
   }
   histList.addEventListener("click", (e) => {
     const o = e.target.closest("[data-open]"), d = e.target.closest("[data-del]");
-    if (o) { const t = ls.read().find((x) => x.id === o.dataset.open); if (t) { cur = t; showHist(false); paint(); } }
+    if (o) { const t = repo.list.find((x) => x.id === o.dataset.open); if (t) { cur = t; showHist(false); paint(); } }
     if (d) {
       const id = d.dataset.del;
-      deleted.add(id); ls.write(ls.read().filter((x) => x.id !== id));
+      deleted.add(id); repo.remove(id);
       if (cur?.id === id) { cur = blank(); paint(); paintStarters(); }
       paintHist();
     }
@@ -201,8 +238,8 @@ export function mountChat({ getClient }) {
   $("[data-clear-all]").addEventListener("click", (e) => {
     const b = e.currentTarget;
     if (!b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "Tap again to delete all"; setTimeout(() => { if (b.dataset.armed) { delete b.dataset.armed; b.textContent = "Clear All History"; } }, 3000); return; }
-    ls.read().forEach((t) => deleted.add(t.id)); pending.forEach((id) => deleted.add(id));
-    ls.write([]); cur = blank(); paintHist(); paint(); paintStarters(); showHist(false);
+    repo.list.forEach((t) => deleted.add(t.id)); pending.forEach((id) => deleted.add(id));
+    repo.clear(); cur = blank(); paintHist(); paint(); paintStarters(); showHist(false);
   });
   $("[data-hist]").addEventListener("click", () => showHist(hist.hidden));
   $("[data-hist-close]").addEventListener("click", () => showHist(false));
@@ -212,6 +249,7 @@ export function mountChat({ getClient }) {
   async function ask(q) {
     q = String(q || "").trim(); if (!q || busyHere()) return;
     const th = cur;                         // the answer always lands in this thread, even if the sheet closes
+    const asker = account.user?.id || null; // …and only for the identity that asked
     if (!th.messages.length) th.title = titleOf(q);
     const history = th.messages.slice(-6).map(({ role, text }) => ({ role, text }));
     th.messages.push({ role: "user", text: q }); pending.add(th.id); persist(th); paint();
@@ -256,6 +294,7 @@ export function mountChat({ getClient }) {
       msg.source = "local"; msg.cards = msg.cards || [];
     }
     cancelAnimationFrame(raf);
+    if ((account.user?.id || null) !== asker) return;                       // signed in/out meanwhile: drop it
     th.messages.push(msg); pending.delete(th.id); persist(th);
     if (visible()) { const node = ensureEl(); node.classList.remove("streaming"); node.innerHTML = botHtml(msg); scrollDown(); }
   }
@@ -302,6 +341,7 @@ export function mountChat({ getClient }) {
   let lastFocus = null;
   function open() {
     cur ||= blank();
+    repo.ensure();
     lastFocus = document.activeElement;
     panel.hidden = false; scrim.classList.add("on"); orb.classList.add("hide"); document.documentElement.classList.add("chat-open");
     requestAnimationFrame(() => panel.classList.add("in"));

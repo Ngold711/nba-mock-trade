@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#0B0E14" media="(prefers-color-scheme: dark)" />
 <meta name="theme-color" content="#F8FAFC" media="(prefers-color-scheme: light)" />
 <meta name="color-scheme" content="dark light" />
-<script>/* Guest mode: a guest's trades, mock drafts and ballots don't carry over to a new visit (members keep theirs). */(function(){try{var L=localStorage,S=sessionStorage;if(L.getItem("htx:acct")||S.getItem("htx:visit"))return;S.setItem("htx:visit","1");for(var i=L.length-1;i>=0;i--){var k=L.key(i);if(/^(trade:workspace|draft:v2:|draft:simcount:|awards:ballot|awards:picks)/.test(k))L.removeItem(k)}}catch(e){}})();</script>
+<script>/* Privacy: purge pre-account history (the old global AI chat list and un-scoped trades, mock drafts and ballots). Personal work is now stored per user (ui/scoped.js); guests keep nothing. */(function(){var R=/^(hooptrax_ai_threads|hooptrax_ai_active|chat:v1|trade:workspace:v1|draft:v2:\d{4}|draft:simcount:\d{4}|awards:ballot|awards:ballot:v2|awards:picks)$/;[function(){return localStorage},function(){return sessionStorage}].forEach(function(f){try{var s=f();for(var i=s.length-1;i>=0;i--){var k=s.key(i);if(k&&R.test(k))s.removeItem(k)}}catch(e){}})})();</script>
 <script>/* theme before first paint: dark default, light optional (localStorage "htx:theme") */(function(){var t="dark";try{t=localStorage.getItem("htx:theme")==="light"?"light":"dark"}catch(e){}document.documentElement.setAttribute("data-theme",t);var c=t==="light"?"#F8FAFC":"#0B0E14";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c)})})();</script>
 <link rel="manifest" href="public/manifest.json" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -308,6 +308,7 @@ import { renderReceipt } from "./ui/receipt.js";
 import { pickGrid } from "./service/draft.js";
 import { openImageSheet } from "./ui/card.js";
 import { saveFlow } from "./ui/account.js";
+import { isScoped, sget, sset } from "./ui/scoped.js";
 const shell = mountShell({ active: "trade" });
 
 const D = window.NBA_DATA;
@@ -319,7 +320,8 @@ const logoUrl = (c) => `https://a.espncdn.com/i/teamlogos/nba/500/${espnAbbr(c).
 const $ = (s, r = document) => r.querySelector(s);
 const slug = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const haptic = (ms = 8) => { try { navigator.vibrate && navigator.vibrate(ms); } catch {} };
-const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+// Personal work (the trade workspace) is per user, or in memory only for guests: see ui/scoped.js.
+const store = { get(k) { if (isScoped(k)) return sget(k); try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { if (isScoped(k)) return sset(k, v); try { localStorage.setItem(k, v); } catch {} } };
 const sheet = createSheet();
 const toast = createToast();
 scrollEdge($("#bar"));
