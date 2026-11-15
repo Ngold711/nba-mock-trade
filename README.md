@@ -321,3 +321,30 @@ Built by an offline generator that cross-checks editorial data against ESPN:
 - **Zero-key local engine:** with no key, after errors, or over the limit (15 AI calls per hour per IP), answers come straight from the
   live cache and `nba_history.json`: scores, standings, injuries, lottery, prospects, 2K27, salary and cap, retired numbers,
   champions, award winners and career leaders. Off-topic questions are declined.
+
+## NBA 2K-style redesign (round 5)
+
+**Draft (`draft.html`)**
+- The header is decluttered to three controls: the year switcher (2027 | 2028 | 2029), **🎲 Start Draft Lottery**, and **⚙ Settings**.
+- The Settings sheet holds:
+  - Sim 1,000x Odds Matrix
+  - Instant lottery
+  - Round 1 / 2-Round
+  - 3-2-1 / Classic 2019 format
+  - Animations on/off
+  - Mock draft actions: take board, auto-fill, projected order, clear picks
+- **Lottery reveal stage:** an envelope countdown from pick 16 to pick 1, with a 3D card flip for each pick. Each card shows the logo, the jump or drop delta, and any trade or swap badge.
+  - Teams that jump into the top 4 get a gold glow and a **LOTTERY JUMP!** tag.
+  - Use **Skip to Results ⏭** to jump ahead, and **Proceed to Mock Draft →** at the end.
+- **ON THE CLOCK banner:** shows the drafting team's color gradient, its logo, the pick number, and its top-2 positional needs.
+  - Three actions: **Pick Player**, **Sim Pick**, and **Sim Rest of Draft**. The CPU takes a need fit from the top 3 available, otherwise the best available.
+- **THE PICK IS IN card:** shows headshot, position, school or country, height/weight, and NBA comp. Turn animations off in Settings to sim instantly.
+
+**Trade Machine (`index.html`), "War Room"**
+- Each team card has a team-color header accent.
+- Player tiles show headshot, 2K27 OVR badge, and salary.
+- Pick cards are gold for 1sts and silver for 2nds, labeled with protection (for example "2027 1st • Unprotected / Protected top-4 / Swap pool · via XXX").
+- Each team has a Salary & Apron meter showing the cap, tax, 1st apron, and 2nd apron.
+- **PROPOSE TRADE** opens a GM verdict stamp:
+  - **✓ TRADE APPROVED**, or **✕ TRADE REJECTED** with a front-office reason taken from the actual CBA failure.
+  - A Sandbox Override switch and a Share Trade Card button.

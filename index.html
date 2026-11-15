@@ -186,6 +186,59 @@ main { max-width: 72rem; margin: 0 auto; padding: 0 max(1rem, env(safe-area-inse
 .pick-year .chip { padding: 0.45rem 0.65rem; }
 .dock #dockLink[disabled], .dock #dockCard[disabled] { opacity: .4; }
 @media (max-width: 34rem) { .page-head h2 { flex-basis: 100%; } .dock #dockLink span { display: none; } .fin { grid-template-columns: repeat(3, 1fr); } .fin .tier { grid-column: 1 / -1; justify-self: start; } }
+
+/* ===== NBA 2K War Room ===== */
+.wr-card { padding: 0; overflow: hidden; gap: 0.6rem; border-top: 0 !important; }
+.wr-card > *:not(.wr-head) { margin-inline: 1rem; }
+.wr-card > .wr-meter { margin-bottom: 1rem; }
+.wr-head { padding: 0.85rem 1rem 0.75rem; background: linear-gradient(115deg, color-mix(in srgb, var(--c) 55%, transparent), transparent 75%), var(--surface); border-bottom: 3px solid var(--c); }
+.wr-head .badge { box-shadow: 0 0 0 2px rgba(255,255,255,.25), 0 6px 18px color-mix(in srgb, var(--c) 50%, transparent); }
+.wr-card .section-label { margin-top: 0.1rem; }
+.player-tile { background: linear-gradient(90deg, color-mix(in srgb, var(--c) 10%, var(--surface-2)), var(--surface-2)); }
+.player-tile .nm .ovr { height: 1.35rem; min-width: 1.9rem; font-size: 0.75rem; vertical-align: 1px; margin-left: 0.2rem; }
+.pick-tile { border: 1px solid rgba(255,255,255,.12); }
+.pick-tile.gold { background: linear-gradient(120deg, #3A2A06 0%, #7A5410 18%, #F5C842 34%, #9A6A12 50%, #3A2A06 72%, #6B4A0E 100%); background-size: 220% 100%; animation: shine 6s ease-in-out infinite; color: #FFF7DD; }
+.pick-tile.silver { background: linear-gradient(120deg, #1F2733, #4B5565 30%, #C7D0DB 45%, #4B5565 60%, #1F2733); background-size: 220% 100%; color: #F1F5F9; }
+.pick-tile .nm { font-weight: 800; text-shadow: 0 1px 2px rgba(0,0,0,.45); } .pick-tile .sub { color: rgba(255,255,255,.85) !important; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+.pt-yr { width: 2.6rem; height: 2.6rem; border-radius: 0.6rem; display: grid; place-items: center; align-content: center; flex: none; background: rgba(0,0,0,.35); font-weight: 900; font-size: 1.05rem; line-height: 1; color: #fff; }
+.pt-yr small { font-size: 0.5rem; letter-spacing: 0.1em; margin-top: 0.1rem; }
+.pick-tile .icon-btn, .pick-tile .dest-static, .pick-tile .dest { background-color: rgba(0,0,0,.3); color: #fff; }
+@keyframes shine { 0%, 100% { background-position: 0% 0; } 50% { background-position: 100% 0; } }
+@media (prefers-reduced-motion: reduce) { .pick-tile.gold { animation: none; } }
+.wr-meter { display: grid; gap: 0.4rem; padding-top: 0.75rem; border-top: 1px solid var(--hair); }
+.wrm-top { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; font-size: 0.8125rem; color: var(--label-2); } .wrm-top > span:first-child { flex: 1; } .wrm-top b { color: var(--label); }
+.wrm-top .arr { color: var(--label-3); font-size: 0.75rem; }
+.wrm-bar { position: relative; height: 0.65rem; border-radius: 99px; background: var(--fill); margin-bottom: 0.7rem; }
+.wrm-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; background: var(--good); transition: width 400ms cubic-bezier(.2,.9,.3,1); }
+.wrm-fill.t-over { background: var(--accent); } .wrm-fill.t-apron1 { background: var(--warn); } .wrm-fill.t-apron2 { background: var(--bad); }
+.wrm-add { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(45deg, rgba(239,68,68,.75) 0 4px, rgba(239,68,68,.35) 4px 8px); border-radius: 0 99px 99px 0; }
+.wrm-ghost { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(45deg, rgba(148,163,184,.4) 0 4px, transparent 4px 8px); border-radius: 0 99px 99px 0; }
+.wrm-mark { position: absolute; top: -0.2rem; bottom: -0.2rem; width: 2px; background: var(--label-3); transform: translateX(-1px); }
+.wrm-mark i { position: absolute; top: 0.95rem; left: 50%; transform: translateX(-50%); font: 700 0.5rem/1 var(--font-mono); font-style: normal; color: var(--label-3); }
+.wrm-flow { display: flex; gap: 0.6rem; font-size: 0.75rem; color: var(--label-2); } .wrm-flow .up { color: var(--bad); } .wrm-flow .down { color: var(--good); }
+.wrm-flow .ok { margin-left: auto; color: var(--good); font-weight: 800; } .wrm-flow .no { margin-left: auto; color: var(--bad); font-weight: 800; }
+.vbanner.slim { display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 0.85rem; flex-wrap: wrap; }
+.vbanner.slim .vt { font-size: 0.9375rem; } .vbanner.slim .vh { font-size: 0.8125rem; color: var(--label-2); flex: 1; min-width: 12rem; }
+.dock .propose { font-weight: 900; letter-spacing: 0.06em; padding-inline: 1.25rem; box-shadow: 0 6px 20px rgba(245,158,11,.35); }
+.dock .propose:disabled { opacity: .45; box-shadow: none; }
+/* GM verdict stamp */
+.verdict[hidden] { display: none !important; }
+.verdict { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 1rem; background: rgba(3,5,9,.72); opacity: 0; transition: opacity 160ms ease; }
+.verdict.in { opacity: 1; }
+.vd-card { width: min(100%, 26rem); background: var(--surface); border: 1px solid var(--hair); border-radius: 1.2rem; padding: 1.25rem 1.1rem 1rem; box-shadow: var(--shadow-lg); display: grid; gap: 0.75rem; justify-items: center; text-align: center; transform: scale(.94); transition: transform 240ms cubic-bezier(.3,1.4,.5,1); }
+.verdict.in .vd-card { transform: none; }
+.vd-teams { display: flex; align-items: center; gap: 0.5rem; } .vd-x { color: var(--label-3); font-weight: 800; }
+.vd-stamp { font: 900 clamp(1.35rem, 6vw, 1.75rem)/1 var(--font-mono); letter-spacing: 0.06em; padding: 0.55rem 0.9rem; border: 4px solid currentColor; border-radius: 0.6rem; transform: rotate(-4deg) scale(1.6); opacity: 0; animation: stamp 420ms cubic-bezier(.2,1.6,.4,1) 120ms forwards; }
+.vd-stamp.ok { color: #10B981; text-shadow: 0 0 18px rgba(16,185,129,.6); box-shadow: 0 0 24px rgba(16,185,129,.35), inset 0 0 18px rgba(16,185,129,.15); }
+.vd-stamp.no { color: #EF4444; text-shadow: 0 0 18px rgba(239,68,68,.5); box-shadow: 0 0 24px rgba(239,68,68,.3), inset 0 0 18px rgba(239,68,68,.12); }
+.vd-stamp.sbx { color: #F59E0B; text-shadow: 0 0 18px rgba(245,158,11,.5); box-shadow: 0 0 24px rgba(245,158,11,.3); }
+@keyframes stamp { to { transform: rotate(-4deg) scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .vd-stamp { animation: none; transform: rotate(-4deg); opacity: 1; } .vd-card { transition: none; } }
+.vd-why { margin: 0.2rem 0 0; font-size: 0.9375rem; line-height: 1.5; color: var(--label); }
+.vd-more { margin: 0; padding-left: 1.1rem; text-align: left; font-size: 0.8125rem; color: var(--label-2); justify-self: stretch; } .vd-more.warn { color: var(--warn); }
+.vd-switch { justify-self: center; }
+.vd-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; justify-self: stretch; } .vd-acts .btn { min-height: 44px; } .vd-acts .btn:first-child { grid-column: 1 / -1; }
+.vd-acts .btn:disabled { opacity: .4; }
 </style>
 </head>
 <body>
@@ -206,11 +259,13 @@ main { max-width: 72rem; margin: 0 auto; padding: 0 max(1rem, env(safe-area-inse
   <p class="fine"><span class="pulse" id="rosterPulse"></span> <span id="rosterLabel">Loading rosters…</span></p>
 </main>
 
+<div class="verdict" id="verdict" role="dialog" aria-label="League office verdict" hidden></div>
 <div class="dock" id="dock">
   <span class="dot" id="dockDot"></span>
   <span class="msg" id="dockMsg">Add players to start</span>
   <button class="btn ghost press" id="dockLink" type="button" aria-label="Copy Trade Link">🔗<span> Copy Trade Link</span></button>
-  <button class="btn primary press" id="dockCard" type="button">Share Image Card</button>
+  <button class="btn primary press propose" id="proposeBtn" type="button">PROPOSE TRADE</button>
+  <button id="dockCard" type="button" hidden>Share Image Card</button>
 </div>
 
 <script src="data.js"></script>
@@ -221,6 +276,7 @@ import { createClient } from "./ui/client.js";
 import { mountShell } from "./ui/shell.js";
 import { resolveSalary, validateTrade, firstRoundHoldings, TIERS, money, encodeTrade, decodeTrade, STEPIEN_YEARS } from "./service/trade.js";
 import { renderReceipt } from "./ui/receipt.js";
+import { pickGrid } from "./service/draft.js";
 import { openImageSheet } from "./ui/card.js";
 const shell = mountShell({ active: "trade" });
 
@@ -412,16 +468,36 @@ const assetFace = (asset, size = "2.25rem") => asset.kind === "pick"
   ? `<span class="pick-icon" style="width:${size};height:${size}" aria-hidden="true">${String(asset.year).slice(2)}′</span>`
   : avatar(asset, { size, color: TEAMS[asset.from]?.color });
 const tierPill = (k) => `<span class="tier ${k}">${TIERS[k]}</span>`;
+let RATINGS = new Map();
+const ovrTier = (o) => (o >= 95 ? "gal" : o >= 90 ? "dia" : o >= 85 ? "ame" : o >= 80 ? "rub" : "base");
+const ovrOf = (a) => { const r = a.espnId && RATINGS.get(String(a.espnId)); return r ? `<span class="ovr t-${ovrTier(r.ovr)}" title="2K27 OVR${r.seeded ? "" : " (est.)"}">${r.ovr}</span>` : ""; };
+/** "2027 1st • Unprotected" style label from the pick-obligation config. */
+function pickLabel(a) {
+  const base = `${a.year} ${a.round === 1 ? "1st" : "2nd"}`;
+  if (a.round === 2) return { head: base, sub: a.origin !== a.from ? `via ${a.origin}` : "Own pick" };
+  const cell = PICKCFG ? pickGrid(PICKCFG, [a.origin])[a.origin]?.[String(a.year)] : null;
+  const prot = !cell || cell.status === "own" ? "Unprotected" : cell.status === "swap" ? "Swap pool" : cell.status === "protected" ? cell.note.replace(/^To \w+ /, "").replace(/^unless /, "Protected ") : "Unprotected";
+  return { head: base, sub: `${a.origin !== a.from ? `via ${a.origin} • ` : ""}${prot}` };
+}
+/** Visual salary & apron meter: payroll before → after against cap / tax / aprons. */
+function apronMeter(r) {
+  const c = cba(), max = c.secondApron * 1.12, pc = (v) => `${Math.max(0, Math.min(100, (v / max) * 100)).toFixed(2)}%`;
+  const up = r.post >= r.pre;
+  return `<div class="wr-meter" title="Payroll ${money(r.pre)} → ${money(r.post)}">
+    <div class="wrm-top"><span class="num">${money(r.pre)} → <b>${money(r.post)}</b></span>${r.tierPost !== r.tierPre ? `${tierPill(r.tierPre)}<span class="arr">→</span>${tierPill(r.tierPost)}` : tierPill(r.tierPost)}</div>
+    <div class="wrm-bar"><span class="wrm-fill t-${r.tierPost}" style="width:${pc(r.post)}"></span>${!up ? `<span class="wrm-ghost" style="left:${pc(r.post)};width:calc(${pc(r.pre)} - ${pc(r.post)})"></span>` : `<span class="wrm-add" style="left:${pc(r.pre)};width:calc(${pc(r.post)} - ${pc(r.pre)})"></span>`}
+      ${[["C", c.salaryCap], ["T", c.taxLine], ["A1", c.firstApron], ["A2", c.secondApron]].map(([l, v]) => `<span class="wrm-mark" style="left:${pc(v)}"><i>${l}</i></span>`).join("")}</div>
+    <div class="wrm-flow num"><span>Out ${money(r.out)}</span><span>In ${money(r.inc)}</span><span class="${r.net > 1e-6 ? "up" : r.net < -1e-6 ? "down" : ""}">Net ${money(r.net, { sign: true })}</span>${r.ok ? '<span class="ok">✓</span>' : '<span class="no">✕</span>'}</div>
+  </div>`;
+}
 
 function renderBanner(v) {
   const el = $("#vbanner");
-  const warn = v.warnings.length ? `<ul class="warns">${v.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>` : "";
-  if (v.status === "incomplete") { el.className = "vbanner"; el.innerHTML = `<div class="vt" style="color:var(--label-2)">${esc(v.reasons[0] || "Build a trade")}</div>`; return; }
-  if (v.status === "legal") { el.className = "vbanner legal"; el.innerHTML = `<div class="vt">✓ Legal NBA Trade</div><ul><li>Salary matching, apron limits and the Stepien Rule all pass.</li></ul>${warn}`; return; }
-  if (v.status === "failed") { el.className = "vbanner failed"; el.innerHTML = `<div class="vt">✕ Trade Failed</div><ul>${v.reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>${warn}`; return; }
-  el.className = "vbanner sandbox";
-  el.innerHTML = `<div class="vt">${v.legal ? "✓ Legal NBA Trade" : "Trade Unlocked"} <span class="sbx">⚡ Sandbox Mode — CBA Rules Overridden</span></div>
-    ${v.legal ? "" : `<ul>${v.reasons.map((r) => `<li>Would fail under the CBA: ${esc(r)}</li>`).join("")}</ul>`}${warn}`;
+  const n = v.reasons.length;
+  if (v.status === "incomplete") { el.className = "vbanner slim"; el.innerHTML = `<span class="vt" style="color:var(--label-2)">${esc(v.reasons[0] || "Build a trade")}</span>`; return; }
+  if (v.status === "legal") { el.className = "vbanner slim legal"; el.innerHTML = `<span class="vt">✓ Cap-legal so far</span><span class="vh">Tap PROPOSE TRADE for the league office call</span>`; return; }
+  if (v.status === "failed") { el.className = "vbanner slim failed"; el.innerHTML = `<span class="vt">✕ ${n} CBA issue${n > 1 ? "s" : ""}</span><span class="vh">${esc(v.reasons[0])}</span>`; return; }
+  el.className = "vbanner slim sandbox"; el.innerHTML = `<span class="vt">⚡ Sandbox</span><span class="vh">${v.legal ? "Legal under the CBA too" : `${n} CBA issue${n > 1 ? "s" : ""} overridden`}</span>`;
 }
 
 function renderBoard(v) {
@@ -434,8 +510,8 @@ function renderBoard(v) {
     const T = TEAMS[abbr];
     const r = byTeam.get(abbr);
     const mine = state.assets.filter((x) => x.id.startsWith(abbr + ":"));
-    html += `<article class="card${collapsed.has(abbr) ? " collapsed" : ""}" data-team="${abbr}">
-      <div class="card-head">
+    html += `<article class="card wr-card${collapsed.has(abbr) ? " collapsed" : ""}" data-team="${abbr}" style="--c:${T.color}">
+      <div class="card-head wr-head">
         <span data-team-hub="${abbr}" title="Open ${esc(T.name)} Team Vault">${badge(abbr)}</span>
         <button class="team-btn" data-pick-team="${slot}" type="button" aria-label="Change team, currently ${esc(T.city)} ${esc(T.name)}">
           <span class="city">${esc(T.city)} <span class="payroll">· ${money(r.pre)} payroll</span></span><span class="nm">${esc(T.name)}</span>
@@ -446,12 +522,7 @@ function renderBoard(v) {
       <div class="section-label">Sends</div>
       <ul class="assets">${mine.length ? mine.map((m) => assetRow(m, abbr, act)).join("") : `<li class="empty">Nothing outgoing yet</li>`}</ul>
       <button class="add-btn press" data-add="${abbr}" type="button">${ICON.plus} Add player or pick</button>
-      <div class="fin">
-        <div><div class="k">Outgoing</div><div class="v">${money(r.out)}</div></div>
-        <div><div class="k">Incoming</div><div class="v">${money(r.inc)}</div></div>
-        <div><div class="k">Net cap</div><div class="v ${r.net > 1e-6 ? "up" : r.net < -1e-6 ? "down" : ""}">${money(r.net, { sign: true })}</div></div>
-        <div title="Before → after this trade">${r.tierPost !== r.tierPre ? `${tierPill(r.tierPre)} → ${tierPill(r.tierPost)}` : tierPill(r.tierPre)}</div>
-      </div>
+      ${apronMeter(r)}
     </article>`;
   });
   if (state.teams.length < 4) html += `<button class="slot-empty press" data-add-slot type="button"><span class="plus">${ICON.plus}</span>Add another team</button>`;
@@ -467,12 +538,23 @@ function assetRow(m, from, act) {
   let dest = "";
   if (others.length > 1) dest = `<select class="dest" data-dest="${esc(m.id)}" aria-label="Send ${esc(asset.name)} to">${others.map((t) => `<option value="${t}" ${m.to === t ? "selected" : ""}>→ ${t}</option>`).join("")}</select>`;
   else if (others.length === 1) dest = `<span class="dest-static">→ ${others[0]}</span>`;
-  const sub = asset.kind === "pick" ? `<span>Draft pick</span>` : `<span>${esc(asset.pos)}</span><span>·</span><span class="money">${salaryTxt(asset)}</span>`;
+  if (asset.kind === "pick") {
+    const L = pickLabel(asset);
+    return `<li class="asset-wrap" data-id="${esc(m.id)}">
+    <div class="asset-under" aria-hidden="true">Remove</div>
+    <div class="asset pick-tile ${asset.round === 1 ? "gold" : "silver"}" data-asset="${esc(m.id)}">
+      <span class="pt-yr num">${String(asset.year).slice(2)}<small>${asset.round === 1 ? "1ST" : "2ND"}</small></span>
+      <div class="meta"><div class="nm">${esc(L.head)}</div><div class="sub">${esc(L.sub)}</div></div>
+      ${dest}
+      <button class="icon-btn press" data-remove="${esc(m.id)}" type="button" aria-label="Remove ${esc(asset.name)}">${ICON.x}</button>
+    </div></li>`;
+  }
+  const sub = `<span>${esc(asset.pos)}</span><span>·</span><span class="money">${salaryTxt(asset)}</span>`;
   return `<li class="asset-wrap" data-id="${esc(m.id)}">
     <div class="asset-under" aria-hidden="true">Remove</div>
-    <div class="asset" data-asset="${esc(m.id)}">
-      ${assetFace(asset)}
-      <div class="meta"><div class="nm">${esc(asset.name)}</div><div class="sub">${sub}</div></div>
+    <div class="asset player-tile" data-asset="${esc(m.id)}">
+      ${assetFace(asset, "2.6rem")}
+      <div class="meta"><div class="nm">${esc(asset.name)} ${ovrOf(asset)}</div><div class="sub">${sub}</div></div>
       ${dest}
       <button class="icon-btn press" data-remove="${esc(m.id)}" type="button" aria-label="Remove ${esc(asset.name)}">${ICON.x}</button>
     </div>
@@ -501,14 +583,14 @@ function updateDock(v) {
   const dot = $("#dockDot"), msg = $("#dockMsg");
   dot.className = "dot";
   const locked = !v.accepted;
-  $("#dockLink").disabled = locked; $("#dockCard").disabled = locked;
+  $("#dockLink").disabled = locked; $("#dockCard").disabled = locked; $("#proposeBtn").disabled = v.status === "incomplete";
   const hint = locked && v.status === "failed" ? "Fix the trade or switch to Sandbox Mode to share it" : "";
   $("#dockLink").title = hint; $("#dockCard").title = hint;
   if (v.status === "incomplete") { msg.textContent = v.reasons[0] || "Build a trade"; return; }
-  if (v.status === "legal") { dot.classList.add("ok"); msg.textContent = "✓ Legal NBA Trade"; return; }
+  if (v.status === "legal") { dot.classList.add("ok"); msg.textContent = "✓ Cap-legal"; return; }
   if (v.status === "sandbox") { dot.style.background = "var(--accent)"; msg.textContent = "⚡ Sandbox trade"; return; }
   dot.classList.add("no"); dot.style.background = "";
-  msg.textContent = `✕ ${v.reasons.length} issue${v.reasons.length > 1 ? "s" : ""}: ${v.reasons[0]}`;
+  msg.textContent = `✕ ${v.reasons.length} CBA issue${v.reasons.length > 1 ? "s" : ""}`;
 }
 
 function commit({ save = true } = {}) {
@@ -669,6 +751,52 @@ $("#dockCard").addEventListener("click", async () => {
   finally { btn.textContent = label; btn.disabled = !lastV?.accepted; }
 });
 
+/* ---------- PROPOSE TRADE → GM verdict stamp ---------- */
+const fullName = (abbr) => `${TEAMS[abbr]?.city || ""} ${TEAMS[abbr]?.name || abbr}`.trim();
+function officeReason(team, err) {
+  const name = fullName(team);
+  if (/^Takes back/.test(err)) { const m = /Takes back (\S+) but may only take back (\S+) for (\S+) outgoing\. (\S+) over/.exec(err); return m ? `${name} would take back ${m[1]} for ${m[3]} going out, ${m[4]} over the salary-matching limit (${m[2]}).` : `${name} fails salary matching.`; }
+  if (/Apron team can't take back/.test(err)) return `${name} would be over the ${/Second/.test(err) ? "Second" : "First"} Apron and can't take back more salary than it sends.`;
+  if (/aggregate/.test(err)) return `${name} is above the Second Apron and can't combine contracts to bring back a bigger salary.`;
+  if (/^Stepien/.test(err)) return `Stepien Rule: ${name} would be left without a first-round pick in back-to-back drafts (${(/\(([^)]+)\)/.exec(err) || [])[1] || ""}).`;
+  if (/already owed|Doesn't own|Doesn't control/.test(err)) return `${name} doesn't control a pick it's trying to send: ${err.replace(/\.$/, "")}.`;
+  return `${name}: ${err}`;
+}
+function openVerdict() {
+  const v = validate();
+  if (v.status === "incomplete") return toast(v.reasons[0] || "Add players or picks first");
+  const errs = v.teams.flatMap((t) => t.errors.map((e) => officeReason(t.abbr, e)));
+  const approved = v.legal || !strict;
+  const kind = v.legal ? "ok" : strict ? "no" : "sbx";
+  const head = v.legal ? "✓ TRADE APPROVED" : strict ? "✕ TRADE REJECTED" : "⚡ SANDBOX APPROVED";
+  const why = v.legal
+    ? `League office: salaries match under the 2026–27 rules, no apron or Stepien Rule violations. ${v.teams.map((t) => `${TEAMS[t.abbr]?.name} ${money(t.net, { sign: true })}`).join(" · ")}.`
+    : strict ? errs[0] : `CBA rules overridden. Under the real rules: ${errs[0]}`;
+  const el = $("#verdict");
+  el.innerHTML = `<div class="vd-card ${kind}">
+    <div class="vd-teams">${v.teams.map((t) => `<span class="vd-team" style="--c:${TEAMS[t.abbr].color}">${badge(t.abbr)}</span>`).join('<span class="vd-x">⇄</span>')}</div>
+    <div class="vd-stamp ${kind}">${head}</div>
+    <p class="vd-why">${esc(why)}</p>
+    ${errs.length > 1 ? `<ul class="vd-more">${errs.slice(1).map((e) => `<li>${esc(e)}</li>`).join("")}</ul>` : ""}
+    ${v.warnings.length ? `<ul class="vd-more warn">${v.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}
+    <label class="switch vd-switch"><input type="checkbox" id="vdSandbox" ${strict ? "" : "checked"} /><span class="track"></span><span>Sandbox Override</span></label>
+    <div class="vd-acts">
+      <button class="btn primary press" type="button" data-vd="share" ${approved ? "" : "disabled"}>Share Trade Card</button>
+      <button class="btn ghost press" type="button" data-vd="link" ${approved ? "" : "disabled"}>🔗 Copy Link</button>
+      <button class="btn ghost press" type="button" data-vd="close">${approved ? "Done" : "Rework Trade"}</button>
+    </div></div>`;
+  el.hidden = false; requestAnimationFrame(() => el.classList.add("in"));
+  el.querySelector("#vdSandbox").addEventListener("change", (e) => { strict = !e.target.checked; store.set(STRICT_KEY, strict ? "1" : "0"); paintStrict(); commit({ save: false }); openVerdict(); });
+  el.querySelector('[data-vd="share"]').addEventListener("click", () => { closeVerdict(); $("#dockCard").click(); });
+  el.querySelector('[data-vd="link"]').addEventListener("click", () => $("#dockLink").click());
+  el.querySelector('[data-vd="close"]').addEventListener("click", closeVerdict);
+  el.addEventListener("click", (e) => { if (e.target === el) closeVerdict(); }, { once: true });
+  try { navigator.vibrate && navigator.vibrate(approved ? [12, 40, 12] : 30); } catch {}
+}
+function closeVerdict() { const el = $("#verdict"); el.classList.remove("in"); setTimeout(() => { if (!el.classList.contains("in")) el.hidden = true; }, 180); }
+$("#proposeBtn").addEventListener("click", openVerdict);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#verdict").hidden) closeVerdict(); });
+
 /* ---------- Load: ?trade= link → legacy #t= hash (Team Hub, Quick-View) → auto-save ---------- */
 function decodeLegacyHash() {
   try {
@@ -705,6 +833,7 @@ createClient().then((c) => {
   client = c;
   activeTeams().forEach(ensureRoster);
   paintRosterStatus();
+  c.get("ratings", {}).then(({ data }) => { RATINGS = new Map(data.players.map((r) => [r.id, r])); commit({ save: false }); }).catch(() => {});
   c.get("players", {}).then(({ data }) => { for (const p of data.players) STATS.set(String(p.id), p.stats); Object.keys(raw).forEach(rebuild); commit({ save: false }); }).catch(() => {});
 }).catch(() => {
   activeTeams().forEach((t) => { rosterState[t] = "failed"; });

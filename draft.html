@@ -236,13 +236,109 @@ th:first-child, td:first-child { text-align: left; }
 .sim-fab button.ghosty { background: var(--fill); color: var(--label); font-weight: 650; }
 .sim-fab .sim-count { background: rgba(11,14,20,.85); color: #F59E0B; }
 @media (min-width: 768px) { .sim-fab { bottom: calc(1.25rem + env(safe-area-inset-bottom)); } }
+
+/* ===== NBA 2K draft night ===== */
+.pickin[hidden], .stage[hidden], .dk-settings[hidden], .dk-scrim[hidden], .clock[hidden], .sim-count[hidden], .stage-skip[hidden], .stage-foot .btn[hidden] { display: none !important; }
+.dk-head { align-items: center; }
+.dk-head .gear { width: 2.6rem; height: 2.6rem; font-size: 1.15rem; }
+.start-lottery { width: 100%; min-height: 52px; font-size: 1.0625rem; margin: 0.25rem 0 0.75rem; letter-spacing: -0.01em; box-shadow: 0 8px 24px rgba(245,158,11,.25); }
+@media (min-width: 768px) { .start-lottery { width: auto; padding-inline: 2rem; } }
+.dk-scrim { position: fixed; inset: 0; z-index: 55; background: var(--scrim); }
+.dk-settings { position: fixed; z-index: 56; left: 50%; bottom: calc(var(--tabbar-h, 0px) + 0.75rem); transform: translate(-50%, 12px); opacity: 0; width: min(calc(100% - 1.5rem), 26rem);
+  background: var(--surface); border: 1px solid var(--hair); border-radius: 1.1rem; padding: 0.9rem; box-shadow: var(--shadow-lg); transition: transform 200ms ease, opacity 200ms ease; display: grid; gap: 0.75rem; }
+.dk-settings.in { transform: translate(-50%, 0); opacity: 1; }
+@media (min-width: 768px) { .dk-settings { top: 5rem; bottom: auto; } }
+.dk-set-head { display: flex; justify-content: space-between; align-items: center; } .dk-set-head b { font-size: 1.0625rem; }
+.dk-set-row { display: grid; gap: 0.35rem; font-size: 0.75rem; font-weight: 700; color: var(--label-3); letter-spacing: 0.04em; text-transform: uppercase; }
+label.dk-set-row { display: flex; justify-content: space-between; text-transform: none; letter-spacing: 0; font-size: 0.875rem; color: var(--label); }
+.dk-set-row .seg { --n: 2; } .dk-set-row .seg button { font-size: 0.8125rem; padding: 0.45rem 0.3rem; text-transform: none; letter-spacing: 0; }
+.dk-set-actions { display: grid; gap: 0.35rem; } .dk-set-actions .btn { text-align: left; min-height: 42px; }
+.lot-head .seg { display: none; }
+
+/* lottery reveal stage */
+body.stage-open { overflow: hidden; }
+.stage { position: fixed; inset: 0; z-index: 70; color: #F1F5F9; color-scheme: dark; display: grid; grid-template-rows: auto auto 1fr auto; gap: 0.75rem;
+  padding: calc(env(safe-area-inset-top) + 0.75rem) 1rem calc(env(safe-area-inset-bottom) + 0.9rem);
+  background: radial-gradient(900px 500px at 50% 20%, rgba(245,158,11,.16), transparent 60%), radial-gradient(700px 400px at 50% 110%, rgba(16,185,129,.12), transparent 60%), linear-gradient(180deg, #05070B, #0B1020 60%, #05070B);
+  opacity: 0; transition: opacity 240ms ease; overflow: hidden; }
+.stage.in { opacity: 1; }
+.stage::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(90deg, rgba(255,255,255,.025) 0 1px, transparent 1px 80px); }
+.stage-top { display: flex; align-items: center; gap: 0.75rem; position: relative; }
+.stage-title { flex: 1; min-width: 0; display: grid; } .stage-title b { font-size: clamp(1.1rem, 4vw, 1.5rem); letter-spacing: -0.02em; text-transform: uppercase; }
+.stage-title small { color: #94A3B8; font-size: 0.75rem; font-family: var(--font-mono); }
+.stage-live { color: #EF4444; font: 800 0.6875rem/1 var(--font-mono); letter-spacing: 0.12em; }
+.stage-skip { border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.08); color: #F1F5F9; border-radius: 999px; padding: 0.6rem 1rem; font-weight: 750; cursor: pointer; min-height: 44px; white-space: nowrap; }
+.stage-spot { position: relative; display: grid; place-items: center; perspective: 1200px; }
+.flip { position: relative; width: min(78vw, 19rem); aspect-ratio: 4 / 3.4; transform-style: preserve-3d; transition: transform 620ms cubic-bezier(.3,1.3,.5,1); }
+.flip.flipped { transform: rotateY(180deg); }
+.flip .face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.flip .front { transform: rotateY(180deg); }
+.ec { height: 100%; border-radius: 1.1rem; display: grid; place-items: center; align-content: center; gap: 0.3rem; text-align: center; padding: 0.9rem; position: relative; overflow: hidden;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--c, #334155) 55%, #0B0E14), #0B0E14 85%); border: 1px solid rgba(255,255,255,.14); box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+.ec.back-face { background: linear-gradient(160deg, #1E293B, #0B0E14); border-color: rgba(245,158,11,.4); }
+.ec-env { font-size: 3rem; line-height: 1; color: #F59E0B; filter: drop-shadow(0 0 12px rgba(245,158,11,.5)); }
+.ec-pick { font: 800 0.75rem/1 var(--font-mono); letter-spacing: 0.14em; color: #CBD5E1; } .ec-pick b { font-size: 1.6rem; color: #fff; margin-left: 0.25rem; vertical-align: -0.2rem; }
+.ec-team { font-size: 1.2rem; letter-spacing: -0.015em; } .ec-meta { font-size: 0.75rem; color: #94A3B8; }
+.ec-tags { display: flex; gap: 0.35rem; justify-content: center; flex-wrap: wrap; margin-top: 0.15rem; }
+.ec-badge { font: 700 0.625rem/1 var(--font-mono); padding: 0.25rem 0.45rem; border-radius: 99px; background: rgba(245,158,11,.18); color: #F59E0B; white-space: nowrap; } .ec-badge.sm { font-size: 0.5625rem; }
+.ec.jump { border-color: #F5C842; box-shadow: 0 0 0 2px rgba(245,200,66,.6), 0 0 60px rgba(245,200,66,.45), 0 0 120px rgba(16,185,129,.25); }
+.ec-jump { position: absolute; top: 0.7rem; left: 50%; transform: translateX(-50%) rotate(-2deg); font: 900 0.75rem/1 var(--font-mono); letter-spacing: 0.14em; padding: 0.3rem 0.6rem; border-radius: 6px; color: #0B0E14; background: linear-gradient(90deg, #F5C842, #10B981); animation: jumpPulse 1s ease-in-out infinite; }
+@keyframes jumpPulse { 50% { transform: translateX(-50%) rotate(-2deg) scale(1.08); } }
+.stage-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr)); gap: 0.35rem; align-content: start; position: relative; }
+.sl { display: flex; align-items: center; gap: 0.45rem; padding: 0.4rem 0.55rem; border-radius: 0.6rem; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); font-size: 0.8125rem; min-height: 2.4rem; }
+.sl.on { background: linear-gradient(90deg, color-mix(in srgb, var(--c) 35%, transparent), rgba(255,255,255,.03)); animation: slIn 380ms ease both; }
+.sl.jump { border-color: rgba(245,200,66,.7); box-shadow: 0 0 18px rgba(245,200,66,.25); }
+.sl b { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sl-n { font: 800 0.875rem/1 var(--font-mono); width: 1.4rem; text-align: right; color: #F59E0B; } .sl-q { color: #475569; font-weight: 800; }
+@keyframes slIn { from { opacity: 0; transform: translateY(6px); } }
+.stage-foot { display: flex; justify-content: center; position: relative; } .stage-foot .btn { min-height: 52px; padding-inline: 2rem; font-size: 1.0625rem; }
+@media (max-width: 520px) {
+  .stage-list { grid-template-columns: 1fr; gap: 0.25rem; }
+  .sl { min-height: 2.1rem; padding: 0.3rem 0.5rem; }
+  .flip { width: min(70vw, 16rem); }
+  .ec-team { font-size: 1.05rem; }
+}
+@media (prefers-reduced-motion: reduce) { .flip { transition: none; } .ec-jump, .sl.on { animation: none; } }
+
+/* ON THE CLOCK */
+.clock { scroll-margin-top: calc(env(safe-area-inset-top) + 5rem); }
+.clock { position: relative; overflow: hidden; border-radius: var(--r-lg); margin: 0 0 0.75rem; color: #fff; color-scheme: dark;
+  background: linear-gradient(115deg, var(--c), color-mix(in srgb, var(--c) 45%, #0B0E14) 60%, #0B0E14); border: 1px solid rgba(255,255,255,.12); box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+.clock::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.08) 45%, transparent 60%); animation: sheen 3.2s ease-in-out infinite; }
+@keyframes sheen { from { transform: translateX(-60%); } to { transform: translateX(80%); } }
+.clk-main { display: flex; align-items: center; gap: 0.75rem; padding: 0.9rem 1rem 0.6rem; position: relative; z-index: 1; }
+.clk-main .avatar { background: rgba(255,255,255,.92); border-radius: 0.8rem; padding: 0.2rem; }
+.clk-t { flex: 1; min-width: 0; display: grid; } .clk-t b { font-size: 1.15rem; letter-spacing: -0.015em; }
+.clk-live { font: 900 0.6875rem/1 var(--font-mono); letter-spacing: 0.16em; color: #FDE68A; } .clk-live::before { content: "● "; color: #EF4444; }
+.clk-meta { font-size: 0.75rem; color: rgba(255,255,255,.85); }
+.clk-num { font: 900 2.6rem/1 var(--font-mono); opacity: 0.25; letter-spacing: -0.06em; }
+.clk-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; padding: 0 0.75rem 0.8rem; position: relative; z-index: 1; }
+.clk-btn { border: 1px solid rgba(255,255,255,.28); background: rgba(0,0,0,.25); color: #fff; border-radius: 999px; min-height: 42px; font-weight: 750; font-size: 0.8125rem; cursor: pointer; padding: 0 0.4rem; }
+.clk-btn.primary { background: #F59E0B; border-color: #F59E0B; color: #0B0E14; }
+.clk-done { padding: 1rem; display: grid; gap: 0.2rem; } .clk-done span { font-size: 0.8125rem; opacity: 0.85; }
+@media (prefers-reduced-motion: reduce) { .clock::after { animation: none; } }
+
+/* THE PICK IS IN */
+.pickin { position: fixed; inset: 0; z-index: 72; display: grid; place-items: center; padding: 1rem; background: rgba(3,5,9,.7); opacity: 0; transition: opacity 160ms ease; }
+.pickin.in { opacity: 1; }
+.pk-card { width: min(100%, 24rem); border-radius: 1.2rem; overflow: hidden; color: #fff; color-scheme: dark; transform: scale(.92); transition: transform 260ms cubic-bezier(.3,1.4,.5,1);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--c) 70%, #0B0E14), #0B0E14 70%); border: 1px solid rgba(255,255,255,.18); box-shadow: 0 30px 80px rgba(0,0,0,.6), 0 0 40px color-mix(in srgb, var(--c) 40%, transparent); }
+.pickin.in .pk-card { transform: none; }
+.pk-in { display: block; text-align: center; font: 900 0.8125rem/1 var(--font-mono); letter-spacing: 0.22em; padding: 0.7rem; background: linear-gradient(90deg, #F59E0B, #F5C842); color: #0B0E14; }
+.pk-top { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem 0; font-size: 0.875rem; color: rgba(255,255,255,.85); }
+.pk-body { display: flex; gap: 0.9rem; align-items: center; padding: 0.9rem 1rem; }
+.pk-name { display: block; font-size: 1.35rem; letter-spacing: -0.02em; line-height: 1.15; }
+.pk-line { display: block; font-size: 0.8125rem; color: rgba(255,255,255,.8); } .pk-comp { display: block; margin-top: 0.35rem; font-size: 0.8125rem; color: #FDE68A; }
+.pk-acts { display: flex; gap: 0.5rem; padding: 0 1rem 1rem; } .pk-acts .btn { flex: 1; min-height: 44px; }
+.pk-acts .btn.ghost { color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.3); }
+@media (prefers-reduced-motion: reduce) { .pk-card, .pickin { transition: none; } }
 </style>
 </head>
 <body>
 <header class="bar" id="bar"></header>
 
 <main>
-  <div class="toolbar">
+  <div class="toolbar dk-head">
     <h2 id="title">2027 Draft</h2>
     <div class="seg years" role="group" aria-label="Draft year" id="years">
       <span class="thumb"></span>
@@ -250,20 +346,9 @@ th:first-child, td:first-child { text-align: left; }
       <button type="button" data-year="2028" aria-pressed="false">2028</button>
       <button type="button" data-year="2029" aria-pressed="false">2029</button>
     </div>
+    <button class="icon-btn press gear" type="button" id="settingsBtn" aria-label="Draft settings" aria-haspopup="dialog">⚙</button>
   </div>
-  <div class="seg rounds" role="group" aria-label="Draft length" id="rounds" style="margin-bottom:.75rem"><span class="thumb"></span>
-    <button type="button" data-rounds="1" aria-pressed="true">Round 1 · Picks 1–30</button><button type="button" data-rounds="2" aria-pressed="false">Full Draft · 1–60</button></div>
-  <div class="actions">
-    <button class="btn primary press" type="button" id="simBtn">Sim Lottery <span class="sim-count" id="simCount" hidden></span></button>
-    <button class="btn ghost press" type="button" id="mcBtn">Sim 1,000x</button>
-    <button class="btn ghost press" type="button" id="projBtn">Reset</button>
-    <button class="btn ghost press" type="button" id="takeBtn">Mock Draft This Order</button>
-    <details class="pop"><summary class="btn ghost press">Options</summary>
-      <div class="pop-body pop-menu">
-        <button class="btn ghost press" type="button" id="autoBtn">Auto-draft remaining picks</button>
-        <button class="btn ghost press" type="button" id="clearBtn">Clear all picks</button>
-      </div></details>
-  </div>
+  <button class="btn primary press start-lottery" type="button" id="lotteryBtn">🎲 Start Draft Lottery <span class="sim-count" id="simCount" hidden></span></button>
   <p class="source" id="source"></p>
   <section id="lotCard" class="lot-card">
   <div class="lot-head"><h3>Lottery</h3>
@@ -278,11 +363,39 @@ th:first-child, td:first-child { text-align: left; }
   <div id="warnings"></div>
   <div class="seg board-mode" id="boardMode" role="group" aria-label="Board view" style="--n:2"><span class="thumb"></span>
     <button type="button" data-bm="board" aria-pressed="true">Mock Board</button><button type="button" data-bm="grid" aria-pressed="false">Pick Grid</button></div>
+  <div class="clock" id="clock" hidden></div>
   <div class="board" id="board"></div>
   <div class="board pick-grid" id="grid" hidden></div>
   <p class="fine">Lottery odds are exact (every drawing sequence enumerated) for the selected format. The 3-2-1 format is modeled as described in the app; the 2019 format is the NBA’s current system. Pick obligations come from draft_picks_2027_2029.json and are applied after every simulation and standings refresh; terms marked unconfirmed should be checked against an official source. College stats and headshots come live from ESPN. 2028 and 2029 orders are projections from today’s standings. Not affiliated with the NBA, NCAA or ESPN.</p>
 </main>
 <div class="tip" id="tip" role="tooltip"></div>
+<div class="dk-scrim" id="settingsScrim" hidden></div>
+<div class="dk-settings" id="settings" role="dialog" aria-label="Draft settings" hidden>
+  <div class="dk-set-head"><b>Draft Settings</b><button class="icon-btn press" type="button" data-close-settings aria-label="Close settings">✕</button></div>
+  <div class="dk-set-row"><span>Lottery format</span>
+    <div class="seg fmt" role="group" aria-label="Lottery format" id="fmt"><span class="thumb"></span>
+      <button type="button" data-format="321" aria-pressed="true">3-2-1 · 16 teams</button><button type="button" data-format="2019" aria-pressed="false">Classic 2019 · 14</button></div></div>
+  <div class="dk-set-row"><span>Draft length</span>
+    <div class="seg rounds" role="group" aria-label="Draft length" id="rounds"><span class="thumb"></span>
+      <button type="button" data-rounds="1" aria-pressed="true">Round 1 · 30</button><button type="button" data-rounds="2" aria-pressed="false">2 Rounds · 60</button></div></div>
+  <label class="switch dk-set-row"><span>Draft-night animations</span><input type="checkbox" id="animToggle" checked /><span class="track"></span></label>
+  <div class="dk-set-actions">
+    <button class="btn ghost press" type="button" id="mcBtn">📊 Sim 1,000x Odds Matrix</button>
+    <button class="btn ghost press" type="button" id="simBtn">⚡ Instant lottery (no reveal)</button>
+    <button class="btn ghost press" type="button" id="takeBtn">Jump to the pick on the clock</button>
+    <button class="btn ghost press" type="button" id="autoBtn">Auto-draft remaining picks</button>
+    <button class="btn ghost press" type="button" id="projBtn">Reset to projected order</button>
+    <button class="btn ghost press" type="button" id="clearBtn">Clear all picks</button>
+  </div>
+</div>
+<div class="stage" id="stage" role="dialog" aria-label="Draft lottery reveal" hidden>
+  <div class="stage-top"><div class="stage-title"><span class="stage-live">● LIVE</span><b id="stageTitle">2027 NBA Draft Lottery</b><small id="stageSub"></small></div>
+    <button class="stage-skip press" type="button" id="stageSkip">Skip to Results ⏭</button></div>
+  <div class="stage-spot"><div class="flip" id="flip"><div class="face back" id="flipBack"></div><div class="face front" id="flipFront"></div></div></div>
+  <ol class="stage-list" id="stageList"></ol>
+  <div class="stage-foot"><button class="btn primary press" type="button" id="stageProceed" hidden>Proceed to Mock Draft →</button></div>
+</div>
+<div class="pickin" id="pickin" role="dialog" aria-label="The pick is in" hidden></div>
 <div class="sim-fab" id="simFab" hidden><button class="press" type="button" id="fabSim">🎲 Sim Again <span class="sim-count" id="fabCount"></span></button><button class="press ghosty" type="button" id="fabReset">Reset</button></div>
 
 <script src="data.js"></script>
@@ -432,6 +545,7 @@ function paintBoardMode() {
   const seg = $("#boardMode"); seg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.bm === boardMode)));
   seg.querySelector(".thumb").style.transform = `translateX(${boardMode === "grid" ? 100 : 0}%)`;
   if (boardMode === "grid" && config) renderGrid();
+  if (typeof paintClock === "function") paintClock();
 }
 
 function renderOdds(table) {
@@ -532,6 +646,7 @@ function render() {
       </div>`;
   }).join("");
   $("#board").innerHTML = rows;
+  if (typeof paintClock === "function") queueMicrotask(paintClock);
   $("#board").dataset.picks = JSON.stringify(picks.map(({ pick, explanation, tradeNote, verified, originalTeam, owner }) => ({ pick, explanation, tradeNote, verified, originalTeam, owner })));
   const empty = !board().length;
   $("#autoBtn").disabled = empty;
@@ -577,7 +692,7 @@ $("#board").addEventListener("click", (e) => {
   const make = e.target.closest("[data-make]"); if (make) return pickSheet(+make.dataset.make);
   const sc = e.target.closest("[data-scout]"); if (sc) return scout(sc.dataset.scout, +sc.closest("[data-row]").dataset.row);
 });
-function runSim({ reveal = true } = {}) {
+function runSim({ reveal = true, quiet = false } = {}) {
   if (!proj) return;
   const s = yearState();
   const sim = simulateLottery(proj.order, Math.random, { format, balls: proj.balls, restricted: restrictedFor() });
@@ -585,7 +700,7 @@ function runSim({ reveal = true } = {}) {
   store.set(simCountKey(), (store.get(simCountKey()) || 0) + 1); paintSimCount(); render();
   document.querySelectorAll("#board .pick").forEach((row, i) => { if (i < F().teams) springIn(row); });
   const jump = sim.lottery.filter((l) => l.moved > 0).sort((a, b) => b.moved - a.moved)[0];
-  toast(jump ? `${teamOf(jump.team).name} jump ${jump.moved} spot${jump.moved > 1 ? "s" : ""} to #${jump.pick}` : "Lottery held to form");
+  if (!quiet) toast(jump ? `${teamOf(jump.team).name} jump ${jump.moved} spot${jump.moved > 1 ? "s" : ""} to #${jump.pick}` : "Lottery held to form");
   lotView = "sim"; paintLotView();
   document.querySelectorAll("#simResults .sr-row").forEach((row, i) => { row.style.animationDelay = `${i * 18}ms`; });
   if (reveal) $("#lotCard").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
@@ -734,8 +849,7 @@ function pickSheet(pickNo) {
       body.querySelector("[data-sort]")?.addEventListener("change", (e) => { pk.sort = e.target.value; sheet.refresh(); });
       body.querySelectorAll("[data-reset]").forEach((b) => b.addEventListener("click", () => { pk.pos = "all"; pk.origin = "all"; pk.sort = "rank"; const sr = document.querySelector(".sheet .search"); if (sr) sr.value = ""; sheet.refresh(); }));
       body.querySelectorAll("[data-choose]").forEach((b) => b.addEventListener("click", () => {
-        s.picks[pickNo] = b.dataset.choose; save(); sheet.close(); render();
-        const row = document.querySelector(`[data-row="${pickNo}"]`); row && springIn(row);
+        sheet.close(); makePick(pickNo, b.dataset.choose, { announce: true });
       }));
       body.querySelectorAll("[data-scout-only]").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); scout(b.dataset.scoutOnly, pickNo); }));
     },
@@ -781,7 +895,7 @@ function scout(id, pickNo) {
         <div class="sheet-sub">Scouting summary</div>
         <div class="notes"><p>${esc(p.summary || "No notes yet.")}</p>${p.comp ? `<p><span class="comp">NBA comp:</span> ${esc(p.comp)}</p>` : ""}<div class="editorial">Draft notes are editorial — edit them in prospects.json.</div></div>
         ${pickNo && s.picks[pickNo] !== p.id ? `<div style="margin-top:1rem"><button class="btn primary press" type="button" data-draft style="width:100%">Draft at #${pickNo}</button></div>` : ""}`;
-      body.querySelector("[data-draft]")?.addEventListener("click", () => { s.picks[pickNo] = p.id; save(); sheet.close(); render(); });
+      body.querySelector("[data-draft]")?.addEventListener("click", () => { sheet.close(); makePick(pickNo, p.id, { announce: true }); });
       body.querySelectorAll("[data-smode]").forEach((b) => b.addEventListener("click", () => { pk.stat = b.dataset.smode; store.set("draft:statMode", pk.stat); sheet.refresh(); }));
     },
   });
@@ -792,6 +906,198 @@ function scout(id, pickNo) {
       .finally(() => { loading = false; if (sheet.isOpen) sheet.refresh(); });
   }
 }
+
+/* ======================================================================
+   NBA 2K-style draft night: settings panel, lottery reveal stage,
+   ON THE CLOCK banner, Sim Pick / Sim Rest, and THE PICK IS IN card.
+   ====================================================================== */
+const RM = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let anim = store.get("draft:anim") !== false;
+$("#animToggle").checked = anim;
+$("#animToggle").addEventListener("change", (e) => { anim = e.target.checked; store.set("draft:anim", anim); });
+
+/* ---------- ⚙ settings ---------- */
+const settings = $("#settings"), setScrim = $("#settingsScrim");
+const openSettings = () => { settings.hidden = false; setScrim.hidden = false; requestAnimationFrame(() => settings.classList.add("in")); };
+const closeSettings = () => { settings.classList.remove("in"); setScrim.hidden = true; setTimeout(() => { if (!settings.classList.contains("in")) settings.hidden = true; }, RM() ? 0 : 220); };
+$("#settingsBtn").addEventListener("click", openSettings);
+setScrim.addEventListener("click", closeSettings);
+settings.querySelector("[data-close-settings]").addEventListener("click", closeSettings);
+settings.querySelector(".dk-set-actions").addEventListener("click", (e) => { if (e.target.closest("button")) setTimeout(closeSettings, 60); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !settings.hidden) closeSettings(); });
+
+/* ---------- lottery reveal stage ---------- */
+const STATUS_TAG = { protected_retained: "Protected · Retained", swapped: "Swap", swap_kept: "Swap · Kept", conveyed: "Traded" };
+let stageTimer = 0, stageRun = 0;
+function stageRows() {
+  const s = yearState();
+  const { picks } = resolvePickOwnership(currentOrder(), year, config);
+  const bySlot = Object.fromEntries((s.lottery || []).map((l) => [l.pick, l]));
+  return picks.slice(0, F().teams).map((p) => ({ ...p, lot: bySlot[p.pick] || {} }));
+}
+function cardFront(r) {
+  const own = teamOf(r.owner), orig = teamOf(r.originalTeam), mv = r.lot.moved || 0;
+  const jump = mv > 0 && r.pick <= 4;
+  return `<div class="ec ${jump ? "jump" : ""}" style="--c:${own.color}">
+    ${jump ? `<span class="ec-jump">LOTTERY JUMP!</span>` : ""}
+    <span class="ec-pick">PICK <b>${r.pick}</b></span>
+    ${teamLogo(own, { size: "4.25rem" })}
+    <b class="ec-team">${esc(own.city)} ${esc(own.name)}</b>
+    <span class="ec-meta">${r.owner !== r.originalTeam ? `via ${esc(orig.city || orig.abbr)} · ` : ""}seed ${r.lot.seed ?? "—"}</span>
+    <span class="ec-tags">${mv ? `<span class="mvb ${mv > 0 ? "up" : "down"}">${mv > 0 ? "↑ +" : "↓ −"}${Math.abs(mv)}</span>` : `<span class="mvb flat">Held</span>`}${STATUS_TAG[r.status] ? `<span class="ec-badge">${STATUS_TAG[r.status]}</span>` : ""}</span>
+  </div>`;
+}
+const cardBack = (pick) => `<div class="ec back-face"><span class="ec-env">✉</span><span class="ec-pick">PICK <b>${pick}</b></span><span class="ec-meta">Hooptrax · ${year} Lottery</span></div>`;
+function stageListHtml(rows, revealedFrom) {
+  return rows.map((r) => {
+    const shown = r.pick >= revealedFrom;
+    const own = teamOf(r.owner), mv = r.lot.moved || 0;
+    return `<li class="sl ${shown ? "on" : ""} ${shown && mv > 0 && r.pick <= 4 ? "jump" : ""}" style="--c:${own.color}"><span class="sl-n">${r.pick}</span>${shown
+      ? `${teamLogo(own, { size: "1.5rem" })}<b>${esc(own.name)}</b>${mv ? `<span class="mvb ${mv > 0 ? "up" : "down"}">${mv > 0 ? "↑ +" : "↓ −"}${Math.abs(mv)}</span>` : ""}${STATUS_TAG[r.status] ? `<span class="ec-badge sm">${STATUS_TAG[r.status]}</span>` : ""}`
+      : `<span class="sl-q">?</span>`}</li>`;
+  }).join("");
+}
+async function startLottery() {
+  if (!proj) return;
+  runSim({ reveal: false, quiet: true });
+  const rows = stageRows();
+  const run = ++stageRun;
+  const stage = $("#stage");
+  $("#stageTitle").textContent = `${year} NBA Draft Lottery`;
+  $("#stageSub").textContent = `${F().label} · ${F().teams} teams · sim #${store.get(simCountKey()) || 1}`;
+  $("#stageProceed").hidden = true; $("#stageSkip").hidden = false;
+  stage.hidden = false; document.body.classList.add("stage-open");
+  requestAnimationFrame(() => stage.classList.add("in"));
+  const list = $("#stageList"), flip = $("#flip");
+  const show = (k) => { list.innerHTML = stageListHtml(rows, k); };
+  show(Infinity);
+  for (let k = rows.length; k >= 1; k--) {
+    if (run !== stageRun) return;
+    const r = rows[k - 1];
+    $("#flipBack").innerHTML = cardBack(k); $("#flipFront").innerHTML = cardFront(r);
+    flip.classList.remove("flipped", "jump"); void flip.offsetWidth;
+    await sleep(RM() ? 80 : k <= 4 ? 700 : 420); if (run !== stageRun) return;
+    flip.classList.add("flipped"); if ((r.lot.moved || 0) > 0 && k <= 4) flip.classList.add("jump");
+    show(k);
+    await sleep(RM() ? 120 : k <= 4 ? 1500 : 760);
+  }
+  if (run === stageRun) finishStage(rows);
+}
+function finishStage(rows) {
+  stageRun++;
+  const flip = $("#flip"), r = rows[0];
+  $("#flipBack").innerHTML = cardBack(1); $("#flipFront").innerHTML = cardFront(r);
+  flip.classList.add("flipped"); if ((r.lot.moved || 0) > 0) flip.classList.add("jump");
+  $("#stageList").innerHTML = stageListHtml(rows, 1);
+  $("#stageSkip").hidden = true; $("#stageProceed").hidden = false; $("#stageProceed").focus({ preventScroll: true });
+}
+function closeStage({ toBoard = false } = {}) {
+  stageRun++;
+  const stage = $("#stage"); stage.classList.remove("in"); document.body.classList.remove("stage-open");
+  setTimeout(() => { if (!stage.classList.contains("in")) stage.hidden = true; }, RM() ? 0 : 260);
+  if (toBoard) { boardMode = "board"; store.set("draft:boardMode", "board"); paintBoardMode(); paintClock(); setTimeout(() => ($("#clock").hidden ? $("#board") : $("#clock")).scrollIntoView({ behavior: RM() ? "auto" : "smooth", block: "start" }), 60); }
+}
+$("#lotteryBtn").addEventListener("click", startLottery);
+$("#stageSkip").addEventListener("click", () => finishStage(stageRows()));
+$("#stageProceed").addEventListener("click", () => closeStage({ toBoard: true }));
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#stage").hidden) closeStage(); });
+
+/* ---------- ON THE CLOCK ---------- */
+function allPicksNow() {
+  const { picks } = resolvePickOwnership(currentOrder(), year, config);
+  return rounds === 2 ? [...picks, ...secondRound()] : picks;
+}
+const NEED_WORD = { PG: "Point guard", SG: "Shooting guard", SF: "Wing", PF: "Forward", C: "Center" };
+function paintClock() {
+  const el = $("#clock");
+  if (!currentOrder() || !board().length || boardMode !== "board") { el.hidden = true; return; }
+  const s = yearState();
+  const next = allPicksNow().find((p) => !s.picks[p.pick]);
+  if (!next) { el.hidden = false; el.style.setProperty("--c", "#334155"); el.innerHTML = `<div class="clk-done"><b>Draft complete</b><span>All ${30 * rounds} picks are in. Clear picks in ⚙ to redo it.</span></div>`; return; }
+  const own = teamOf(next.owner);
+  const need = needCache.get(next.owner);
+  if (!need && client) teamNeed(next.owner).then(paintClock);
+  const needs = [...new Set((need || []).map((x) => (x === "PG" || x === "SG" ? "Guard" : x === "SF" || x === "PF" ? "Forward" : "Center")))].slice(0, 2);
+  el.hidden = false; el.style.setProperty("--c", own.color);
+  el.innerHTML = `<div class="clk-main">${teamLogo(own, { size: "3.25rem" })}
+      <div class="clk-t"><span class="clk-live">ON THE CLOCK</span><b>${esc(own.city)} ${esc(own.name)}</b>
+        <span class="clk-meta">Pick <b class="num">#${next.pick}</b>${next.pick > 30 ? " · Round 2" : ""}${next.owner !== next.originalTeam ? ` · via ${esc(teamOf(next.originalTeam).abbr)}` : ""}${needs.length ? ` · Needs: ${needs.join(", ")}` : ""}</span></div>
+      <span class="clk-num num">${next.pick}</span></div>
+    <div class="clk-actions"><button class="clk-btn primary" type="button" data-clk="pick">Pick Player</button><button class="clk-btn" type="button" data-clk="sim">Sim Pick</button><button class="clk-btn" type="button" data-clk="rest">Sim Rest of Draft</button></div>`;
+}
+$("#clock").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-clk]"); if (!b) return;
+  const s = yearState(); const next = allPicksNow().find((p) => !s.picks[p.pick]); if (!next) return;
+  if (b.dataset.clk === "pick") return pickSheet(next.pick);
+  if (b.dataset.clk === "sim") return simPick(next, { announce: anim });
+  if (b.dataset.clk === "rest") return simRest();
+});
+/** CPU pick: best available by rank, nudged toward need when a need fit is within the next 3 on the board. */
+function cpuChoice(owner) {
+  const s = yearState(); const taken = new Set(Object.values(s.picks));
+  const avail = board().filter((p) => !taken.has(p.id));
+  if (!avail.length) return null;
+  const need = new Set(needCache.get(owner) || []);
+  return avail.slice(0, 3).find((p) => [...posSet(p.position)].some((x) => need.has(x))) || avail[0];
+}
+async function simPick(next, { announce = true } = {}) {
+  if (!needCache.has(next.owner) && client) await teamNeed(next.owner);
+  const p = cpuChoice(next.owner); if (!p) return toast("No prospects left on the board");
+  await makePick(next.pick, p.id, { announce });
+}
+let simming = false;
+async function simRest() {
+  if (simming) return; simming = true;
+  try {
+    const s = yearState();
+    for (const next of allPicksNow()) {
+      if (s.picks[next.pick]) continue;
+      const p = cpuChoice(next.owner); if (!p) break;
+      if (anim && !fastSim) await makePick(next.pick, p.id, { announce: true, quick: true });
+      else { s.picks[next.pick] = p.id; }
+    }
+    save(); render(); fastSim = false;
+    toast("Draft complete");
+  } finally { simming = false; }
+}
+
+/* ---------- THE PICK IS IN ---------- */
+let fastSim = false, pickinResolve = null, pickinTimer = 0;
+async function makePick(pickNo, id, { announce = true, quick = false } = {}) {
+  const s = yearState();
+  s.picks[pickNo] = id; save();
+  if (announce && anim) await showPickIn(pickNo, id, { quick });
+  render();
+  const row = document.querySelector(`[data-row="${pickNo}"]`); row && springIn(row);
+}
+function showPickIn(pickNo, id, { quick = false } = {}) {
+  const p = board().find((x) => x.id === id); if (!p) return Promise.resolve();
+  const owner = allPicksNow().find((x) => x.pick === pickNo)?.owner;
+  const own = teamOf(owner || "");
+  const el = $("#pickin");
+  el.style.setProperty("--c", own.color);
+  el.innerHTML = `<div class="pk-card">
+      <span class="pk-in">THE PICK IS IN</span>
+      <div class="pk-top">${teamLogo(own, { size: "2.25rem" })}<span>Pick <b class="num">#${pickNo}</b> · ${esc(own.city)} ${esc(own.name)}</span></div>
+      <div class="pk-body">${avatar(p, { size: "6rem", color: own.color, full: true })}
+        <div><b class="pk-name">${esc(p.name)}</b>
+          <span class="pk-line">${esc([p.position, p.school || (p.type === "international" ? "International" : "High School")].filter(Boolean).join(" · "))}</span>
+          <span class="pk-line num">${esc([p.height, p.weight].filter(Boolean).join(" · ") || "—")}</span>
+          ${p.comp ? `<span class="pk-comp">NBA comp: <b>${esc(p.comp)}</b></span>` : ""}</div></div>
+      <div class="pk-acts"><button class="btn primary press" type="button" data-pk="ok">Continue</button>${quick ? `<button class="btn ghost press" type="button" data-pk="fast">Skip animations</button>` : ""}</div>
+    </div>`;
+  el.hidden = false; requestAnimationFrame(() => el.classList.add("in"));
+  return new Promise((resolve) => {
+    const done = () => { clearTimeout(pickinTimer); el.classList.remove("in"); setTimeout(() => { if (!el.classList.contains("in")) el.hidden = true; }, RM() ? 0 : 180); pickinResolve = null; resolve(); };
+    pickinResolve = done;
+    el.querySelector('[data-pk="ok"]').addEventListener("click", done);
+    el.querySelector('[data-pk="fast"]')?.addEventListener("click", () => { fastSim = true; done(); });
+    el.addEventListener("click", (e) => { if (e.target === el) done(); }, { once: true });
+    pickinTimer = setTimeout(done, quick ? 900 : 2600);
+  });
+}
+document.addEventListener("keydown", (e) => { if ((e.key === "Escape" || e.key === "Enter") && pickinResolve) pickinResolve(); });
 
 /* ---------- boot ---------- */
 (async () => {
