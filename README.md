@@ -470,3 +470,31 @@ Built by an offline generator that cross-checks editorial data against ESPN:
 - **Signing in:** loads that account's own data. A guest's in-progress trade, draft or ballot moves into the new account; the guest chat is dropped.
 - **"Continue as Guest":** wipes guest memory and chats.
 - **Mismatched session:** if the page's stored user id disagrees with the server (expired session, logout in another tab, a forged hint), the page fixes the hint and reloads once.
+
+## Round 10: Player Encyclopedia
+
+**Search**
+- **🔍** in the header (every page) opens Player Search in the shared sheet. The input is 16px so iOS doesn't zoom.
+- `GET /api/players/search?q=` matches as you type against:
+  - every active 2026–27 player (cached league rosters);
+  - every legend in `nba_history.json`;
+  - ESPN's athlete search, only when local matches are thin, waiting at most 1.5 s.
+- Ranking: exact name, then name prefix, then last-name prefix, with a fame boost (current PPG for active players, career points and MVPs for legends). "jordan" → Michael Jordan, "kobe" → Kobe Bryant.
+- Featured pills when empty: Wembanyama, Dončić, LeBron, Jordan, Kobe, Rose, Curry.
+
+**Profile**
+- `GET /api/players/:id/full` and `service/player.js` assemble it.
+- **Bio:** ESPN headshot (initials fallback), team logo or Retired / 🏛 Hall of Fame badge, jersey, position, height/weight, age and birthdate, college or country, draft (`Year • Rd • Pick #`), years pro. Active players add 2026–27 salary and the 2K27 OVR badge.
+- **Trophy shelf:**
+  - Championships: a season counts when the team the player finished it with won the title.
+  - Finals MVP, MVP, DPOY, ROY, 6MOY and MIP come from `nba_history.json`.
+  - All-NBA, All-Defensive and All-Star Game MVP come from ESPN honors.
+  - Retired jerseys come from `nba_history.json`.
+  - All-Star *selections* aren't in any free feed, so they aren't shown.
+- **Career Stats:**
+  - Every regular season from ESPN `/athletes/:id/stats`, with sticky Season and Team columns and `TOT` rows for traded seasons.
+  - Career Averages and Career Totals rows.
+  - **Per Game / Per 36 Min / Totals / Advanced** (TS%, eFG%, AST/TO, Hollinger Game Score).
+- **Game Log (active players):** the last 15 games of 2026–27 from ESPN `/gamelog`, refreshed every 2 minutes while open. ESPN's game log has no +/-, so that column isn't shown.
+- **Actions:** ⚖️ Compare Player (the existing Compare tool) and ⇄ Load in Trade Machine (active players). Player Quick-View gained a **📖 Full Profile** button.
+- **Header on phones:** the signed-in account pill shrinks to the team-logo circle under 768px, and the "30 Teams" label hides under 480px, so the header fits from 320 to 1280px with the new button.

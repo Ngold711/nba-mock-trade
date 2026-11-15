@@ -13,6 +13,7 @@ import { logoMark, wordmark, HooptraxWatermark } from "./brand.js";
 import { mountVault } from "./vault.js";
 import { mountChat } from "./chat.js";
 import { mountAccount, account } from "./account.js";
+import { mountEncyclopedia } from "./encyclopedia.js";
 
 const ICON = {
   live: '<path d="M2 12h3.5l2.5-6 4 12 3-9 2 3H22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
@@ -50,6 +51,7 @@ export function mountShell({ active = "live" } = {}) {
       <nav class="topnav" aria-label="Tools">${TABS.map(tabLink).join("")}</nav>
       <div class="bar-right">
         <button class="status-pill" type="button" id="statusPill" aria-label="${hasWire ? "Live data status. Open LiveWire." : "Live data status. Go to Live."}"><span class="pulse" id="pulse"></span><span id="sync">Live Sync</span></button>
+        <button class="search-btn" type="button" id="searchBtn" aria-haspopup="dialog" aria-label="Search any NBA player" title="Player search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M15.5 15.5 20 20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
         <button class="teams-btn" type="button" id="teamsBtn" aria-haspopup="dialog" aria-label="30 Teams">${svg("teams")}<span>30 Teams</span></button>
         <button class="theme-btn" type="button" id="themeBtn" aria-label="Switch to light mode"><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
       </div>
@@ -169,6 +171,9 @@ export function mountShell({ active = "live" } = {}) {
 
   const vault = mountVault({ sheet, getClient: () => (client ? Promise.resolve(client) : createClient()), teamLook, ensureData, pickConfig, toast: (m) => toastFn(m) });
   const { openTeam, openPlayer, openCompare } = vault;
+  const encyclopedia = mountEncyclopedia({ sheet, openCompare, toast: toastFn });
+  document.getElementById("searchBtn").addEventListener("click", () => encyclopedia.openSearch());
+  addEventListener("htx:profile", (e) => e.detail?.id && encyclopedia.openProfile(String(e.detail.id)));
   const chat = mountChat({ getClient: () => (client ? Promise.resolve(client) : createClient()) });
 
   // Popovers (<details class="pop">): close on outside tap, Escape, or after choosing an item.
@@ -186,7 +191,7 @@ export function mountShell({ active = "live" } = {}) {
   }, true);
 
   instance = {
-    openTeam, openPlayer, openCompare, openDrawer, closeDrawer, chat, account,
+    openTeam, openPlayer, openCompare, openDrawer, closeDrawer, chat, account, encyclopedia,
     setWireHandler(fn) { wireHandler = fn; },
     get wire() { return wire; },
     setStatus(kind, text) {

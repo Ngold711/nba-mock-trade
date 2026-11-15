@@ -100,10 +100,11 @@ function teamOptions(sel) {
   return `<option value="">Favorite team (optional)</option>${Object.entries(TEAM_NAMES).sort((a, b) => a[1].localeCompare(b[1])).map(([c, n]) => `<option value="${c}"${c === sel ? " selected" : ""}>${esc(n)}</option>`).join("")}`;
 }
 export function openAuth({ mode = "signup", message = "", then = null } = {}) {
-  let m = mode;
+  let m = mode, mounted = false;
   S().open({
     title: m === "signup" ? "Create your free account" : "Log in",
     render(body) {
+      if (mounted) return; mounted = true;          // the host page may call sheet.refresh(); never wipe a half-typed form
       const draw = () => {
         S().setTitle(m === "signup" ? "Create your free account" : "Log in");
         body.innerHTML = `${message ? `<p class="auth-msg">${esc(message)}</p>` : ""}
@@ -169,9 +170,11 @@ export function saveFlow({ type, visibility, build }) {
         .catch((e) => T(e.message));
       return;
     }
+    let mounted = false;
     S().open({
       title: "Post to the Community",
       render(body) {
+        if (mounted) return; mounted = true;
         body.innerHTML = `<form class="auth-form post-form">
             <label>Headline (optional)<input name="title" type="text" maxlength="140" value="${esc(got.title || "")}" placeholder="${type === "trade" ? "e.g. Lakers go all in" : "e.g. My 2027 mock: Wizards land the #1 pick"}" /></label>
             <div class="post-preview">${itemBody({ type, payloadJson: got.payload })}</div>
@@ -227,6 +230,7 @@ export function openProfile({ tab = "public" } = {}) {
   S().open({
     title: "Your Profile",
     render(b) {
+      if (body === b) { draw(); return; }           // a host refresh: repaint, don't reload or rebind
       body = b; draw();
       b.onclick = async (e) => {
         const t = e.target;

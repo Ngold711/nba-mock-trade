@@ -487,6 +487,12 @@ export function normalizeBio(json) {
     height: str(get(a, "displayHeight"), ""), weight: str(get(a, "displayWeight"), ""),
     age: num(get(a, "age"), null), dob: str(get(a, "displayDOB"), ""),
     experience: str(get(a, "displayExperience"), ""), debutYear: num(get(a, "debutYear"), null),
+    jersey: str(get(a, "jersey") || get(a, "displayJersey"), "").replace(/^#/, ""),
+    position: str(get(a, "position.abbreviation") || get(a, "position.displayName"), ""),
+    positionName: str(get(a, "position.displayName"), ""),
+    active: Boolean(get(a, "active", false)),
+    status: str(get(a, "status.name"), ""),
+    team: get(a, "team.id") ? { id: str(get(a, "team.id"), ""), abbr: str(get(a, "team.abbreviation"), ""), name: str(get(a, "team.displayName"), ""), logo: get(a, "team.logos.0.href", null) || get(a, "team.logo", null), color: hex(get(a, "team.color")) } : null,
   };
 }
 

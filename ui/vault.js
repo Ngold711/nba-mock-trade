@@ -204,8 +204,9 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
           <div class="qv-stats adv">${[["TS%", pct1(adv?.ts)], ["eFG%", pct1(adv?.efg)], ["AST/TO", adv?.astTo != null ? adv.astTo.toFixed(2) : "—"], ["GmSc", adv?.gmsc != null ? adv.gmsc.toFixed(1) : "—"], ["FG%", f1(s.fgPct)], ["3P%", f1(s.threePct)]].map(([k, v]) => `<div><div class="k">${k}</div><div class="v num">${v}</div></div>`).join("")}</div>
           <p class="qv-note num">${s.gp} games · ${f1(s.min)} MIN · FT ${f1(s.ftPct)}%${statMode === "per36" ? " · scaled to 36 minutes" : statMode === "totals" ? " · season totals" : ""}</p>`
           : S.loading ? `<div class="skel-line"></div>` : `<div class="empty">No 2026–27 games yet.</div>`}
-        <div class="hub-actions"><button class="btn primary press" type="button" data-compare>Compare</button><a class="btn ghost press" href="${tradeHref}">Open in Trade Machine</a>${code ? `<button class="btn ghost press" type="button" data-team-hub="${code}">Team Vault</button>` : ""}</div>`;
+        <div class="hub-actions"><button class="btn primary press" type="button" data-full>📖 Full Profile</button><button class="btn ghost press" type="button" data-compare>Compare</button><a class="btn ghost press" href="${tradeHref}">Open in Trade Machine</a>${code ? `<button class="btn ghost press" type="button" data-team-hub="${code}">Team Vault</button>` : ""}</div>`;
       body.querySelector("[data-compare]").addEventListener("click", () => openCompare(String(id)));
+      body.querySelector("[data-full]").addEventListener("click", () => dispatchEvent(new CustomEvent("htx:profile", { detail: { id: String(id) } })));
       bindMode(body, () => draw(body));
     };
     sheet.open({ title: "Player", render: draw });

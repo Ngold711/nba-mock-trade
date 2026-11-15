@@ -36,6 +36,8 @@ export const TTL = {
   bio: 24 * 60 * MIN,
   search: 24 * 60 * MIN,
   career: 12 * 60 * MIN,
+  seasons: 6 * 60 * MIN,   // encyclopedia: season-by-season stats
+  gamelog: 10 * MIN,       // encyclopedia: last 15 games
 };
 const MAX_BACKOFF = 5 * MIN;
 
@@ -87,6 +89,8 @@ export const POLICIES = {
   bio: () => TTL.bio,
   search: () => TTL.search,
   career: () => TTL.career,
+  seasons: () => TTL.seasons,
+  gamelog: () => TTL.gamelog,
 };
 
 const keyOf = (resource, params = {}) =>

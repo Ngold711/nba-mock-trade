@@ -540,12 +540,78 @@ async function feedRoute(req, res, m, q) {
   return json(res, 200, { data: { items: rows.map((it) => publicItem(it, user?.id)), next: rows.length === 25 ? offset + 25 : null, storage: store.kind } });
 }
 
+
+/* =====================================================================
+   Player Encyclopedia: search (active rosters + all-time legends + ESPN) and the full profile.
+   ===================================================================== */
+import { searchLocal, mergeSearch, trophies } from "./service/player.js";
+import { retiredBy } from "./service/chat.js";
+import { resolveSalary as salaryOf } from "./service/trade.js";
+const timeout = (p, ms, fallback) => Promise.race([p, new Promise((r) => setTimeout(() => r(fallback), ms))]);
+async function playerSearchRoute(req, res, m, q) {
+  const term = String(q.get("q") || "").trim();
+  if (term.length < 2 || term.length > 40) return json(res, 400, { error: "Search needs 2–40 characters" });
+  const [league, d] = await Promise.all([store.get("league").then((r) => r.data).catch(() => null), chatData().catch(() => ({}))]);
+  const ppg = new Map(((await store.get("players").then((r) => r.data).catch(() => null))?.players || []).map((p) => [String(p.id), p.stats?.pts || 0]));
+  const active = (league?.players || []).map((p) => ({ ...p, ppg: ppg.get(String(p.id)) || 0 }));
+  const local = searchLocal(term, { active, legends: d.history?.legends || [] }, 12);
+  // ESPN's athlete search fills in anyone our caches don't know (deep benches, older players); never wait long for it
+  const remote = local.length >= 8 ? [] : await timeout(store.get("search", { q: term.toLowerCase() }).then((r) => r.data).catch(() => []), 1500, []);
+  res.setHeader("cache-control", "public, max-age=300");
+  return json(res, 200, { data: { players: mergeSearch(local, remote, 12) } });
+}
+/** ESPN's displayDOB is day/month/year ("17/2/1963") → "Feb 17, 1963". */
+const fmtDob = (d) => { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(d || "")); return m ? new Date(Date.UTC(+m[3], +m[2] - 1, +m[1])).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : String(d || ""); };
+async function playerFullRoute(req, res, m) {
+  const id = m[1];
+  const get = (name, params) => store.get(name, params).then((r) => r.data).catch(() => null);
+  const [bio, career, honors, log, league, ratings, stats, d] = await Promise.all([
+    get("bio", { id }), get("seasons", { id }), get("honors", { id }), timeout(get("gamelog", { id }), 4000, null),
+    get("league"), get("ratings"), get("players"), chatData().catch(() => ({})),
+  ]);
+  const lp = league?.players?.find((p) => String(p.id) === id) || null;
+  const leg = d.history?.legends?.find((l) => String(l.id) === id) || null;
+  const name = bio?.name || lp?.name || leg?.name;
+  if (!name) return json(res, 404, { error: "No NBA player with that id" });
+  const active = !!lp || (bio?.active && !!bio?.team);
+  const teamRow = lp ? league.teams?.[lp.teamAbbr] : null;
+  const team = teamRow ? { abbr: teamRow.abbr, code: ({ GS: "GSW", NO: "NOP", NY: "NYK", SA: "SAS", UTAH: "UTA", WSH: "WAS" })[teamRow.abbr] || teamRow.abbr, name: teamRow.displayName, logo: teamRow.logo, color: teamRow.color } : null;
+  const st = stats?.players?.find((p) => String(p.id) === id)?.stats;
+  const sal = lp ? salaryOf(lp, { book: d.book, stats: st, cba: d.book?.cba }) : null;
+  const rating = ratings?.players?.find((p) => String(p.id) === id) || null;
+  const seasons = career?.seasons || [];
+  const retired = retiredBy(d.history, name).filter((r) => r.code !== "NBA" || /russell/i.test(name));
+  const years = [...new Set(seasons.map((s) => s.year).filter(Boolean))];
+  const profile = {
+    id, name, active,
+    headshot: `https://a.espncdn.com/i/headshots/nba/players/full/${id}.png`,
+    jersey: lp?.jersey || bio?.jersey || "", position: lp?.position || bio?.position || leg?.position || "", positionName: bio?.positionName || "",
+    height: bio?.height || lp?.height || leg?.height || "", weight: bio?.weight || lp?.weight || "",
+    age: active ? bio?.age ?? lp?.age ?? null : null, dob: fmtDob(bio?.dob), birthPlace: bio?.birthPlace || leg?.birthPlace || "",
+    college: bio?.college || "", country: bio?.country || "",
+    draft: bio?.draft || (leg?.draft ? { text: leg.draft } : null),
+    yearsPro: years.length || null, span: years.length ? `${Math.min(...years) - 1}–${Math.max(...years)}` : leg?.from ? `${leg.from}–${leg.to}` : "",
+    team, salary: sal ? { amount: sal.salary, estimate: sal.source === "estimate" } : null,
+    ovr: rating ? { value: rating.ovr, official: !!rating.seeded } : null,
+    hof: retired.some((r) => r.hof) || null,
+    retired: retired.map((r) => ({ team: r.code, num: r.num, retiredOn: r.retiredOn || null, upcoming: !!r.upcoming, date: r.date || null })),
+    trophies: trophies({ name, history: d.history, honors: honors || [], seasons }),
+    seasons, career: career?.career || null,
+    gameLog: active && log?.games?.length ? log : null,
+    sources: { stats: career ? "ESPN" : null, awards: "nba_history.json + ESPN honors" },
+  };
+  res.setHeader("cache-control", "no-cache");
+  return json(res, 200, { data: profile });
+}
+
 const routes = [
   [/^\/api\/nba-chat$/, chatRoute],
   [/^\/api\/auth\/(signup|login|logout|me)$/, authRoute],
   [/^\/api\/me(?:\/(items)(?:\/(public|private))?)?$/, meRoute],
   [/^\/api\/items(?:\/([A-Za-z0-9_-]{6,24})(?:\/(like|delete|update))?)?$/, itemsRoute],
   [/^\/api\/feed$/, feedRoute],
+  [/^\/api\/players\/search$/, playerSearchRoute],
+  [/^\/api\/players\/(\d{1,12})\/full$/, playerFullRoute],
   [/^\/api\/ai-threads(?:\/([A-Za-z0-9_-]{5,40})(?:\/(delete))?)?$/, aiThreadsRoute],
   // spec names: /api/saved-items (your own items; POST saves) and /api/profile (your profile). Both require a session.
   [/^\/api\/saved-items(?:\/(public|private))?$/, (req, res, m, q) => (req.method === "POST" ? itemsRoute(req, res, [m[0]]) : meRoute(req, res, [m[0], "items", m[1] || q.get("visibility") || undefined]))],
