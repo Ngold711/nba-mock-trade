@@ -200,30 +200,39 @@ async function loadRatings() {
 let txStatus = { syncedAt: null, sources: {} };
 export const transactionsStatus = () => txStatus;
 async function loadTransactions(_p, opts) {
-  const { mergeTransactions, normalizeNbaMovement, newest, NBA_MOVEMENT_URL, REALGM_RSS_URL, parseRss, realgmTransactions } = await import("./transactions.js");
+  const { mergeTransactions, normalizeNbaMovement, newest, NBA_MOVEMENT_URL, REALGM_RSS_URL, parseRss, realgmTransactions, espnNewsItems, shamsItems, SHAMS_RSS_URL } = await import("./transactions.js");
   const server = typeof window === "undefined";
   const env = (k) => (typeof process !== "undefined" ? process.env?.[k] : undefined);
   const nbaOn = server && env("TRANSACTIONS_NBA") !== "0";
   const rgmOn = server && env("TRANSACTIONS_REALGM") !== "0";
-  const [espnR, nbaR, teamsR, rgmR] = await Promise.allSettled([
+  const shamsOn = server && env("TRANSACTIONS_SHAMS") !== "0";
+  const [espnR, nbaR, teamsR, rgmR, newsR, shamsR] = await Promise.allSettled([
     fetchJson(ENDPOINTS.transactions(), opts).then(normalizeTransactions),
     nbaOn ? fetch(NBA_MOVEMENT_URL, { headers: { accept: "application/json", referer: "https://www.nba.com/" }, signal: AbortSignal.timeout(9000) })
       .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }) : Promise.reject(new Error("off")),
     dep("teams").catch(() => []),
     rgmOn ? fetch(env("TRANSACTIONS_REALGM_URL") || REALGM_RSS_URL, { headers: { accept: "application/rss+xml, application/xml, text/xml", "user-agent": "Hooptrax/1.0 (transactions sync)" }, signal: AbortSignal.timeout(9000) })
       .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); }) : Promise.reject(new Error("off")),
+    dep("news"),
+    shamsOn ? fetch(env("SHAMS_RSS_URL") || SHAMS_RSS_URL, { headers: { accept: "application/rss+xml, application/xml, text/xml", "user-agent": "Hooptrax/1.0 (news sync)" }, signal: AbortSignal.timeout(9000) })
+      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); }) : Promise.reject(new Error("off")),
   ]);
   const byAbbr = Object.fromEntries((teamsR.value || []).map((t) => [t.abbr, t]));
   const espn = espnR.status === "fulfilled" ? espnR.value : [];
   const nba = nbaR.status === "fulfilled" ? normalizeNbaMovement(nbaR.value, byAbbr) : [];
   const rgm = rgmR.status === "fulfilled" ? realgmTransactions(parseRss(rgmR.value), byAbbr) : [];
-  if (espnR.status !== "fulfilled" && !nba.length && !rgm.length) throw espnR.reason;
-  const list = mergeTransactions(espn, nba, rgm);
+  const byId = Object.fromEntries((teamsR.value || []).map((t) => [String(t.id), t]));
+  const news = newsR.status === "fulfilled" ? espnNewsItems(newsR.value, byId, byAbbr) : [];
+  const shams = shamsR.status === "fulfilled" ? shamsItems(parseRss(shamsR.value), byAbbr) : [];
+  if (espnR.status !== "fulfilled" && !nba.length && !rgm.length && !news.length && !shams.length) throw espnR.reason;
+  const list = mergeTransactions(espn, nba, news, shams, rgm);
   const official = list.filter((t) => t.category !== "rumor");
   txStatus = { syncedAt: new Date().toISOString(), newest: newest(official), newestRumor: newest(list.filter((t) => t.category === "rumor")),
     counts: { moves: official.length, rumors: list.length - official.length }, sources: {
     espn: espnR.status === "fulfilled" ? { ok: true, newest: newest(espn), count: espn.length } : { ok: false, error: String(espnR.reason?.message || espnR.reason) },
     nba: nbaOn ? (nbaR.status === "fulfilled" ? { ok: true, newest: newest(nba), count: nba.length } : { ok: false, error: String(nbaR.reason?.message || nbaR.reason) }) : { ok: false, error: "disabled" },
+    espnNews: newsR.status === "fulfilled" ? { ok: true, newest: newest(news), count: news.length } : { ok: false, error: String(newsR.reason?.message || newsR.reason) },
+    shams: shamsOn ? (shamsR.status === "fulfilled" ? { ok: true, newest: newest(shams), count: shams.length } : { ok: false, error: String(shamsR.reason?.message || shamsR.reason) }) : { ok: false, error: "disabled" },
     realgm: rgmOn ? (rgmR.status === "fulfilled" ? { ok: true, newest: newest(rgm), newestMove: newest(rgm.filter((t) => t.category === "move")), count: rgm.length } : { ok: false, error: String(rgmR.reason?.message || rgmR.reason) }) : { ok: false, error: "disabled" },
   } };
   return list;

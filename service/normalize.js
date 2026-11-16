@@ -411,6 +411,7 @@ export function normalizeNews(json) {
       url: get(a, "links.web.href", null),
       image: get(a, "images.0.url", null),
       byline: str(get(a, "byline"), ""),
+      type: str(get(a, "type"), ""),
       teamIds: cats.filter((c) => get(c, "type") === "team").map((c) => str(get(c, "teamId") || get(c, "team.id"))).filter(Boolean),
       athleteIds: cats.filter((c) => get(c, "type") === "athlete").map((c) => str(get(c, "athleteId") || get(c, "athlete.id"))).filter(Boolean),
       premium: Boolean(get(a, "premium", false)),

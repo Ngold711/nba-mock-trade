@@ -675,3 +675,16 @@ Built by an offline generator that cross-checks editorial data against ESPN:
   - Moves are de-duplicated across sources; up to 60 moves + 40 rumors, newest first. Non-NBA Wiretap items are dropped.
 - `/api/transactions/status` reports `newest` (official moves only), `newestRumor` and counts. The amber lag warning is based on official moves.
 - The LED Wire shows official moves only. Ask Hooptrax gets official moves and, separately, rumors labelled "NOT official".
+
+## Round 23: ESPN News + Shams Charania in Live → News, source attribution
+
+- **New sources** in `service/transactions.js`, merged by the `transactions` loader every 3 minutes:
+  - **ESPN NBA news** (`espnNewsItems`): stories and headline news only. Recaps, previews, videos, fantasy/betting, other sports and listicles are dropped. Team comes from ESPN's tags; reporter from the byline.
+  - **Shams Charania feed** (`shamsItems`): any RSS. The default is a Google News search for "Shams Charania" NBA stories; set `SHAMS_RSS_URL` for another feed and `TRANSACTIONS_SHAMS=0` to disable. Google News titles' " - Outlet" suffix becomes "(via Outlet)".
+  - Existing sources: ESPN and NBA.com transaction logs, RealGM Wiretap.
+- **One classifier** (`classifyNews`) for all sources:
+  - `move`: a completed move (move verb, no hedging), or, for insiders only (Shams / ESPN reporters / "sources"), a reported agreement ("is signing", "agreed to a … deal"), which gets kind `agreed` and an **Agreed** badge.
+  - `rumor`: kind `rumor` for trade chatter and speculation (`SPECULATION_RE`), `news` for injuries, lineups, coaching and other reports.
+- **Attribution:** every row has `sourceAttribution` ("Per Shams Charania", "Per Brian Windhorst", "Per Bobby Marks", "Per ESPN", "Per RealGM", "Per NBA.com"), shown under each headline in the News tab.
+- **Dedupe:** the same story from ESPN, Shams and RealGM appears once. Moves win over rumors; the order is logs, ESPN News, Shams, RealGM.
+- `/api/transactions/status` adds `espnNews` and `shams`, and the Live sync line lists them ("ESPN News Nov 16 · Shams …").

@@ -58,3 +58,39 @@ test("RealGM rumors vs official moves: speculation never counts as a move", () =
   assert.equal(merged.filter((t) => t.category === "rumor").length, 4);
   assert.ok(merged.every((t) => t.category === "move" || t.category === "rumor"));
 });
+
+import { espnNewsItems, shamsItems, classifyNews, attributionFor } from "../service/transactions.js";
+test("ESPN news: stories only, insider attribution, categories", () => {
+  const now = Date.parse("2026-11-16T03:00:00Z");
+  const news = [
+    { headline: "Sources: Hawks are signing guard Ty Jerome to a two-year deal", byline: "Shams Charania", type: "HeadlineNews", published: "2026-11-16T02:00:00Z", teamIds: ["1"], url: "https://espn.com/1" },
+    { headline: "Brunson hits tiebreaking 3-pointer in OT", type: "Recap", published: "2026-11-16T02:10:00Z", teamIds: ["18"] },
+    { headline: "Kings exploring trades for Zach LaVine", byline: "Brian Windhorst", type: "Story", published: "2026-11-16T01:00:00Z", teamIds: ["23"] },
+    { headline: "Jokic (ankle) expected to miss two weeks", type: "Story", published: "2026-11-15T23:00:00Z", teamIds: ["7"] },
+  ];
+  const r = espnNewsItems(news, { 1: { abbr: "ATL" }, 23: { abbr: "SAC" }, 7: { abbr: "DEN" } }, {}, { now });
+  assert.equal(r.length, 3, "recaps dropped");
+  assert.deepEqual(r.map((t) => [t.team.abbr, t.category, t.kind, t.sourceAttribution]), [
+    ["ATL", "move", "agreed", "Per Shams Charania"], ["SAC", "rumor", "rumor", "Per Brian Windhorst"], ["DEN", "rumor", "news", "Per ESPN"]]);
+});
+test("Shams RSS (Google News format): outlet kept for attribution; same story from ESPN shows once", () => {
+  const now = Date.parse("2026-11-16T03:00:00Z");
+  const xml = `<rss><channel>
+    <item><title>Hawks are signing guard Ty Jerome to a two-year deal, sources say - ESPN</title><link>https://news.google.com/a</link><pubDate>Mon, 16 Nov 2026 02:05:00 GMT</pubDate></item>
+    <item><title>Shams: Celtics' Brown to miss Friday with ankle sprain - Yahoo Sports</title><link>https://news.google.com/b</link><pubDate>Mon, 16 Nov 2026 01:00:00 GMT</pubDate></item>
+    <item><title>Charania's podcast picks top golf moments - Golf Digest</title><pubDate>Mon, 16 Nov 2026 01:00:00 GMT</pubDate></item>
+  </channel></rss>`;
+  const s = shamsItems(parseRss(xml), {}, { now });
+  assert.equal(s.length, 2, "non-NBA item dropped");
+  assert.equal(s[0].sourceAttribution, "Per Shams Charania (via ESPN)");
+  assert.equal(s[1].kind, "news");
+  const espnNews = [{ date: "2026-11-16T02:00Z", description: "Sources: Hawks are signing guard Ty Jerome to a two-year deal.", category: "move", kind: "agreed", team: { abbr: "ATL" }, source: "espnNews", sourceAttribution: "Per Shams Charania" }];
+  const merged = mergeTransactions([], [], espnNews, s);
+  assert.equal(merged.filter((t) => /Jerome/.test(t.description)).length, 1);
+  assert.ok(merged.every((t) => t.sourceAttribution));
+});
+test("speculation from insiders stays a rumor; agreements from non-insiders stay rumors", () => {
+  assert.equal(classifyNews("Sources: Bulls could trade Coby White", { insider: true }).category, "rumor");
+  assert.equal(classifyNews("Lakers, Reaves agree to four-year extension").category, "rumor");
+  assert.equal(attributionFor("", "Kings waive X", "RealGM"), "Per RealGM");
+});

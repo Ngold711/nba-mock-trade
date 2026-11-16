@@ -228,6 +228,8 @@ tr.cut td { border-top: 1.5px dashed var(--fill-strong); }
 .pill.rumor { background: rgba(245,158,11,.14); color: #F59E0B; }
 .pill.news { background: var(--fill); color: var(--label-2); }
 .moves a.desc { color: inherit; text-decoration: none; }
+.moves .attr { display: block; margin-top: 0.2rem; font-size: 0.75rem; color: var(--label-3); font-weight: 500; }
+.pill.agreed { background: rgba(34,197,94,.14); color: var(--good, #22C55E); }
 .moves a.desc:hover { text-decoration: underline; text-underline-offset: 3px; }
 </style>
 </head>
@@ -649,7 +651,7 @@ $("#injFilter").addEventListener("click", (e) => {
 $("#injSearch").addEventListener("input", renderInjuries);
 
 /* Transactions */
-const KIND = { trade: "Trade", release: "Waived", signing: "Signed", contract: "Contract", assignment: "Assigned", suspension: "Suspended", other: "Move", rumor: "Rumor", news: "News" };
+const KIND = { trade: "Trade", release: "Waived", signing: "Signed", contract: "Contract", assignment: "Assigned", suspension: "Suspended", other: "Move", agreed: "Agreed", rumor: "Rumor", news: "News" };
 let newsFilter = "all", movesList = [];
 /* "Last synced": when the server last pulled the feeds, and the newest move each source has published. */
 const agoTxt = (iso) => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return !Number.isFinite(m) ? "" : m <= 0 ? "just now" : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`; };
@@ -661,10 +663,10 @@ function renderMoves() {
   el.innerHTML = rows.length ? rows.map((t) => {
     const rumor = t.category === "rumor";
     const label = rumor ? (t.kind === "news" ? "News" : "Rumor") : KIND[t.kind] || "Move";
-    const cls = rumor ? (t.kind === "news" ? " news" : " rumor") : t.kind === "trade" ? " live" : "";
+    const cls = rumor ? (t.kind === "news" ? " news" : " rumor") : t.kind === "trade" ? " live" : t.kind === "agreed" ? " agreed" : "";
     const desc = t.url ? `<a class="desc" href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.description)}</a>` : `<span class="desc">${esc(t.description)}</span>`;
     return `<li class="row${rumor ? " is-rumor" : ""}">${teamLogo(t.team, { size: "2.25rem" })}
-      <span class="meta"><span class="when">${esc(fmtDay(t.date))} · ${esc(t.team?.abbr || "NBA")}${t.source === "realgm" ? " · RealGM" : ""}</span> ${desc}</span>
+      <span class="meta"><span class="when">${esc(fmtDay(t.date))} · ${esc(t.team?.abbr || "NBA")}</span> ${desc}${t.sourceAttribution ? ` <span class="attr">${esc(t.sourceAttribution)}</span>` : ""}</span>
       <span class="pill${cls}">${label}</span></li>`;
   }).join("") : `<li class="empty">${empty}</li>`;
 }
@@ -679,7 +681,7 @@ async function paintMovesSync(meta) {
   const st = await fetch("/api/transactions/status").then((r) => r.json()).then((j) => j.data).catch(() => null);
   const synced = st?.syncedAt || meta?.fetchedAt;
   if (!synced) { el.innerHTML = ""; return; }
-  const NAMES = { espn: "ESPN", realgm: "RealGM", nba: "NBA.com" };
+  const NAMES = { espn: "ESPN moves", nba: "NBA.com", espnNews: "ESPN News", shams: "Shams", realgm: "RealGM" };
   const live = Object.entries(st?.sources || {}).filter(([, v]) => v.ok);
   // amber only when every source that answered is 36+ hours behind (the overall newest move is that old)
   const lag = !!st?.newest && Date.now() - Date.parse(st.newest) > 36 * 3600e3;

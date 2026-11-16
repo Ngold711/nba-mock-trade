@@ -17,7 +17,7 @@ export const TTL = {
   idle: 15 * MIN,          // nothing live, nothing soon
   injuries: 15 * MIN,
   standings: 15 * MIN,
-  transactions: 15 * MIN,
+  transactions: 3 * MIN,   // ESPN + NBA.com moves, ESPN news, Shams, RealGM (breaking news within minutes)
   roster: 60 * MIN,
   teams: 24 * 60 * MIN,
   historical: 10 * MIN,
