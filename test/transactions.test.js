@@ -40,3 +40,21 @@ test("RealGM Wiretap RSS: NBA move headlines only, team + kind detected, deduped
   assert.equal(merged[0].source, "realgm");
   assert.equal(merged.filter((t) => /Broome/.test(t.description)).length, 1);
 });
+
+test("RealGM rumors vs official moves: speculation never counts as a move", () => {
+  const xml = `<rss><channel>
+    <item><title>Pelicans Working On Trade For Starting Center</title><pubDate>Sun, 15 Nov 2026 20:00:00 -0500</pubDate></item>
+    <item><title>Bulls Open To Trading Coby White</title><pubDate>Sun, 15 Nov 2026 19:30:00 -0500</pubDate></item>
+    <item><title>Heat Sign Vladislav Goldin To Two-Way Contract</title><pubDate>Sun, 15 Nov 2026 19:00:00 -0500</pubDate></item>
+    <item><title>Report: Lakers Exploring Market For Austin Reaves</title><pubDate>Sun, 15 Nov 2026 18:00:00 -0500</pubDate></item>
+    <item><title>Mavericks Hire New Assistant Coach</title><pubDate>Sun, 15 Nov 2026 17:00:00 -0500</pubDate></item>
+  </channel></rss>`;
+  const r = realgmTransactions(parseRss(xml));
+  const by = Object.fromEntries(r.map((t) => [t.team.abbr, [t.category, t.kind]]));
+  assert.deepEqual(by.NO, ["rumor", "rumor"]); assert.deepEqual(by.CHI, ["rumor", "rumor"]);
+  assert.deepEqual(by.MIA, ["move", "signing"]); assert.deepEqual(by.LAL, ["rumor", "rumor"]); assert.deepEqual(by.DAL, ["rumor", "news"]);
+  const merged = mergeTransactions(espn, [], r);
+  assert.ok(merged.filter((t) => t.category === "move").every((t) => !/working on trade|open to trading|exploring/i.test(t.description)));
+  assert.equal(merged.filter((t) => t.category === "rumor").length, 4);
+  assert.ok(merged.every((t) => t.category === "move" || t.category === "rumor"));
+});

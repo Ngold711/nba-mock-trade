@@ -219,10 +219,12 @@ async function loadTransactions(_p, opts) {
   const rgm = rgmR.status === "fulfilled" ? realgmTransactions(parseRss(rgmR.value), byAbbr) : [];
   if (espnR.status !== "fulfilled" && !nba.length && !rgm.length) throw espnR.reason;
   const list = mergeTransactions(espn, nba, rgm);
-  txStatus = { syncedAt: new Date().toISOString(), newest: newest(list), sources: {
+  const official = list.filter((t) => t.category !== "rumor");
+  txStatus = { syncedAt: new Date().toISOString(), newest: newest(official), newestRumor: newest(list.filter((t) => t.category === "rumor")),
+    counts: { moves: official.length, rumors: list.length - official.length }, sources: {
     espn: espnR.status === "fulfilled" ? { ok: true, newest: newest(espn), count: espn.length } : { ok: false, error: String(espnR.reason?.message || espnR.reason) },
     nba: nbaOn ? (nbaR.status === "fulfilled" ? { ok: true, newest: newest(nba), count: nba.length } : { ok: false, error: String(nbaR.reason?.message || nbaR.reason) }) : { ok: false, error: "disabled" },
-    realgm: rgmOn ? (rgmR.status === "fulfilled" ? { ok: true, newest: newest(rgm), count: rgm.length } : { ok: false, error: String(rgmR.reason?.message || rgmR.reason) }) : { ok: false, error: "disabled" },
+    realgm: rgmOn ? (rgmR.status === "fulfilled" ? { ok: true, newest: newest(rgm), newestMove: newest(rgm.filter((t) => t.category === "move")), count: rgm.length } : { ok: false, error: String(rgmR.reason?.message || rgmR.reason) }) : { ok: false, error: "disabled" },
   } };
   return list;
 }

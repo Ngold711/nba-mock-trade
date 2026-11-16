@@ -664,3 +664,14 @@ Built by an offline generator that cross-checks editorial data against ESPN:
   - Spotrac is not scraped: its terms prohibit automated scraping and it publishes no feed.
 - `/api/transactions/status` reports `espn`, `nba` and `realgm` separately. The Live sync line lists each responding source's newest move, and turns amber only when every one of them is 36+ hours old.
 - **Spacing:** the Live list shows the date/team line above the description (no more "MINSigned"), and the LED Wire has space after the team symbol.
+
+## Round 22: Live → News (official moves vs. rumors)
+
+- The Live sub-tabs are Games | Standings | Injuries | **News** | Feed. Games is still first and the default, and Feed (Community Feed) is unchanged. The 4th tab's heading is now "News".
+- Inside News, pills **All | Official Moves | Rumors & News** filter on the client (no reload).
+- `service/transactions.js` tags every row with `category`:
+  - **`move`**: ESPN and NBA.com transaction logs, plus RealGM headlines reporting a completed move with no speculation language. Badges: Signed / Waived / Trade / Contract / Assigned / Suspended.
+  - **`rumor`**: other RealGM Wiretap NBA items, with kind `rumor` (trade talk, availability, interest, "report", "could", "expected to"…; see `RUMOR_RE`) or `news` (other league reports). Badges: amber "Rumor" / grey "News".
+  - Moves are de-duplicated across sources; up to 60 moves + 40 rumors, newest first. Non-NBA Wiretap items are dropped.
+- `/api/transactions/status` reports `newest` (official moves only), `newestRumor` and counts. The amber lag warning is based on official moves.
+- The LED Wire shows official moves only. Ask Hooptrax gets official moves and, separately, rumors labelled "NOT official".

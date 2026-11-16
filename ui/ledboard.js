@@ -150,7 +150,7 @@ export function mountLedBoard(el, { client, onGame = () => {} }) {
       const status = String(i.status || "").toUpperCase().replace("DAY-TO-DAY", "DTD");
       out.push(`<button class="led-q" type="button" data-player="${esc(i.athlete?.id || "")}" data-name="${esc(i.athlete?.name || "")}" data-team="${esc(i.team?.abbr || "")}"><span class="dim">INJ:</span><span class="sym">${esc(shortName(i.athlete?.name))}</span><span class="dim">${esc(tk(i.team?.abbr))}</span>(${esc(status)})<span class="dn">▼</span></button>`);
     }
-    for (const m of (S.moves || []).slice(0, 10)) {
+    for (const m of (S.moves || []).filter((x) => x.category !== "rumor").slice(0, 10)) {   // official moves only
       const txt = String(m.description || "").replace(/\.$/, "").toUpperCase();
       out.push(`<span class="led-q"><span class="dim">MOVE:</span><span class="sym">${esc(tk(m.team?.abbr))}</span> ${esc(txt.length > 64 ? txt.slice(0, 62) + "…" : txt)}<span class="up">▲</span></span>`);
     }

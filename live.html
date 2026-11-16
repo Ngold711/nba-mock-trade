@@ -220,6 +220,15 @@ tr.cut td { border-top: 1.5px dashed var(--fill-strong); }
 .sync-line .dot.warn { background: var(--warn, #F59E0B); }
 .sync-line .lag { color: var(--warn, #F59E0B); }
 .sync-line .src { color: var(--label-3); }
+.news-pills { display: flex; gap: 0.4rem; overflow-x: auto; scrollbar-width: none; padding: 0.8rem 1rem 0; }
+.news-pills::-webkit-scrollbar { display: none; }
+.news-pills button { flex: none; border: 0; border-radius: 999px; min-height: 36px; padding: 0 0.9rem; background: transparent; color: var(--label-2); font: inherit; font-size: 0.8125rem; font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--sep); cursor: pointer; }
+.news-pills button[aria-selected="true"] { background: var(--accent); color: #111; box-shadow: none; }
+.pill.rumor { background: rgba(245,158,11,.14); color: #F59E0B; }
+.pill.news { background: var(--fill); color: var(--label-2); }
+.moves a.desc { color: inherit; text-decoration: none; }
+.moves a.desc:hover { text-decoration: underline; text-underline-offset: 3px; }
 </style>
 </head>
 <body>
@@ -234,7 +243,7 @@ tr.cut td { border-top: 1.5px dashed var(--fill-strong); }
       <button type="button" role="tab" data-view="games">Games</button>
       <button type="button" role="tab" data-view="standings">Standings</button>
       <button type="button" role="tab" data-view="injuries">Injuries</button>
-      <button type="button" role="tab" data-view="moves">Moves</button>
+      <button type="button" role="tab" data-view="moves">News</button>
       <button type="button" role="tab" data-view="feed">Feed</button>
     </div>
   </div>
@@ -265,7 +274,7 @@ tr.cut td { border-top: 1.5px dashed var(--fill-strong); }
     <div class="groups" id="injuries"></div>
   </section>
   <section class="view" id="view-feed" hidden><div class="feed" id="feed"></div></section>
-  <section class="view" id="view-moves" hidden><div class="panel moves"><p class="sync-line" id="movesSync" aria-live="polite"></p><ul class="list" id="moves" style="padding:0 1rem"></ul></div></section>
+  <section class="view" id="view-moves" hidden><div class="panel moves"><div class="news-pills" role="tablist" aria-label="Filter news"><button type="button" role="tab" data-nf="all" aria-selected="true">All</button><button type="button" role="tab" data-nf="move" aria-selected="false">Official Moves</button><button type="button" role="tab" data-nf="rumor" aria-selected="false">Rumors &amp; News</button></div><p class="sync-line" id="movesSync" aria-live="polite"></p><ul class="list" id="moves" style="padding:0 1rem"></ul></div></section>
 
   <p class="fine">Data from ESPN’s public feeds, refreshed every 20 seconds while games are live and every 15–60 minutes for standings, injuries and rosters. Player photos are served by ESPN’s image CDN; players without one show their initials. Not affiliated with the NBA or ESPN.</p>
 </main>
@@ -328,7 +337,7 @@ function statusPill(g) {
 
 /* ---------- views ---------- */
 const VIEWS = ["games", "standings", "injuries", "moves", "feed"];
-const TITLES = { games: "Games", standings: "Standings", injuries: "Injury report", moves: "Transactions", feed: "Community Feed" };
+const TITLES = { games: "Games", standings: "Standings", injuries: "Injury report", moves: "News", feed: "Community Feed" };
 let current = null, stopView = null;
 const tabs = $("#tabs");
 const tabThumb = new Spring(0, (x) => { tabs.querySelector(".thumb").style.transform = `translateX(${x * 100}%)`; }, 0.001);
@@ -640,9 +649,31 @@ $("#injFilter").addEventListener("click", (e) => {
 $("#injSearch").addEventListener("input", renderInjuries);
 
 /* Transactions */
-const KIND = { trade: "Trade", release: "Waived", signing: "Signed", contract: "Contract", assignment: "Assigned", suspension: "Suspended", other: "Move" };
+const KIND = { trade: "Trade", release: "Waived", signing: "Signed", contract: "Contract", assignment: "Assigned", suspension: "Suspended", other: "Move", rumor: "Rumor", news: "News" };
+let newsFilter = "all", movesList = [];
 /* "Last synced": when the server last pulled the feeds, and the newest move each source has published. */
 const agoTxt = (iso) => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return !Number.isFinite(m) ? "" : m <= 0 ? "just now" : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`; };
+/* News tab: official moves (ESPN / NBA.com logs, completed RealGM moves) and RealGM rumors & reports. */
+function renderMoves() {
+  const el = $("#moves"); if (!el) return;
+  const rows = movesList.filter((t) => newsFilter === "all" || (newsFilter === "rumor" ? t.category === "rumor" : t.category !== "rumor"));
+  const empty = newsFilter === "rumor" ? "No rumors or league reports right now." : newsFilter === "move" ? "No recent official moves." : "No recent moves or news.";
+  el.innerHTML = rows.length ? rows.map((t) => {
+    const rumor = t.category === "rumor";
+    const label = rumor ? (t.kind === "news" ? "News" : "Rumor") : KIND[t.kind] || "Move";
+    const cls = rumor ? (t.kind === "news" ? " news" : " rumor") : t.kind === "trade" ? " live" : "";
+    const desc = t.url ? `<a class="desc" href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.description)}</a>` : `<span class="desc">${esc(t.description)}</span>`;
+    return `<li class="row${rumor ? " is-rumor" : ""}">${teamLogo(t.team, { size: "2.25rem" })}
+      <span class="meta"><span class="when">${esc(fmtDay(t.date))} · ${esc(t.team?.abbr || "NBA")}${t.source === "realgm" ? " · RealGM" : ""}</span> ${desc}</span>
+      <span class="pill${cls}">${label}</span></li>`;
+  }).join("") : `<li class="empty">${empty}</li>`;
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-nf]"); if (!b) return;
+  newsFilter = b.dataset.nf;
+  document.querySelectorAll("[data-nf]").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
+  renderMoves();
+});
 async function paintMovesSync(meta) {
   const el = $("#movesSync"); if (!el) return;
   const st = await fetch("/api/transactions/status").then((r) => r.json()).then((j) => j.data).catch(() => null);
@@ -661,9 +692,7 @@ function startMoves() {
   const el = $("#moves"); el.dataset.loaded = "";
   return client.watch("transactions", {}, (list, meta) => {
     noteMeta(meta); el.dataset.loaded = "1"; paintMovesSync(meta);
-    el.innerHTML = list.length ? list.map((t) => `<li class="row">${teamLogo(t.team, { size: "2.25rem" })}
-      <span class="meta"><span class="when">${esc(fmtDay(t.date))} · ${esc(t.team.abbr)}</span> <span class="desc">${esc(t.description)}</span></span>
-      <span class="pill${t.kind === "trade" ? " live" : ""}">${KIND[t.kind] || "Move"}</span></li>`).join("") : `<li class="empty">No recent transactions.</li>`;
+    movesList = list || []; renderMoves();
   }, (err) => noteError(err, el));
 }
 

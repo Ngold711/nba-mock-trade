@@ -171,7 +171,11 @@ export function buildContext(question, d, idx, now = Date.now()) {
     const scoped = ent.teams.length ? (d.injuries || []).filter((i) => ent.teams.some((t) => t.abbr === i.team?.abbr)) : (d.injuries || []).slice(0, 25);
     out.push(`INJURIES: ${scoped.map((i) => `${i.athlete?.name} (${i.team?.abbr}) ${i.status}${i.injury ? " – " + i.injury : ""}`).join("; ") || "none reported"}`);
   }
-  if (intents.has("trade")) out.push(`RECENT TRANSACTIONS: ${(d.transactions || []).slice(0, 12).map((t) => `${t.team?.abbr}: ${t.description}`).join(" | ")}`);
+  if (intents.has("trade")) {
+    out.push(`RECENT OFFICIAL TRANSACTIONS: ${(d.transactions || []).filter((t) => t.category !== "rumor").slice(0, 12).map((t) => `${t.team?.abbr}: ${t.description}`).join(" | ")}`);
+    const rum = (d.transactions || []).filter((t) => t.category === "rumor").slice(0, 8);
+    if (rum.length) out.push(`RUMORS & REPORTS (RealGM Wiretap, NOT official; say so if you cite them): ${rum.map((t) => `${t.team?.abbr}: ${t.description}`).join(" | ")}`);
+  }
   if (intents.has("2k") && !ent.players.length) out.push(`2K27 TOP 20 (Hooptrax; * = official Nov 2026 update): ${(d.ratings?.players || []).slice(0, 20).map((p) => `${p.name} ${p.ovr}${p.seeded ? "*" : ""}`).join(", ")}`);
   const statsById = new Map((d.stats?.players || []).map((p) => [p.id, p]));
   for (const p of ent.players) {

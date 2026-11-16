@@ -16,22 +16,37 @@ const ENTITY = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", "#39": "'", "
 const decode = (x) => String(x || "").replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").replace(/&(#?\w+);/g, (m, e) => ENTITY[e] ?? (/^#\d+$/.test(e) ? String.fromCharCode(+e.slice(1)) : m)).replace(/<[^>]+>/g, "").trim();
 const tag = (block, name) => decode((new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`, "i").exec(block) || [])[1]);
 
+/** Speculation / reporting language: never an "official move". */
+export const RUMOR_RE = new RegExp([
+  "available in trades?", "open to trad(es|ing)", "working on (a )?trade", "tops? rival", "signals? no interest", "shopping", "explor(e|es|ing)",
+  "\\binterest(ed)? in", "linked to", "\\brumou?rs?\\b", "\\bcould\\b", "expected to", "plans? to", "\\bwould\\b", "\\bmight\\b", "\\bmay\\b", "likely",
+  "\\bin talks", "talks with", "\\bdiscuss(es|ed|ing)?\\b", "\\bconsider(s|ed|ing)?\\b", "\\bpursu(e|es|ing)\\b", "\\beye(s|ing)?\\b", "\\btarget(s|ing)?\\b", "\\bmonitor(s|ing)?\\b",
+  "\\bnearing\\b", "close to", "\\bagree(s|d)? to", "\\bagreement\\b", "deal in place", "\\breport(s|ed|edly)?\\b", "\\bsources\\b", "\\bwants? to", "\\bseek(s|ing)?\\b", "\\binquir", "\\bintrigued\\b",
+].join("|"), "i");
+
 /** RSS 2.0 → [{ title, link, pubDate, description }] */
 export function parseRss(xml) {
   return [...String(xml || "").matchAll(/<item\b[\s\S]*?<\/item>/gi)].map((m) => ({ title: tag(m[0], "title"), link: tag(m[0], "link"), pubDate: tag(m[0], "pubDate"), description: tag(m[0], "description") }));
 }
-/** Wiretap items that are NBA transactions (a move verb + an NBA team in the headline) → transaction rows. */
-export function realgmTransactions(items, teamsByAbbr = {}, { limit = 60 } = {}) {
+/**
+ * RealGM Wiretap → rows. Only NBA items (a team name in the headline). A headline is an official "move" when it
+ * reports a completed transaction (move verb) with no speculation language; everything else is "rumor"
+ * (trade talk, interest, availability) or "news" (other league reports).
+ */
+export function realgmTransactions(items, teamsByAbbr = {}, { limit = 80 } = {}) {
   const out = [];
   for (const it of items || []) {
     const title = it.title || "";
-    if (!MOVE_RE.test(title)) continue;
     const hit = NICK.find(([n]) => new RegExp(`\\b${n}\\b`).test(title));
     if (!hit) continue;
     const t = Date.parse(it.pubDate || ""); if (!Number.isFinite(t)) continue;
     const abbr = hit[1];
     const team = teamsByAbbr[abbr] || { id: "", abbr, name: abbr, displayName: abbr, logo: `https://a.espncdn.com/i/teamlogos/nba/500/${abbr.toLowerCase()}.png` };
-    out.push({ date: new Date(t).toISOString().replace(/:\d\d\.\d+Z$/, "Z"), description: /[.!?]$/.test(title) ? title : `${title}.`, kind: transactionKind(title), team, source: "realgm", url: it.link || "" });
+    const speculative = RUMOR_RE.test(title);
+    const isMove = MOVE_RE.test(title) && !speculative;
+    const kind = isMove ? transactionKind(title) : (speculative || /\btrade|deal|free agen|market\b/i.test(title) ? "rumor" : "news");
+    out.push({ date: new Date(t).toISOString().replace(/:\d\d\.\d+Z$/, "Z"), description: /[.!?]$/.test(title) ? title : `${title}.`,
+      kind, category: isMove ? "move" : "rumor", team, source: "realgm", url: it.link || "" });
   }
   return out.sort((a, b) => b.date.localeCompare(a.date)).slice(0, limit);
 }
@@ -76,11 +91,20 @@ function same(a, b) {
   return inter >= 2 && inter / Math.max(1, Math.min(A.size, B.size)) >= 0.5;
 }
 
-/** Merge sources, newest first; on duplicates the earlier list's wording wins (ESPN, then NBA.com, then RealGM). */
+/**
+ * Merge sources, newest first. Official logs (ESPN, NBA.com) are always category "move"; RealGM rows carry their
+ * own move/rumor category. Moves are de-duplicated across sources (the earlier list's wording wins: ESPN, NBA.com,
+ * RealGM); rumors only against identical headlines. Up to 60 moves + 40 rumors.
+ */
 export function mergeTransactions(espn = [], ...others) {
-  const limit = 60;
-  const out = [...espn.map((t) => ({ ...t, source: t.source || "espn" }))];
-  for (const list of others) for (const t of list || []) if (!out.some((x) => same(x, t))) out.push(t);
-  return out.sort((a, b) => b.date.localeCompare(a.date)).slice(0, limit);
+  const moves = [...espn.map((t) => ({ ...t, source: t.source || "espn", category: "move" }))];
+  const rumors = [];
+  for (const list of others) for (const t0 of list || []) {
+    const t = { ...t0, category: t0.category || "move" };
+    if (t.category === "rumor") { if (!rumors.some((x) => x.description === t.description)) rumors.push(t); }
+    else if (!moves.some((x) => same(x, t))) moves.push(t);
+  }
+  const byDate = (a, b) => b.date.localeCompare(a.date);
+  return [...moves.sort(byDate).slice(0, 60), ...rumors.sort(byDate).slice(0, 40)].sort(byDate);
 }
 export const newest = (list) => list.reduce((m, t) => (t.date > m ? t.date : m), "");
