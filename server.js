@@ -6,7 +6,7 @@ import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize as normPath, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createStore } from "./service/store.js";
-import { setResolver, setRatingsFeedProvider } from "./service/espn.js";
+import { setResolver, setRatingsFeedProvider, transactionsStatus } from "./service/espn.js";
 import { parseRatingsFeed, fetchRatingsFeed } from "./service/ratings-feed.js";
 
 const ROOT = fileURLToPath(new URL(".", import.meta.url));
@@ -177,9 +177,12 @@ async function refreshAfterFinals() {
     const sb = (await store.get("scoreboard")).data;
     const finals = (sb?.games || []).filter((g) => g.status?.completed).map((g) => g.id).sort().join(",");
     if (finalsSeen != null && finals !== finalsSeen && finals.length >= finalsSeen.length) {
-      await Promise.allSettled(["players", "standings", "injuries"].map((r) => store.get(r, {}, { force: true })));
+      // everything that depends on results: box-score stats, standings, injuries, team net ratings, remaining SOS,
+      // 2K27 ratings (stat model), rosters and the transactions wire
+      await Promise.allSettled(["players", "standings", "injuries", "transactions"].map((r) => store.get(r, {}, { force: true })));
+      await Promise.allSettled(["teamstats", "sos", "ratings", "league"].map((r) => store.get(r, {}, { force: true })));
       dirCache.at = 0; liveHist.at = 0;
-      log(`[awards] new final(s): stats, standings and injuries refreshed`);
+      log(`[sync] new final(s): stats, standings, injuries, net ratings, SOS, ratings, rosters and transactions refreshed`);
     }
     finalsSeen = finals;
   } catch { /* next tick */ }
@@ -845,6 +848,7 @@ const routes = [
     return serve(res, "college", team ? { id: m[1], team } : { id: m[1] });
   }],
   [/^\/api\/transactions$/, (req, res) => serve(res, "transactions", {})],
+  [/^\/api\/transactions\/status$/, async (req, res) => { await store.get("transactions").catch(() => {}); res.setHeader("cache-control", "no-store"); return json(res, 200, { data: transactionsStatus() }); }],
 ];
 
 const DENY = new Set(["package.json", "package-lock.json", "server.js"]);

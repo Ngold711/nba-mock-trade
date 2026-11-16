@@ -310,6 +310,7 @@ export function transactionKind(desc) {
   const d = str(desc).toLowerCase();
   if (/\btrade|acquired\b/.test(d)) return "trade";
   if (/\bwaive|released?\b/.test(d)) return "release";
+  if (/\bguarantee|exercised|declined .*option|picked up .*option|extension|extended\b/.test(d)) return "contract";
   if (/\bsigned|re-signed|converted\b/.test(d)) return "signing";
   if (/\bassigned|recalled\b/.test(d)) return "assignment";
   if (/\bsuspend/.test(d)) return "suspension";

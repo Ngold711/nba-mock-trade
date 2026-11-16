@@ -213,6 +213,11 @@ tr.cut td { border-top: 1.5px dashed var(--fill-strong); }
 .eff-row .eff-chips:last-child { justify-content: flex-end; }
 .eff-chips span { background: var(--surface-2); border: 1px solid var(--hair); border-radius: 99px; padding: 0.15rem 0.45rem; white-space: nowrap; font-family: var(--font-mono); }
 .eff-chips b { color: var(--label); } .eff-chips .pos b { color: var(--good); } .eff-chips .neg b { color: var(--bad); }
+.sync-line { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin: 0.6rem 1rem 0.2rem; font-size: 0.75rem; color: var(--label-3); }
+.sync-line b { color: var(--label-2); font-weight: 650; }
+.sync-line .dot { width: 0.45rem; height: 0.45rem; border-radius: 99px; background: var(--good, #22C55E); flex: none; }
+.sync-line .dot.warn { background: var(--warn, #F59E0B); }
+.sync-line .lag { color: var(--warn, #F59E0B); }
 </style>
 </head>
 <body>
@@ -258,7 +263,7 @@ tr.cut td { border-top: 1.5px dashed var(--fill-strong); }
     <div class="groups" id="injuries"></div>
   </section>
   <section class="view" id="view-feed" hidden><div class="feed" id="feed"></div></section>
-  <section class="view" id="view-moves" hidden><div class="panel moves"><ul class="list" id="moves" style="padding:0 1rem"></ul></div></section>
+  <section class="view" id="view-moves" hidden><div class="panel moves"><p class="sync-line" id="movesSync" aria-live="polite"></p><ul class="list" id="moves" style="padding:0 1rem"></ul></div></section>
 
   <p class="fine">Data from ESPN’s public feeds, refreshed every 20 seconds while games are live and every 15–60 minutes for standings, injuries and rosters. Player photos are served by ESPN’s image CDN; players without one show their initials. Not affiliated with the NBA or ESPN.</p>
 </main>
@@ -633,11 +638,21 @@ $("#injFilter").addEventListener("click", (e) => {
 $("#injSearch").addEventListener("input", renderInjuries);
 
 /* Transactions */
-const KIND = { trade: "Trade", release: "Waived", signing: "Signed", assignment: "Assigned", suspension: "Suspended", other: "Move" };
+const KIND = { trade: "Trade", release: "Waived", signing: "Signed", contract: "Contract", assignment: "Assigned", suspension: "Suspended", other: "Move" };
+/* "Last synced": when the server last pulled the feeds, and the newest move each source has published. */
+const agoTxt = (iso) => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return !Number.isFinite(m) ? "" : m <= 0 ? "just now" : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`; };
+async function paintMovesSync(meta) {
+  const el = $("#movesSync"); if (!el) return;
+  const st = await fetch("/api/transactions/status").then((r) => r.json()).then((j) => j.data).catch(() => null);
+  const synced = st?.syncedAt || meta?.fetchedAt;
+  const nb = st?.newest ? fmtDay(st.newest) : "";
+  const lag = st?.newest && Date.now() - Date.parse(st.newest) > 36 * 3600e3;
+  el.innerHTML = synced ? `<span class="dot${lag ? " warn" : ""}" aria-hidden="true"></span>Last synced <b>${esc(agoTxt(synced))}</b>${nb ? ` · newest move ${esc(nb)}` : ""}${lag ? ` · <span class="lag">${st?.sources?.nba?.ok ? "ESPN and NBA.com haven't" : "ESPN hasn't"} posted newer moves yet</span>` : ""}` : "";
+}
 function startMoves() {
   const el = $("#moves"); el.dataset.loaded = "";
   return client.watch("transactions", {}, (list, meta) => {
-    noteMeta(meta); el.dataset.loaded = "1";
+    noteMeta(meta); el.dataset.loaded = "1"; paintMovesSync(meta);
     el.innerHTML = list.length ? list.map((t) => `<li class="row">${teamLogo(t.team, { size: "2.25rem" })}
       <span class="meta"><span class="when">${esc(fmtDay(t.date))} · ${esc(t.team.abbr)}</span><span class="desc">${esc(t.description)}</span></span>
       <span class="pill${t.kind === "trade" ? " live" : ""}">${KIND[t.kind] || "Move"}</span></li>`).join("") : `<li class="empty">No recent transactions.</li>`;

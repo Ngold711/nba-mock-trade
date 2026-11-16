@@ -60,8 +60,18 @@ export function compare(guess, mystery) {
 }
 
 /* ---------- daily puzzle ---------- */
+/** The puzzle date in US Eastern time, so everyone gets the same mystery player and it rotates at midnight ET. */
 export function dayKey(d = new Date()) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" })
+    .formatToParts(d).map((x) => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day}`;
+}
+/** Milliseconds until the next midnight US Eastern (the next puzzle). */
+export function msUntilNextPuzzle(now = new Date()) {
+  const today = dayKey(now);
+  let lo = now.getTime(), hi = lo + 26 * 3600e3;            // binary search for the instant the ET date changes (DST-safe)
+  while (hi - lo > 1000) { const mid = Math.floor((lo + hi) / 2); if (dayKey(new Date(mid)) === today) lo = mid; else hi = mid; }
+  return hi - now.getTime();
 }
 export function gameNumber(key = dayKey()) {
   const [y, m, d] = key.split("-").map(Number);

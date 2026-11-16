@@ -642,3 +642,15 @@ Built by an offline generator that cross-checks editorial data against ESPN:
   - The server watches the scoreboard every 2 minutes and force-refreshes stats, standings and injuries as soon as another game goes final.
   - The page re-runs both models every 5 minutes (and when you return to the tab), and shows "Live model · stats & standings updated N min ago" above the model toggle.
 - **Audit:** neither the award nor the All-Star models contain hardcoded players or overrides. All-Star selection uses the same AwardScore with no 65-game rule.
+
+## Round 20: site-wide real-time audit
+
+- **Transactions:** ESPN's own transactions feed currently ends on Nov 13; Hooptrax's cache wasn't the cause.
+  - `service/transactions.js` and the custom `transactions` loader in `service/espn.js` now merge ESPN with NBA.com's official player-movement JSON (`TRANSACTIONS_NBA=0` disables it). Moves both sources report are de-duplicated, newest first.
+  - New "Contract" type (guarantees, options, extensions). Cache is 15 min, refreshed again whenever a game goes final.
+  - `GET /api/transactions/status` reports when the feeds were last synced and each source's newest move.
+  - Live → Transactions shows "Last synced N min ago · newest move <date>", with a warning when the sources haven't posted for 36+ hours.
+- **After every final:** the server force-refreshes season stats, standings, injuries, transactions, team net ratings, remaining SOS, 2K27 ratings and all 30 rosters, so lottery odds, awards, All-Star, ratings and the Archive's active badges all recalculate. Games-started (3 h) and coaches (6 h) caches were shortened.
+- **McConnell:** the daily puzzle date is now US Eastern (it used the device's local date), so everyone gets the same mystery player and it rotates at midnight ET. An open page rolls over to the new puzzle at midnight ET, or prompts if a game is in progress.
+- **Bug sweep:** one capture-phase image-error handler in `ui/shell.js` covers every page. A failed headshot or logo tries its `data-alt` URL, then hides, so the initials badge shows. The draft page's ⓘ "Explain pick" buttons got a 44×44 touch target. A browser crawl of 20 views (every tab, sub-view and Archive role) found no NaN/undefined cells, broken images, dead API calls, overflow or console errors.
+- **Still static by necessity:** 2026–27 contracts (`salaries_2026_27.json`, as of Nov 14) and future pick ownership (`draft_picks_2027_2029.json`) have no free live source, so they're dated files. The awards Player of the Week list is a record that also picks up new winners from ESPN news.

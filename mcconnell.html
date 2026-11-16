@@ -155,7 +155,7 @@ import { mountShell } from "./ui/shell.js";
 import { createClient } from "./ui/client.js";
 import { avatar, teamLogo, esc } from "./ui/avatar.js";
 import { Spring, createSheet, createToast } from "./ui/motion.js";
-import { MAX_GUESSES, COLUMNS, DIV_ABBR, toGamePlayer, compare, dailyMystery, dayKey, gameNumber, recordResult, emptyStats, shareText, searchPlayers, fmtHeight } from "./service/mcconnell.js";
+import { MAX_GUESSES, COLUMNS, DIV_ABBR, toGamePlayer, compare, dailyMystery, dayKey, msUntilNextPuzzle, gameNumber, recordResult, emptyStats, shareText, searchPlayers, fmtHeight } from "./service/mcconnell.js";
 
 const $ = (s, r = document) => r.querySelector(s);
 const shell = mountShell({ active: "mcconnell" });
@@ -352,6 +352,11 @@ function showResults() {
     loadState(); renderAll();
     shell.setStatus("on", client.mode === "service" ? "Live Sync" : "Live · ESPN");
     if (state.done) setTimeout(showResults, 300);
+    // midnight ET: a new mystery player. Reload into it (or prompt if a game is in progress).
+    setTimeout(function nextPuzzle() {
+      if (state.done || !state.guesses?.length) location.reload();
+      else { shell.toast?.("A new McConnell is ready. Finish this one, then refresh."); setTimeout(() => location.reload(), 30 * 60e3); }
+    }, msUntilNextPuzzle() + 2000);
   } catch (e) {
     $("#grid").innerHTML = `<div class="empty">Couldn’t load NBA rosters from ESPN: ${esc(e.message || e)}. Retrying in a minute.</div>`;
     shell.setStatus("err", "Offline");

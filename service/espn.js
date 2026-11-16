@@ -23,7 +23,7 @@ export const ENDPOINTS = {
   news: () => `${SITE}/news?limit=50`,
   honors: ({ id }) => `https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/${encodeURIComponent(id)}/overview`,
   players: ({ season } = {}) => `${NBA_STATS}?region=us&lang=en&contentorigin=espn&isqualified=false&page=1&limit=1000&sort=offensive.avgPoints%3Adesc${season ? `&season=${encodeURIComponent(season)}&seasontype=2` : ""}`,
-  transactions: () => `${SITE}/transactions`,
+  transactions: () => `${SITE}/transactions?limit=60`,
   teams: () => `${SITE}/teams`,
   collegeOverview: ({ id }) => `${NCAA_ATHLETE}/${encodeURIComponent(id)}/overview`,
   collegeStats: ({ id }) => `${NCAA_ATHLETE}/${encodeURIComponent(id)}/stats`,
@@ -196,6 +196,31 @@ async function loadRatings() {
     ratingsFeed ? ratingsFeed().catch(() => null) : null]);
   return buildRatings({ players, league, prevPlayers, feed });
 }
+/* Transactions: ESPN + NBA.com player movement (server only; NBA.com doesn't allow browser CORS). */
+let txStatus = { syncedAt: null, sources: {} };
+export const transactionsStatus = () => txStatus;
+async function loadTransactions(_p, opts) {
+  const { mergeTransactions, normalizeNbaMovement, newest, NBA_MOVEMENT_URL } = await import("./transactions.js");
+  const server = typeof window === "undefined";
+  const nbaOn = server && !(typeof process !== "undefined" && process.env?.TRANSACTIONS_NBA === "0");
+  const [espnR, nbaR, teamsR] = await Promise.allSettled([
+    fetchJson(ENDPOINTS.transactions(), opts).then(normalizeTransactions),
+    nbaOn ? fetch(NBA_MOVEMENT_URL, { headers: { accept: "application/json", referer: "https://www.nba.com/" }, signal: AbortSignal.timeout(9000) })
+      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }) : Promise.reject(new Error("off")),
+    dep("teams").catch(() => []),
+  ]);
+  const byAbbr = Object.fromEntries((teamsR.value || []).map((t) => [t.abbr, t]));
+  const espn = espnR.status === "fulfilled" ? espnR.value : [];
+  const nba = nbaR.status === "fulfilled" ? normalizeNbaMovement(nbaR.value, byAbbr) : [];
+  if (espnR.status !== "fulfilled" && !nba.length) throw espnR.reason;
+  const list = mergeTransactions(espn, nba);
+  txStatus = { syncedAt: new Date().toISOString(), newest: newest(list), sources: {
+    espn: espnR.status === "fulfilled" ? { ok: true, newest: newest(espn), count: espn.length } : { ok: false, error: String(espnR.reason?.message || espnR.reason) },
+    nba: nbaOn ? (nbaR.status === "fulfilled" ? { ok: true, newest: newest(nba), count: nba.length } : { ok: false, error: String(nbaR.reason?.message || nbaR.reason) }) : { ok: false, error: "disabled" },
+  } };
+  return list;
+}
+
 /* Team efficiency: season averages for all 30 teams (in parallel) + opponent scoring from standings. */
 async function loadTeamStats(_p, opts) {
   const { teamEfficiency } = await import("./advanced.js");
@@ -231,7 +256,7 @@ async function loadSos(_p, opts) {
   for (const conf of st?.conferences || []) for (const t of conf.teams) winPct[t.team.abbr] = t.pct;
   return { asOf: new Date().toISOString(), teams: scheduleStrength(schedules, winPct) };
 }
-const CUSTOM = { teamstats: loadTeamStats, sos: loadSos, college: loadCollege, starts: loadStarts, coaches: loadCoaches, league: loadLeague, ratings: loadRatings };
+const CUSTOM = { transactions: loadTransactions, teamstats: loadTeamStats, sos: loadSos, college: loadCollege, starts: loadStarts, coaches: loadCoaches, league: loadLeague, ratings: loadRatings };
 
 /** Fetch + normalize one resource. */
 export async function load(resource, params = {}, opts = {}) {

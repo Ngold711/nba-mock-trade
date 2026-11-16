@@ -39,6 +39,17 @@ const slug = (s) => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCa
 const f1 = (x) => (x == null || !Number.isFinite(+x) ? "—" : Number(x).toFixed(1));
 
 let instance = null;
+/* Site-wide image fallback: a headshot or logo that fails to load tries its data-alt URL, otherwise hides, so the
+   initials badge (or plain text) underneath shows instead of a broken-image icon. */
+if (typeof document !== "undefined" && !window.__htxImgFallback) {
+  window.__htxImgFallback = true;
+  document.addEventListener("error", (e) => {
+    const img = e.target;
+    if (!(img instanceof HTMLImageElement) || img.closest(".card-img, .ballot-img")) return;
+    if (img.dataset.alt) { const a = img.dataset.alt; img.removeAttribute("data-alt"); img.src = a; return; }
+    img.style.display = "none";
+  }, true);
+}
 export function mountShell({ active = "live" } = {}) {
   if (instance) return instance;
   // A shared trade link always opens on the Trade tab, whichever page it was pasted onto.
@@ -201,7 +212,7 @@ export function mountShell({ active = "live" } = {}) {
   }, true);
 
   instance = {
-    openTeam, openPlayer, openCompare, openDrawer, closeDrawer, chat, account, encyclopedia,
+    openTeam, openPlayer, openCompare, openDrawer, closeDrawer, chat, account, encyclopedia, toast: toastFn,
     setWireHandler(fn) { wireHandler = fn; },
     get wire() { return wire; },
     setStatus(kind, text) {

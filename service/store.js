@@ -17,7 +17,7 @@ export const TTL = {
   idle: 15 * MIN,          // nothing live, nothing soon
   injuries: 15 * MIN,
   standings: 15 * MIN,
-  transactions: 30 * MIN,
+  transactions: 15 * MIN,
   roster: 60 * MIN,
   teams: 24 * 60 * MIN,
   historical: 10 * MIN,
@@ -25,8 +25,8 @@ export const TTL = {
   news: 1 * MIN,
   players: 15 * MIN,
   playersPrev: 24 * 60 * MIN,
-  starts: 6 * 60 * MIN,
-  coaches: 12 * 60 * MIN,
+  starts: 3 * 60 * MIN,   // games started (Sixth Man eligibility)
+  coaches: 6 * 60 * MIN,
   honors: 24 * 60 * MIN,
   league: 30 * MIN,        // all 30 rosters, warmed at startup
   ratings: (Number(typeof process !== "undefined" && process.env?.RATINGS_TTL_MIN) || 6 * 60) * MIN,   // 2K27 ratings (re-reads RATINGS_FEED_URL each cycle)
