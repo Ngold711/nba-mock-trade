@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Tier List Maker · Hooptrax</title>
+<meta name="description" content="NBA Tier List Maker: rank current players, rookies, all-time legends or all 30 teams into S, A, B, C, D and F tiers and post it to the Hooptrax Community Feed." />
+<meta name="theme-color" content="#0B0E14" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#F8FAFC" media="(prefers-color-scheme: light)" />
+<meta name="color-scheme" content="dark light" />
+<script>/* Privacy: purge pre-account history (the old global AI chat list and un-scoped trades, mock drafts and ballots). Personal work is now stored per user (ui/scoped.js); guests keep nothing. */(function(){var R=/^(hooptrax_ai_threads|hooptrax_ai_active|chat:v1|trade:workspace:v1|draft:v2:\d{4}|draft:simcount:\d{4}|awards:ballot|awards:ballot:v2|awards:picks)$/;[function(){return localStorage},function(){return sessionStorage}].forEach(function(f){try{var s=f();for(var i=s.length-1;i>=0;i--){var k=s.key(i);if(k&&R.test(k))s.removeItem(k)}}catch(e){}})})();</script>
+<script>/* theme before first paint: dark default, light optional (localStorage "htx:theme") */(function(){var t="dark";try{t=localStorage.getItem("htx:theme")==="light"?"light":"dark"}catch(e){}document.documentElement.setAttribute("data-theme",t);var c=t==="light"?"#F8FAFC":"#0B0E14";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c)})})();</script>
+<link rel="manifest" href="public/manifest.json" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Hooptrax" />
+<link rel="icon" href="public/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="public/favicon-32.png" type="image/png" sizes="32x32" />
+<link rel="apple-touch-icon" href="public/apple-touch-icon.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="public/apple-touch-icon.png" />
+<meta property="og:site_name" content="Hooptrax" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Tier List Maker · Hooptrax" />
+<meta property="og:description" content="NBA Tier List Maker: rank current players, rookies, all-time legends or all 30 teams into S, A, B, C, D and F tiers and post it to the Hooptrax Community Feed." />
+<meta property="og:url" content="https://hooptrax.com/tierlist.html" />
+<meta property="og:image" content="https://hooptrax.com/public/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Hooptrax: live NBA trade machine, 3-2-1 lottery simulator and draft hub" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Tier List Maker · Hooptrax" />
+<meta name="twitter:description" content="NBA Tier List Maker: rank current players, rookies, all-time legends or all 30 teams into S, A, B, C, D and F tiers and post it to the Hooptrax Community Feed." />
+<meta name="twitter:image" content="https://hooptrax.com/public/og-image.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
+<link rel="stylesheet" href="ui/base.css" />
+<link rel="stylesheet" href="ui/games.css" />
+</head>
+<body>
+<header class="bar" id="bar"></header>
+<main class="hub-page game tierlist">
+  <h1 class="large-title">Tier List Maker</h1>
+  <label class="tl-cat"><span>Category</span><select id="cat">
+    <option value="pg">Current Point Guards</option><option value="sg">Current Shooting Guards</option><option value="sf">Current Small Forwards</option>
+    <option value="pf">Current Power Forwards</option><option value="c">Current Centers</option><option value="top25" selected>Top 25 NBA Players Right Now</option>
+    <option value="rookies">2026–27 Rookie Class</option><option value="top75">All-Time Top 75 Legends</option><option value="teams">All 30 NBA Teams</option></select></label>
+  <p class="g-note" id="hint">Tap a player, then tap a tier. Or drag. Tap a ranked player to send them back.</p>
+  <div class="tl-board" id="board"></div>
+  <div class="tl-tray-wrap"><div class="tl-tray-h"><b>Unranked</b><span id="left"></span></div><div class="tl-tray" id="tray" data-zone="tray"></div></div>
+  <div class="tl-actions">
+    <button class="g-cta ghost press" type="button" id="reset">Reset</button>
+    <button class="g-cta ghost press" type="button" id="copy">Copy</button>
+    <button class="g-cta press" type="button" id="post">Post to Feed</button>
+  </div>
+  <p class="g-note" id="srcNote"></p>
+</main>
+<script src="data.js"></script>
+<script type="module">
+import { mountShell } from "./ui/shell.js";
+import { esc } from "./ui/avatar.js";
+import { saveFlow } from "./ui/account.js";
+const shell = mountShell({ active: "tierlist" });
+const $ = (s) => document.querySelector(s);
+const LS = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+const TIERS = ["S", "A", "B", "C", "D", "F"];
+const ESPN = { GSW: "gs", NOP: "no", NYK: "ny", SAS: "sa", UTA: "utah", WAS: "wsh" };
+const logo = (abbr) => `https://a.espncdn.com/i/teamlogos/nba/500/${ESPN[abbr] || String(abbr || "").toLowerCase()}.png`;
+const ini = (n) => String(n).split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+const toast = (m) => shell.toast?.(m);
+let data = { ratings: null, league: null, top75: null }, cat = LS.get("tiers:cat", "top25"), items = {}, st = null, sel = null;
+
+/* ---------- categories (live data) ---------- */
+const CATS = { pg: "Current Point Guards", sg: "Current Shooting Guards", sf: "Current Small Forwards", pf: "Current Power Forwards", c: "Current Centers",
+  top25: "Top 25 NBA Players Right Now", rookies: "2026–27 Rookie Class", top75: "All-Time Top 75 Legends", teams: "All 30 NBA Teams" };
+function build(key) {
+  const R = (data.ratings?.players || []).filter((p) => p.teamAbbr);
+  const P = (p) => ({ id: p.id, n: p.name, t: p.teamAbbr, img: p.headshotSmall || p.headshot || null });
+  const top = (arr, n = 25) => [...arr].sort((a, b) => b.ovr - a.ovr).slice(0, n).map(P);
+  const fwd = R.filter((p) => /F/.test(p.position) && p.pos !== "C");
+  const bigness = (p) => (p.attrs?.rebounding || 0) - (p.attrs?.threePt || 0);   // ESPN lists only F: split by profile
+  const byBig = [...fwd].sort((a, b) => bigness(b) - bigness(a));
+  switch (key) {
+    case "pg": return top(R.filter((p) => p.pos === "PG").concat(R.filter((p) => p.pos === "SG" && (p.attrs?.playmaking || 0) >= 68)), 25);
+    case "sg": return top(R.filter((p) => p.pos === "SG" && (p.attrs?.playmaking || 0) < 68), 25);
+    case "sf": return top(byBig.slice(Math.floor(byBig.length / 2)), 25);
+    case "pf": return top(byBig.slice(0, Math.floor(byBig.length / 2)).concat(R.filter((p) => p.pos === "PF")), 25);
+    case "c": return top(R.filter((p) => p.pos === "C"), 25);
+    case "top25": return top(R, 25);
+    case "rookies": { const rk = new Set((data.league?.players || []).filter((p) => p.experience === 0).map((p) => String(p.id))); return top(R.filter((p) => rk.has(String(p.id))), 25); }
+    case "top75": return (data.top75 || []).map((p) => ({ id: p.id, n: p.name, t: "", img: p.headshot || null }));
+    case "teams": return Object.values(data.league?.teams || {}).filter((t) => t.displayName).map((t) => ({ id: `team:${t.abbr}`, n: t.displayName, t: t.abbr, img: t.logo, team: true }))
+      .sort((a, b) => a.n.localeCompare(b.n));
+  }
+  return [];
+}
+const SRC = { teams: "From live ESPN team data.", top75: "The NBA's 75th Anniversary Team (76 players).", rookies: "Rookies on live ESPN rosters, by 2K27 rating.",
+  pf: "Positions are approximate: ESPN lists forwards as F, so they're split by rebounding vs. shooting profile." };
+
+/* ---------- state ---------- */
+const key = () => `tiers:v1:${cat}`;
+function load() {
+  const list = build(cat); items = Object.fromEntries(list.map((x) => [x.id, x]));
+  const saved = LS.get(key(), null);
+  st = { S: [], A: [], B: [], C: [], D: [], F: [], tray: [] };
+  if (saved) for (const k of [...TIERS, "tray"]) st[k] = (saved[k] || []).filter((id) => items[id]);
+  const placed = new Set(Object.values(st).flat());
+  st.tray.push(...list.map((x) => x.id).filter((id) => !placed.has(id)));
+  sel = null; render();
+  $("#srcNote").textContent = SRC[cat] || "Ranked by the live NBA 2K27 ratings feed, refreshed through the season.";
+}
+const persist = () => LS.set(key(), st);
+function move(id, to) {
+  for (const k of Object.keys(st)) st[k] = st[k].filter((x) => x !== id);
+  st[to].push(id); sel = null; persist(); render();
+}
+
+/* ---------- render ---------- */
+const tile = (id) => { const x = items[id]; if (!x) return "";
+  return `<button class="tl-tile${x.team ? " team" : ""}${sel === id ? " sel" : ""}" type="button" data-id="${esc(id)}" aria-pressed="${sel === id}" aria-label="${esc(x.n)}">
+    <span class="tl-img"><span>${esc(ini(x.n))}</span>${x.img ? `<img src="${esc(x.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" draggable="false">` : ""}</span>
+    <span class="tl-n">${esc(x.team ? x.t : x.n.split(" ").slice(-1)[0])}</span>${x.t && !x.team ? `<img class="tl-badge-logo" src="${logo(x.t)}" alt="" loading="lazy" referrerpolicy="no-referrer" draggable="false">` : ""}</button>`; };
+function render() {
+  $("#board").innerHTML = TIERS.map((k) => `<div class="tl-row" data-zone="${k}"><span class="tl-badge t-${k}">${k}</span><div class="tl-drop">${st[k].map(tile).join("") || `<span class="tl-empty">${sel ? "Tap to place here" : ""}</span>`}</div></div>`).join("");
+  $("#tray").innerHTML = st.tray.map(tile).join("") || `<span class="tl-empty">Everyone's ranked.</span>`;
+  $("#left").textContent = `${st.tray.length} left`;
+  document.body.classList.toggle("tl-selecting", !!sel);
+}
+
+/* ---------- input: one pointer handler for tap AND drag (mouse + touch) ---------- */
+let drag = null;
+document.addEventListener("pointerdown", (e) => {
+  const t = e.target.closest(".tl-tile"); if (!t) return;
+  drag = { id: t.dataset.id, x: e.clientX, y: e.clientY, el: t, ghost: null, moved: false };
+  if (e.pointerType === "mouse") e.preventDefault();   // no text selection while dragging with a mouse
+});
+document.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 8) return;
+  if (!drag.moved) { drag.moved = true; drag.ghost = drag.el.cloneNode(true); drag.ghost.classList.add("tl-ghost"); document.body.append(drag.ghost); drag.el.classList.add("dragging"); }
+  drag.ghost.style.transform = `translate(${e.clientX - 28}px, ${e.clientY - 34}px)`;
+  if (e.clientY < 90) scrollBy(0, -14); else if (e.clientY > innerHeight - 110) scrollBy(0, 14);   // edge auto-scroll: the tray sits below the board on phones
+  document.querySelectorAll("[data-zone].over").forEach((z) => z.classList.remove("over"));
+  document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-zone]")?.classList.add("over");
+  e.preventDefault();
+}, { passive: false });
+document.addEventListener("pointerup", (e) => {
+  if (!drag) return;
+  const d = drag; drag = null;
+  document.querySelectorAll("[data-zone].over").forEach((z) => z.classList.remove("over"));
+  if (d.moved) { d.ghost?.remove(); d.el.classList.remove("dragging"); const z = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-zone]"); if (z) move(d.id, z.dataset.zone); return; }
+  // tap: tray tile → select; ranked tile → back to the tray (or place the selected player in its row)
+  const inTray = st.tray.includes(d.id);
+  if (sel && !inTray) { const row = TIERS.find((k) => st[k].includes(d.id)); return move(sel, row); }
+  if (inTray) { sel = sel === d.id ? null : d.id; return render(); }
+  move(d.id, "tray");
+});
+document.addEventListener("pointercancel", () => { if (drag) { drag.ghost?.remove(); drag.el.classList.remove("dragging"); drag = null; } });
+document.addEventListener("click", (e) => {
+  const row = e.target.closest(".tl-row"); if (row && sel && !e.target.closest(".tl-tile")) move(sel, row.dataset.zone);
+});
+
+/* ---------- actions ---------- */
+const summary = () => `${CATS[cat]} — Hooptrax tier list\n${TIERS.filter((k) => st[k].length).map((k) => `${k}: ${st[k].map((id) => items[id].n).join(", ")}`).join("\n")}`;
+$("#reset").addEventListener("click", () => { st = { S: [], A: [], B: [], C: [], D: [], F: [], tray: build(cat).map((x) => x.id) }; sel = null; persist(); render(); toast("Tier list reset"); });
+$("#copy").addEventListener("click", async () => { try { await navigator.clipboard.writeText(summary()); toast("Copied to clipboard"); } catch { toast("Couldn't copy"); } });
+$("#post").addEventListener("click", () => {
+  if (!TIERS.some((k) => st[k].length)) return toast("Rank at least one player first");
+  saveFlow({ type: "tierlist", visibility: "public", build: () => ({ title: "My tier list", payload: { category: CATS[cat], key: cat,
+    tiers: Object.fromEntries(TIERS.map((k) => [k, st[k].map((id) => ({ n: items[id].n, id: String(id), t: items[id].t || "" }))])) } }) });
+});
+$("#cat").addEventListener("change", (e) => { cat = e.target.value; LS.set("tiers:cat", cat); load(); });
+
+/* ---------- data ---------- */
+$("#cat").value = cat;
+const [r, l, t75] = await Promise.all(["/api/2k-ratings", "/api/league", "/api/players/directory?filter=top75&limit=100"].map((u) => fetch(u).then((x) => x.json()).then((j) => j.data).catch(() => null)));
+data = { ratings: r, league: l, top75: t75?.players || [] };
+// opened from the Community Feed: ?item=<id> loads that list read-only into the board
+const itemId = new URLSearchParams(location.search).get("item");
+if (itemId) {
+  const it = await fetch(`/api/items/${encodeURIComponent(itemId)}`).then((x) => x.json()).then((j) => j.data?.item || j.data).catch(() => null);
+  const p = it?.payloadJson;
+  if (p?.tiers) {
+    if (p.key && CATS[p.key]) { cat = p.key; $("#cat").value = cat; }
+    items = {}; st = { S: [], A: [], B: [], C: [], D: [], F: [], tray: [] };
+    for (const k of TIERS) for (const x of p.tiers[k] || []) { const id = x.id || x.n; items[id] = { id, n: x.n, t: x.t, img: /^team:/.test(id) ? logo(x.t) : /^\d+$/.test(id) ? `https://a.espncdn.com/i/headshots/nba/players/full/${id}.png` : null, team: /^team:/.test(id) }; st[k].push(id); }
+    render(); $("#srcNote").textContent = `Viewing @${it.username || "a fan"}'s ${p.category} tier list. Change the category to start your own.`;
+  } else load();
+} else load();
+</script>
+</body>
+</html>

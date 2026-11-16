@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Who He Play For? · Hooptrax</title>
+<meta name="description" content="Who He Play For?: name the NBA team of role players, journeymen and recent movers before the 10-second shot clock runs out." />
+<meta name="theme-color" content="#0B0E14" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#F8FAFC" media="(prefers-color-scheme: light)" />
+<meta name="color-scheme" content="dark light" />
+<script>/* Privacy: purge pre-account history (the old global AI chat list and un-scoped trades, mock drafts and ballots). Personal work is now stored per user (ui/scoped.js); guests keep nothing. */(function(){var R=/^(hooptrax_ai_threads|hooptrax_ai_active|chat:v1|trade:workspace:v1|draft:v2:\d{4}|draft:simcount:\d{4}|awards:ballot|awards:ballot:v2|awards:picks)$/;[function(){return localStorage},function(){return sessionStorage}].forEach(function(f){try{var s=f();for(var i=s.length-1;i>=0;i--){var k=s.key(i);if(k&&R.test(k))s.removeItem(k)}}catch(e){}})})();</script>
+<script>/* theme before first paint: dark default, light optional (localStorage "htx:theme") */(function(){var t="dark";try{t=localStorage.getItem("htx:theme")==="light"?"light":"dark"}catch(e){}document.documentElement.setAttribute("data-theme",t);var c=t==="light"?"#F8FAFC":"#0B0E14";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c)})})();</script>
+<link rel="manifest" href="public/manifest.json" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Hooptrax" />
+<link rel="icon" href="public/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="public/favicon-32.png" type="image/png" sizes="32x32" />
+<link rel="apple-touch-icon" href="public/apple-touch-icon.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="public/apple-touch-icon.png" />
+<meta property="og:site_name" content="Hooptrax" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Who He Play For? · Hooptrax" />
+<meta property="og:description" content="Who He Play For?: name the NBA team of role players, journeymen and recent movers before the 10-second shot clock runs out." />
+<meta property="og:url" content="https://hooptrax.com/whoplays.html" />
+<meta property="og:image" content="https://hooptrax.com/public/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Hooptrax: live NBA trade machine, 3-2-1 lottery simulator and draft hub" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Who He Play For? · Hooptrax" />
+<meta name="twitter:description" content="Who He Play For?: name the NBA team of role players, journeymen and recent movers before the 10-second shot clock runs out." />
+<meta name="twitter:image" content="https://hooptrax.com/public/og-image.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
+<link rel="stylesheet" href="ui/base.css" />
+<link rel="stylesheet" href="ui/games.css" />
+</head>
+<body>
+<header class="bar" id="bar"></header>
+<main class="hub-page game whoplays">
+  <h1 class="large-title">Who He Play For?</h1>
+  <div class="g-score"><span>Round <b id="round">1</b>/10</span><span>Score <b id="score">0</b></span><span>Streak <b id="wstreak">0</b></span><span>Best <b id="wbest">0</b></span></div>
+  <div class="wp-clock" aria-hidden="true"><i id="clock"></i></div>
+  <div id="wpStage"><div class="sk" style="height:22rem;border-radius:1.2rem"></div></div>
+</main>
+<script src="data.js"></script>
+<script type="module">
+import { mountShell } from "./ui/shell.js";
+import { avatar, teamLogo, esc } from "./ui/avatar.js";
+mountShell({ active: "whoplays" });
+const $ = (s) => document.querySelector(s);
+const LS = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+const ROUNDS = 10, SHOT = 10000;
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let teams = {}, pool = [], moves = [], round = 0, score = 0, streak = 0, correct = 0, used = new Set(), cur = null, timer = 0, t0 = 0, answered = false;
+
+const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const last = (n) => String(n).split(" ").filter((w) => !/^(jr\.?|sr\.?|ii|iii|iv)$/i.test(w)).pop() || n;
+/** The latest official move mentioning this player (by last name) for the post-guess note. */
+const rx = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const moveNote = (p) => moves.find((m) => m.category !== "rumor" && (new RegExp(`\\b${rx(p.name)}\\b`, "i").test(m.description)
+  || (m.team?.abbr === p.teamAbbr && new RegExp(`\\b${rx(last(p.name))}\\b`, "i").test(m.description))));
+/** Weighted draw: recent movers ×4, veterans on modest ratings (journeymen) ×2, everyone else ×1. */
+function draw() {
+  const left = pool.filter((p) => !used.has(p.id));
+  const total = left.reduce((s, p) => s + p.w, 0);
+  let r = Math.random() * total;
+  for (const p of left) { r -= p.w; if (r <= 0) return p; }
+  return left[0];
+}
+function ask() {
+  if (round >= ROUNDS) return finish();
+  round++; answered = false;
+  cur = draw(); used.add(cur.id);
+  const others = shuffle(Object.keys(teams).filter((a) => a !== cur.teamAbbr)).slice(0, 3);
+  const opts = shuffle([cur.teamAbbr, ...others]);
+  $("#round").textContent = round;
+  $("#wpStage").innerHTML = `<div class="wp-card">
+      <div class="wp-face">${avatar({ name: cur.name, headshot: cur.headshot }, { size: "7rem", color: "#334155", full: true })}</div>
+      <b class="wp-name">${esc(cur.name)}</b><small class="wp-sub">${esc(cur.position || "")}${cur.experience != null ? ` · ${cur.experience ? `${cur.experience} yr${cur.experience === 1 ? "" : "s"} pro` : "Rookie"}` : ""}</small></div>
+    <div class="wp-opts">${opts.map((a) => `<button class="wp-opt press" type="button" data-team="${esc(a)}">${teamLogo(teams[a], { size: "1.75rem" })}<span>${esc(teams[a].displayName || a)}</span></button>`).join("")}</div>
+    <div class="wp-result" id="wpResult" aria-live="polite"></div>`;
+  t0 = performance.now(); tick();
+}
+function tick() {
+  const left = Math.max(0, SHOT - (performance.now() - t0));
+  const bar = $("#clock"); bar.style.transform = `scaleX(${left / SHOT})`; bar.classList.toggle("late", left < 3000);
+  if (answered) return;
+  if (left <= 0) return answer(null);
+  timer = requestAnimationFrame(tick);
+}
+function answer(abbr) {
+  if (answered) return; answered = true; cancelAnimationFrame(timer);
+  const left = Math.max(0, SHOT - (performance.now() - t0));
+  const ok = abbr === cur.teamAbbr;
+  if (ok) { streak++; correct++; score += Math.round((100 + Math.ceil(left / 1000) * 15) * (1 + 0.1 * (streak - 1))); } else streak = 0;
+  $("#score").textContent = score; $("#wstreak").textContent = streak;
+  document.querySelectorAll(".wp-opt").forEach((b) => { b.disabled = true; b.classList.toggle("right", b.dataset.team === cur.teamAbbr); b.classList.toggle("wrong", b.dataset.team === abbr && !ok); });
+  const t = teams[cur.teamAbbr], mv = moveNote(cur);
+  $("#wpResult").innerHTML = `<p class="${ok ? "ok" : "no"}">${ok ? `Bucket! +${Math.round((100 + Math.ceil(left / 1000) * 15) * (1 + 0.1 * (streak - 1)))}` : abbr ? "Brick." : "Shot-clock violation."} ${esc(cur.name)} plays for the <b>${esc(t.displayName)}</b>.</p>
+    ${mv ? `<p class="mv">Latest move: ${esc(mv.description)} <small>(${esc(new Date(mv.date).toLocaleDateString([], { month: "short", day: "numeric" }))})</small></p>` : ""}
+    <button class="g-cta press" type="button" id="next">${round >= ROUNDS ? "See results" : "Next player"}</button>`;
+}
+function finish() {
+  const best = Math.max(score, LS.get("whoplays:best", 0)); LS.set("whoplays:best", best);
+  $("#wbest").textContent = best; $("#clock").style.transform = "scaleX(0)";
+  $("#wpStage").innerHTML = `<div class="wp-final"><b>${score.toLocaleString("en-US")}</b><span>${correct}/${ROUNDS} correct${score >= best && score > 0 ? " · new best!" : ""}</span>
+    <button class="g-cta press" type="button" id="restart">Play again</button></div>`;
+}
+function start() { round = 0; score = 0; streak = 0; correct = 0; used = new Set(); $("#score").textContent = 0; $("#wstreak").textContent = 0; ask(); }
+document.addEventListener("click", (e) => {
+  const o = e.target.closest(".wp-opt"); if (o) return answer(o.dataset.team);
+  if (e.target.closest("#next")) return ask();
+  if (e.target.closest("#restart")) return start();
+});
+$("#wbest").textContent = LS.get("whoplays:best", 0);
+const [l, r, tx] = await Promise.all(["/api/league", "/api/2k-ratings", "/api/transactions"].map((u) => fetch(u).then((x) => x.json()).then((j) => j.data).catch(() => null)));
+teams = Object.fromEntries(Object.entries(l?.teams || {}).filter(([, t]) => t.displayName));
+moves = (tx || []).filter((m) => m.category !== "rumor");
+const ovr = new Map((r?.players || []).map((p) => [String(p.id), p.ovr]));
+const recent = (p) => moveNote(p) && Date.now() - Date.parse(moveNote(p).date) < 45 * 864e5;
+// role players, recent movers and journeymen: no obvious stars (2K27 85+ OVR)
+pool = (l?.players || []).filter((p) => p.teamAbbr && teams[p.teamAbbr] && (ovr.get(String(p.id)) ?? 70) < 85)
+  .map((p) => ({ ...p, w: recent(p) ? 4 : (p.experience >= 6 && (ovr.get(String(p.id)) ?? 70) < 80) ? 2 : 1 }));
+if (pool.length < 20) $("#wpStage").innerHTML = `<div class="empty">Couldn't load NBA rosters right now.</div>`; else start();
+</script>
+</body>
+</html>

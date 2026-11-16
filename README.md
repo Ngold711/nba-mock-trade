@@ -688,3 +688,32 @@ Built by an offline generator that cross-checks editorial data against ESPN:
 - **Attribution:** every row has `sourceAttribution` ("Per Shams Charania", "Per Brian Windhorst", "Per Bobby Marks", "Per ESPN", "Per RealGM", "Per NBA.com"), shown under each headline in the News tab.
 - **Dedupe:** the same story from ESPN, Shams and RealGM appears once. Moves win over rumors; the order is logs, ESPN News, Shams, RealGM.
 - `/api/transactions/status` adds `espnNews` and `shams`, and the Live sync line lists them ("ESPN News Nov 16 · Shams …").
+
+## Round 24: stricter trade classification, Arcade games
+
+**News classifier**
+- The bare word "trade" never marks an item as an official move.
+- A trade counts as a move only when it's completed or agreed: "traded", "trade X to the Y", "trade for", "acquire(s/d)", "send(s) … to", "deal(s) … to", "complete/finalize/agree to a trade".
+- Trade demands, buzz roundups, "latest on trades", trade targets, contract explainers, intel, "working on", "exploring", "open to", mailbags and power rankings are always Rumors & News (`ROUNDUP_RE` in `service/transactions.js`).
+- The status line uses capitalized source labels from the server: ESPN, NBA.com, ESPN News, Shams, RealGM.
+
+**Arcade** (McConnell stays featured at the top):
+- `hilo.html`: Higher or Lower.
+  - Two modes: 2K27 OVR, and 2026–27 PPG/RPG/APG for players with 5+ games and 18+ minutes.
+  - Flip reveal with count-up, streak, and best score per mode in localStorage. Arrow keys work.
+- `whoplays.html`: Who He Play For?
+  - 10 rounds, a 10-second shot clock, and four team choices with logos.
+  - Points are 100 + 15 per second left, times a streak bonus.
+  - Draws from live rosters but excludes 85+ OVR stars. Recent movers are weighted ×4 and journeyman veterans ×2.
+  - After each guess it shows the latest official move.
+- `tierlist.html`: Tier List Maker.
+  - S (coral), A (orange), B (yellow), C (green), D (blue) and F (purple) rows above an Unranked tray.
+  - One pointer handler covers drag-and-drop (mouse and touch, with edge auto-scroll) and tap-to-select then tap-a-tier. Tapping a ranked player returns it to the tray.
+  - Categories:
+    - The five positions and Top 25, from the live 2K27 feed. Positions are approximate: ESPN lists most forwards as "F", so SF/PF are split by rebounding vs. three-point profile.
+    - 2026–27 rookies (live rosters with 0 years of experience).
+    - The All-Time Top 75 (76 honorees).
+    - All 30 teams.
+  - Each category's board is saved in localStorage. Reset and Copy (a text summary) are available.
+  - **Post to Feed** saves a public `tierlist` item. Feed cards have a "Tier Lists" filter, and "Open Tier List" loads the list read-only.
+- New saved-item type `tierlist`. The Postgres CHECK constraint is migrated automatically on startup.

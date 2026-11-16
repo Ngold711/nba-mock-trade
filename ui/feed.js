@@ -3,7 +3,7 @@
 import { account, itemBody, openHref, openLabel, logoImg, ago } from "./account.js";
 import { esc } from "./avatar.js";
 
-const FILTERS = [["all", "All"], ["trade", "Trades"], ["draft", "Mock Drafts"], ["top", "Top Upvoted"]];
+const FILTERS = [["all", "All"], ["trade", "Trades"], ["draft", "Mock Drafts"], ["tierlist", "Tier Lists"], ["top", "Top Upvoted"]];
 
 export function startFeed(el) {
   let filter = "all", items = [], next = 0, loading = false, alive = true, error = "";
@@ -15,7 +15,7 @@ export function startFeed(el) {
   const card = (it) => `<article class="post" data-id="${esc(it.id)}">
       <header class="post-head">${it.favoriteTeam ? logoImg(it.favoriteTeam, "1.6rem") : '<span class="acct-dot">@</span>'}
         <span class="post-by"><b>@${esc(it.username)}</b><small>${esc(ago(it.createdAt))}</small></span>
-        <span class="it-type ${it.type}">${it.type === "trade" ? "Trade" : "Mock Draft"}</span></header>
+        <span class="it-type ${it.type}">${it.type === "trade" ? "Trade" : it.type === "tierlist" ? "Tier List" : "Mock Draft"}</span></header>
       ${it.title ? `<h4 class="post-title">${esc(it.title)}</h4>` : ""}
       ${itemBody(it)}
       <footer class="post-foot">
@@ -37,7 +37,7 @@ export function startFeed(el) {
     if (reset) { items = []; next = 0; }
     paint();
     const qs = new URLSearchParams({ offset: String(next || 0) });
-    if (filter === "trade" || filter === "draft") qs.set("type", filter);
+    if (filter === "trade" || filter === "draft" || filter === "tierlist") qs.set("type", filter);
     if (filter === "top") qs.set("sort", "top");
     try {
       const r = await fetch(`/api/feed?${qs}`, { credentials: "same-origin" });

@@ -136,7 +136,7 @@ CREATE TABLE IF NOT EXISTS saved_items (
   user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   username text NOT NULL,
   favorite_team text,
-  type text NOT NULL CHECK (type IN ('trade', 'draft')),
+  type text NOT NULL CHECK (type IN ('trade', 'draft', 'tierlist')),
   title text NOT NULL DEFAULT '',
   payload_json jsonb NOT NULL,
   visibility text NOT NULL CHECK (visibility IN ('private', 'public')),
@@ -144,6 +144,9 @@ CREATE TABLE IF NOT EXISTS saved_items (
   liked_by_user_ids text[] NOT NULL DEFAULT '{}',
   created_at timestamptz NOT NULL DEFAULT now()
 );
+-- databases created before tier lists: widen the type check (idempotent)
+ALTER TABLE saved_items DROP CONSTRAINT IF EXISTS saved_items_type_check;
+ALTER TABLE saved_items ADD CONSTRAINT saved_items_type_check CHECK (type IN ('trade', 'draft', 'tierlist'));
 CREATE INDEX IF NOT EXISTS saved_items_user ON saved_items (user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS saved_items_feed ON saved_items (visibility, created_at DESC);
 CREATE INDEX IF NOT EXISTS saved_items_top ON saved_items (visibility, likes_count DESC, created_at DESC);

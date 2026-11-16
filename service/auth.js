@@ -85,8 +85,8 @@ export { cleanText };
 
 /** Saved trade / mock draft payloads: shape-checked and size-limited; stored as JSON, rendered escaped. */
 export function validateItem(body) {
-  const type = body?.type === "draft" ? "draft" : body?.type === "trade" ? "trade" : null;
-  if (!type) return { error: "type must be trade or draft" };
+  const type = ["trade", "draft", "tierlist"].includes(body?.type) ? body.type : null;
+  if (!type) return { error: "type must be trade, draft or tierlist" };
   const visibility = body?.visibility === "public" ? "public" : "private";
   const title = cleanText(body?.title, 140);
   const p = body?.payload;
@@ -97,6 +97,18 @@ export function validateItem(body) {
     if (typeof p.trade !== "string" || !/^[A-Za-z0-9._~-]{4,2000}$/.test(p.trade)) return { error: "trade link code missing" };
     if (!Array.isArray(p.teams) || p.teams.length < 2 || p.teams.length > 4 || !p.teams.every((t) => TEAM_CODES.has(t))) return { error: "2–4 teams" };
     if (!Array.isArray(p.assets) || p.assets.length < 1 || p.assets.length > 40) return { error: "1–40 assets" };
+  } else if (type === "tierlist") {
+    if (typeof p.category !== "string" || !p.category.trim() || p.category.length > 80) return { error: "tier list category" };
+    if (!p.tiers || typeof p.tiers !== "object" || Array.isArray(p.tiers)) return { error: "tiers required" };
+    const keys = Object.keys(p.tiers);
+    if (keys.some((k) => !["S", "A", "B", "C", "D", "F"].includes(k))) return { error: "tiers are S, A, B, C, D, F" };
+    let n = 0;
+    for (const k of keys) {
+      const row = p.tiers[k];
+      if (!Array.isArray(row) || row.length > 60 || row.some((x) => !x || typeof x.n !== "string" || x.n.length > 60)) return { error: `tier ${k} is invalid` };
+      n += row.length;
+    }
+    if (!n) return { error: "Rank at least one entry first" };
   } else {
     if (!/^20(2[6-9]|3\d)$/.test(String(p.year))) return { error: "draft year" };
     if (!p.picks || typeof p.picks !== "object") return { error: "picks required" };

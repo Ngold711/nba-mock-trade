@@ -681,11 +681,11 @@ async function paintMovesSync(meta) {
   const st = await fetch("/api/transactions/status").then((r) => r.json()).then((j) => j.data).catch(() => null);
   const synced = st?.syncedAt || meta?.fetchedAt;
   if (!synced) { el.innerHTML = ""; return; }
-  const NAMES = { espn: "ESPN moves", nba: "NBA.com", espnNews: "ESPN News", shams: "Shams", realgm: "RealGM" };
+  const NAMES = { espn: "ESPN", nba: "NBA.com", espnNews: "ESPN News", shams: "Shams", realgm: "RealGM" };
   const live = Object.entries(st?.sources || {}).filter(([, v]) => v.ok);
   // amber only when every source that answered is 36+ hours behind (the overall newest move is that old)
   const lag = !!st?.newest && Date.now() - Date.parse(st.newest) > 36 * 3600e3;
-  const per = live.map(([k, v]) => `${NAMES[k] || k} ${v.newest ? esc(fmtDay(v.newest)) : "—"}`).join(" · ");
+  const per = live.map(([k, v]) => `${v.label || NAMES[k] || k} ${v.newest ? esc(fmtDay(v.newest)) : "—"}`).join(" · ");
   el.innerHTML = `<span class="dot${lag ? " warn" : ""}" aria-hidden="true"></span>Last synced <b>${esc(agoTxt(synced))}</b>${st?.newest ? ` · newest move ${esc(fmtDay(st.newest))}` : ""}`
     + (per ? ` <span class="src">(${per})</span>` : "")
     + (lag ? ` · <span class="lag">no source has posted a newer move yet</span>` : "");

@@ -203,3 +203,20 @@ test("store contract: PostgreSQL", { skip: !process.env.PG_TEST_URL && "set PG_T
   await s.pool.query("DROP TABLE IF EXISTS saved_items; DROP TABLE IF EXISTS users;");
   try { await contract(s); } finally { await s.close(); }
 });
+
+const TIERS = { category: "Top 25 NBA Players Right Now", key: "top25", tiers: { S: [{ n: "Shai Gilgeous-Alexander", id: "4278073", t: "OKC" }], A: [{ n: "Nikola Jokic", id: "3112335", t: "DEN" }], B: [], C: [], D: [], F: [] } };
+test("tier lists: validation, post to the Community Feed, Tier Lists filter, fetch by id", async () => {
+  assert.ok(validateItem({ type: "tierlist", payload: TIERS }).value);
+  assert.match(validateItem({ type: "tierlist", payload: { ...TIERS, tiers: { S: [], A: [] } } }).error, /at least one/);
+  assert.match(validateItem({ type: "tierlist", payload: { ...TIERS, tiers: { Z: [{ n: "x" }] } } }).error, /S, A, B, C, D, F/);
+  assert.match(validateItem({ type: "tierlist", payload: { ...TIERS, category: "" } }).error, /category/);
+  assert.match(validateItem({ type: "tierlist", payload: { ...TIERS, tiers: { S: [{ n: 5 }] } } }).error, /tier S/);
+  const c = client();
+  await c.call("/api/auth/signup", { method: "POST", body: { email: "tiers@x.co", username: "tier_maker", password: "password123" } });
+  const it = (await c.call("/api/items", { method: "POST", body: { type: "tierlist", visibility: "public", title: "My tiers", payload: TIERS } })).body.data.item;
+  assert.equal(it.type, "tierlist");
+  const feed = (await client().call("/api/feed?type=tierlist")).body.data.items;
+  assert.deepEqual(feed.map((x) => x.id), [it.id]);
+  const got = (await client().call(`/api/items/${it.id}`)).body.data.item;
+  assert.equal(got.payloadJson.tiers.S[0].n, "Shai Gilgeous-Alexander");
+});

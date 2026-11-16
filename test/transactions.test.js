@@ -94,3 +94,15 @@ test("speculation from insiders stays a rumor; agreements from non-insiders stay
   assert.equal(classifyNews("Lakers, Reaves agree to four-year extension").category, "rumor");
   assert.equal(attributionFor("", "Kings waive X", "RealGM"), "Per RealGM");
 });
+
+test("trade demands, buzz roundups and contract explainers are never official moves", () => {
+  for (const h of ["Dejounte Murray NBA Contract Details After Trade Demand", "Dejoute Murray Demands Trade From The Pelicans",
+    "NBA buzz: Latest on trades, news, roster moves and intel", "Dejounte Murray wants trade from Pelicans", "Kings trade targets: five names to watch"]) {
+    assert.equal(classifyNews(h, { insider: true }).category, "rumor", h);
+  }
+  for (const h of ["Pelicans trade Dejounte Murray to Hawks", "Hawks acquire Dejounte Murray from Pelicans", "Pelicans send Murray to Atlanta for two firsts", "Traded G Dejounte Murray to Atlanta."]) {
+    assert.deepEqual(classifyNews(h), { category: "move", kind: "trade" }, h);
+  }
+  assert.equal(classifyNews("Kings could trade Zach LaVine to the Spurs").category, "rumor");
+  assert.equal(transactionKind("Signed F X after his trade request was denied."), "signing");
+});

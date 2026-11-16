@@ -31,7 +31,7 @@ const svg = (k, cls = "ic") => `<svg class="${cls}" viewBox="0 0 24 24" aria-hid
 export const TABS = [
   ["live", "Live", "live.html"], ["gmlab", "GM Lab", "gmlab.html"], ["archive", "Archive", "archive.html"], ["arcade", "Arcade", "arcade.html"],
 ];
-const SECTION_OF = { trade: "gmlab", draft: "gmlab", awards: "gmlab", mcconnell: "arcade" };
+const SECTION_OF = { trade: "gmlab", draft: "gmlab", awards: "gmlab", mcconnell: "arcade", hilo: "arcade", whoplays: "arcade", tierlist: "arcade" };
 const BACK_TO = { gmlab: ["GM Lab", "gmlab.html"], arcade: ["Arcade", "arcade.html"] };
 const ESPN_SLUG = { GSW: "gs", NOP: "no", NYK: "ny", SAS: "sa", UTA: "utah", WAS: "wsh" };
 const CODE_TO_ESPN = { GSW: "GS", NOP: "NO", NYK: "NY", SAS: "SA", UTA: "UTAH", WAS: "WSH" };

@@ -11,7 +11,12 @@ const NICK = [["Trail Blazers", "POR"], ["Blazers", "POR"], ["Timberwolves", "MI
   ["Mavericks", "DAL"], ["Mavs", "DAL"], ["Hawks", "ATL"], ["Celtics", "BOS"], ["Nets", "BKN"], ["Hornets", "CHA"], ["Bulls", "CHI"], ["Nuggets", "DEN"], ["Pistons", "DET"],
   ["Warriors", "GS"], ["Rockets", "HOU"], ["Pacers", "IND"], ["Clippers", "LAC"], ["Lakers", "LAL"], ["Grizzlies", "MEM"], ["Heat", "MIA"], ["Bucks", "MIL"], ["Pelicans", "NO"],
   ["Knicks", "NY"], ["Thunder", "OKC"], ["Magic", "ORL"], ["Suns", "PHX"], ["Kings", "SAC"], ["Spurs", "SA"], ["Raptors", "TOR"], ["Jazz", "UTAH"], ["Wizards", "WSH"]];
-const MOVE_RE = /\b(sign(s|ed)?|re-sign(s|ed)?|waive(s|d)?|release(s|d)?|guarantee(s|d)?|trade(s|d)?|acquire(s|d)?|assign(s|ed)?|recall(s|ed)?|convert(s|ed)?|suspend(s|ed)?|exercise(s|d)?|decline(s|d)?|extension|extend(s|ed)?|claim(s|ed)?)\b/i;
+// Move verbs. The bare noun "trade(s)" is deliberately NOT here: a trade is a move only when TRADE_DONE_RE reports it.
+const MOVE_RE = /\b(sign(s|ed)?|re-sign(s|ed)?|waive(s|d)?|release(s|d)?|guarantee(s|d)?|assign(s|ed)?|recall(s|ed)?|convert(s|ed)?|suspend(s|ed)?|exercise(s|d)?|decline(s|d)?|extension|extend(s|ed)?|claim(s|ed)?)\b/i;
+/** A completed (or agreed) trade: "traded", "trade for", "acquire(s|d)", "send(s) X to", "deal X to", "complete/finalize/agree to a trade". */
+export const TRADE_DONE_RE = /\btraded\b|\btrades? (?!for\b|to\b|demand|request|rumou?r|target|buzz)\S+(?: \S+){0,3} to (the )?\S+|\btrades? for\b|\bacquir(e|es|ed|ing)\b|\bsend(s|ing)?\b.{1,60}\bto\b|\bdeal(s|t|ing)?\b.{1,60}\bto\b|\bcomplet(e|es|ed|ing) (a |the )?(\S+ )?trade|\bfinaliz\w* (a |the )?(\S+ )?trade|\bagree(s|d)? (to|on) (a |the )?(\S+ )?trade/i;
+/** Trade demands, buzz roundups and contract explainers: never a move, whatever verbs they contain. */
+export const ROUNDUP_RE = /\btrade demands?\b|\bdemands? (a )?trade\b|\bwants? (a )?trade\b|\brequests? (a )?trade\b|\btrade (buzz|request|rumou?rs?|targets?|deadline (buzz|preview|primer))\b|\bnba buzz\b|\blatest on trades\b|\bcontract details\b|\bintel\b|\bworking on\b|\bexplor(e|es|ing)\b|\bopen to\b|\bmailbag\b|\bpower rankings?\b/i;
 const ENTITY = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", "#39": "'", "#039": "'", nbsp: " " };
 const decode = (x) => String(x || "").replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").replace(/&(#?\w+);/g, (m, e) => ENTITY[e] ?? (/^#\d+$/.test(e) ? String.fromCharCode(+e.slice(1)) : m)).replace(/<[^>]+>/g, "").trim();
 const tag = (block, name) => decode((new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`, "i").exec(block) || [])[1]);
@@ -44,7 +49,9 @@ export function attributionFor(byline = "", text = "", fallback = "ESPN") {
 export function classifyNews(text, { insider = false } = {}) {
   const t = String(text || "");
   const speculative = SPECULATION_RE.test(t);
+  if (ROUNDUP_RE.test(t)) return { category: "rumor", kind: TRADE_TALK_RE.test(t) || speculative ? "rumor" : "news" };   // demands, buzz, explainers
   if (insider && AGREED_RE.test(t) && !speculative) return { category: "move", kind: "agreed" };
+  if (TRADE_DONE_RE.test(t) && !RUMOR_RE.test(t)) return { category: "move", kind: "trade" };
   if (MOVE_RE.test(t) && !RUMOR_RE.test(t)) return { category: "move", kind: transactionKind(t) };
   if (INJURY_RE.test(t) && !TRADE_TALK_RE.test(t)) return { category: "rumor", kind: "news" };     // injury timelines, lineups
   return { category: "rumor", kind: TRADE_TALK_RE.test(t) || speculative ? "rumor" : "news" };
@@ -134,7 +141,7 @@ const NBA_TEAM = { 1610612737: "ATL", 1610612738: "BOS", 1610612739: "CLE", 1610
 
 export function transactionKind(desc) {
   const d = String(desc || "").toLowerCase();
-  if (/\btrade|acquired\b/.test(d)) return "trade";
+  if (/\btraded\b|\btrades? for\b|\bacquir(e|es|ed|ing)\b/.test(d)) return "trade";
   if (/\bwaive|released?\b/.test(d)) return "release";
   if (/\bguarantee|exercised|declined .*option|picked up .*option|extension|extended\b/.test(d)) return "contract";
   if (/\b(re-)?sign(s|ed)?\b|\bconvert(s|ed)?\b/.test(d)) return "signing";

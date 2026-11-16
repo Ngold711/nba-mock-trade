@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Higher or Lower · Hooptrax</title>
+<meta name="description" content="Higher or Lower: is the next NBA player's 2K27 rating or 2026–27 PPG, RPG or APG higher or lower? Build the longest streak." />
+<meta name="theme-color" content="#0B0E14" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#F8FAFC" media="(prefers-color-scheme: light)" />
+<meta name="color-scheme" content="dark light" />
+<script>/* Privacy: purge pre-account history (the old global AI chat list and un-scoped trades, mock drafts and ballots). Personal work is now stored per user (ui/scoped.js); guests keep nothing. */(function(){var R=/^(hooptrax_ai_threads|hooptrax_ai_active|chat:v1|trade:workspace:v1|draft:v2:\d{4}|draft:simcount:\d{4}|awards:ballot|awards:ballot:v2|awards:picks)$/;[function(){return localStorage},function(){return sessionStorage}].forEach(function(f){try{var s=f();for(var i=s.length-1;i>=0;i--){var k=s.key(i);if(k&&R.test(k))s.removeItem(k)}}catch(e){}})})();</script>
+<script>/* theme before first paint: dark default, light optional (localStorage "htx:theme") */(function(){var t="dark";try{t=localStorage.getItem("htx:theme")==="light"?"light":"dark"}catch(e){}document.documentElement.setAttribute("data-theme",t);var c=t==="light"?"#F8FAFC":"#0B0E14";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c)})})();</script>
+<link rel="manifest" href="public/manifest.json" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Hooptrax" />
+<link rel="icon" href="public/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="public/favicon-32.png" type="image/png" sizes="32x32" />
+<link rel="apple-touch-icon" href="public/apple-touch-icon.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="public/apple-touch-icon.png" />
+<meta property="og:site_name" content="Hooptrax" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Higher or Lower · Hooptrax" />
+<meta property="og:description" content="Higher or Lower: is the next NBA player's 2K27 rating or 2026–27 PPG, RPG or APG higher or lower? Build the longest streak." />
+<meta property="og:url" content="https://hooptrax.com/hilo.html" />
+<meta property="og:image" content="https://hooptrax.com/public/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Hooptrax: live NBA trade machine, 3-2-1 lottery simulator and draft hub" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Higher or Lower · Hooptrax" />
+<meta name="twitter:description" content="Higher or Lower: is the next NBA player's 2K27 rating or 2026–27 PPG, RPG or APG higher or lower? Build the longest streak." />
+<meta name="twitter:image" content="https://hooptrax.com/public/og-image.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
+<link rel="stylesheet" href="ui/base.css" />
+<link rel="stylesheet" href="ui/games.css" />
+</head>
+<body>
+<header class="bar" id="bar"></header>
+<main class="hub-page game hilo">
+  <h1 class="large-title">Higher or Lower</h1>
+  <div class="g-seg" role="tablist" aria-label="Mode"><button type="button" role="tab" data-mode="2k" aria-selected="true">2K27 Ratings</button><button type="button" role="tab" data-mode="stats" aria-selected="false">2026–27 Stats</button></div>
+  <div class="g-score"><span>Streak <b id="streak">0</b></span><span>Best <b id="best">0</b></span></div>
+  <div class="hl-stage" id="stage"><div class="sk" style="height:18rem;border-radius:1.2rem"></div></div>
+  <div class="hl-actions" id="actions" hidden>
+    <button class="hl-btn up press" type="button" data-guess="higher">Higher <span aria-hidden="true">▲</span></button>
+    <button class="hl-btn down press" type="button" data-guess="lower">Lower <span aria-hidden="true">▼</span></button>
+  </div>
+  <p class="g-note" id="note"></p>
+</main>
+<script src="data.js"></script>
+<script type="module">
+import { mountShell } from "./ui/shell.js";
+import { avatar, teamLogo, esc } from "./ui/avatar.js";
+const shell = mountShell({ active: "hilo" });
+const $ = (s) => document.querySelector(s);
+const LS = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+const STATS = [["pts", "PPG"], ["reb", "RPG"], ["ast", "APG"]];
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let mode = LS.get("hilo:mode", "2k"), pools = { "2k": [], stats: [] }, teams = {}, A = null, B = null, stat = "pts", streak = 0, busy = false;
+
+const team = (abbr) => teams[abbr] || { abbr, logo: `https://a.espncdn.com/i/teamlogos/nba/500/${String(abbr).toLowerCase()}.png`, color: "#64748B" };
+const valueOf = (p) => (mode === "2k" ? p.ovr : p.stats[stat]);
+const fmt = (v) => (mode === "2k" ? String(v) : Number(v).toFixed(1));
+const metric = () => (mode === "2k" ? "OVR in NBA 2K27" : `${STATS.find(([k]) => k === stat)[1]} this season`);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+/** Next opponent: a different player whose value isn't a tie (2K: ≥1 OVR apart, stats: ≥0.3 apart). */
+function nextB(a) {
+  const gap = mode === "2k" ? 1 : 0.3, pool = pools[mode];
+  for (let i = 0; i < 200; i++) { const b = pick(pool); if (b.id !== a.id && Math.abs(valueOf(b) - valueOf(a)) >= gap) return b; }
+  return pool.find((b) => b.id !== a.id);
+}
+function card(p, { reveal, side }) {
+  const t = team(p.teamAbbr);
+  return `<div class="hl-card ${side}${reveal ? " shown" : ""}" style="--tc:${esc(t.color || "#64748B")}">
+    <div class="hl-face">${avatar({ name: p.name, headshot: p.headshot }, { size: "6rem", color: t.color, full: true })}</div>
+    <div class="hl-team">${teamLogo(t, { size: "1.5rem" })}<span>${esc(t.abbr)}</span></div>
+    <b class="hl-name">${esc(p.name)}</b>
+    <div class="hl-val"><div class="hl-flip"><span class="front">?</span><span class="back" data-val="${valueOf(p)}">${reveal ? fmt(valueOf(p)) : "?"}</span></div></div>
+    <small class="hl-metric">${metric()}</small></div>`;
+}
+function render() {
+  $("#stage").innerHTML = `<div class="hl-pair">${card(A, { reveal: true, side: "a" })}<div class="hl-vs" aria-hidden="true">VS</div>${card(B, { reveal: false, side: "b" })}</div>`;
+  $("#actions").hidden = false;
+  $("#note").textContent = `Is ${B.name}'s ${mode === "2k" ? "2K27 rating" : STATS.find(([k]) => k === stat)[1]} higher or lower than ${fmt(valueOf(A))}?`;
+  $("#streak").textContent = streak; $("#best").textContent = LS.get(`hilo:best:${mode}`, 0);
+}
+function countUp(el, to) {
+  if (reduce) { el.textContent = fmt(to); return; }
+  const t0 = performance.now(), from = mode === "2k" ? Math.max(40, to - 25) : 0;
+  const step = (t) => { const k = Math.min(1, (t - t0) / 650); el.textContent = fmt(from + (to - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+async function guess(dir) {
+  if (busy) return; busy = true;
+  const right = dir === "higher" ? valueOf(B) > valueOf(A) : valueOf(B) < valueOf(A);
+  const bCard = $(".hl-card.b"); bCard.classList.add("shown", right ? "win" : "lose");
+  countUp(bCard.querySelector(".back"), valueOf(B));
+  $("#actions").hidden = true;
+  await new Promise((r) => setTimeout(r, reduce ? 300 : 1000));
+  if (right) {
+    streak++;
+    if (streak > LS.get(`hilo:best:${mode}`, 0)) LS.set(`hilo:best:${mode}`, streak);
+    $("#stage").classList.add("slide");                             // B slides into A's place
+    await new Promise((r) => setTimeout(r, reduce ? 0 : 320));
+    $("#stage").classList.remove("slide");
+    A = B; if (mode === "stats") stat = pick(STATS)[0]; B = nextB(A); render();
+  } else {
+    $("#note").innerHTML = `<b>${esc(B.name)}</b>: ${fmt(valueOf(B))} ${metric()}. Final streak <b>${streak}</b>.`;
+    $("#stage").insertAdjacentHTML("beforeend", `<button class="g-cta press" type="button" id="again">Play again</button>`);
+    streak = 0;
+  }
+  busy = false;
+}
+function start() {
+  const pool = pools[mode];
+  if (pool.length < 10) { $("#stage").innerHTML = `<div class="empty">Couldn't load ${mode === "2k" ? "2K27 ratings" : "season stats"} right now.</div>`; return; }
+  streak = 0; if (mode === "stats") stat = pick(STATS)[0];
+  A = pick(pool); B = nextB(A); render();
+}
+document.addEventListener("click", (e) => {
+  const g = e.target.closest("[data-guess]"); if (g) return guess(g.dataset.guess);
+  if (e.target.closest("#again")) return start();
+  const m = e.target.closest("[data-mode]");
+  if (m && m.dataset.mode !== mode) { mode = m.dataset.mode; LS.set("hilo:mode", mode); document.querySelectorAll("[data-mode]").forEach((x) => x.setAttribute("aria-selected", String(x === m))); start(); }
+});
+document.addEventListener("keydown", (e) => { if (e.key === "ArrowUp") guess("higher"); if (e.key === "ArrowDown") guess("lower"); });
+document.querySelectorAll("[data-mode]").forEach((x) => x.setAttribute("aria-selected", String(x.dataset.mode === mode)));
+const [r, s, l] = await Promise.all(["/api/2k-ratings", "/api/players", "/api/league"].map((u) => fetch(u).then((x) => x.json()).then((j) => j.data).catch(() => null)));
+teams = l?.teams || {};
+const shots = new Map((l?.players || []).map((p) => [String(p.id), p.headshot]));
+pools["2k"] = (r?.players || []).filter((p) => p.ovr >= 70 && p.teamAbbr);
+pools.stats = (s?.players || []).filter((p) => p.stats?.gp >= 5 && p.stats?.min >= 18 && p.teamAbbr).map((p) => ({ ...p, headshot: p.headshot || shots.get(String(p.id)) }));
+start();
+</script>
+</body>
+</html>

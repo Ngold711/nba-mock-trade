@@ -60,14 +60,20 @@ export function itemBody(it, { full = false } = {}) {
     const lines = (p.lines || []).map((l) => `<li>${logoImg(l.team)}<b>${esc(l.team)}</b> gets <span>${esc((l.gets || []).join(", ") || "—")}</span></li>`).join("");
     return `<div class="it-trade"><ul class="it-lines">${lines}</ul>${p.verdict?.head ? `<span class="it-verdict ${esc(p.verdict.kind || "")}">${esc(p.verdict.head)}</span>` : ""}</div>`;
   }
+  if (it.type === "tierlist") {
+    const TIERS = ["S", "A", "B", "C", "D", "F"];
+    const rows = TIERS.filter((k) => (p.tiers?.[k] || []).length);
+    const show = full ? rows : rows.slice(0, 4);
+    return `<div class="it-tiers"><span class="it-sub">${esc(p.category || "Tier list")} · ${TIERS.reduce((n, k) => n + (p.tiers?.[k] || []).length, 0)} ranked</span>${show.map((k) => `<div class="it-tier"><span class="tl-badge t-${k}">${k}</span><span>${(p.tiers[k] || []).slice(0, full ? 60 : 6).map((x) => esc(x.n)).join(", ")}${!full && p.tiers[k].length > 6 ? ` +${p.tiers[k].length - 6}` : ""}</span></div>`).join("")}</div>`;
+  }
   const board = p.board || [];
   const show = full ? board : board.slice(0, 5);
   return `<div class="it-draft"><span class="it-sub">${esc(p.year)} mock draft · ${board.length} pick${board.length === 1 ? "" : "s"}${p.formatLabel ? ` · ${esc(p.formatLabel)}` : ""}</span>
     <ol class="it-picks">${show.map((b) => `<li><span class="num">${b.pick}</span>${logoImg(b.team)}<b>${esc(b.name)}</b><small>${esc([b.pos, b.school].filter(Boolean).join(" · "))}</small></li>`).join("")}</ol>
     ${!full && board.length > show.length ? `<span class="it-more">+${board.length - show.length} more picks</span>` : ""}</div>`;
 }
-export const openHref = (it) => (it.type === "trade" ? `index.html?trade=${encodeURIComponent(it.payloadJson?.trade || "")}` : `draft.html?item=${encodeURIComponent(it.id)}`);
-export const openLabel = (it) => (it.type === "trade" ? "Open in Trade Machine" : "Open in Mock Draft");
+export const openHref = (it) => (it.type === "trade" ? `index.html?trade=${encodeURIComponent(it.payloadJson?.trade || "")}` : it.type === "tierlist" ? `tierlist.html?item=${encodeURIComponent(it.id)}` : `draft.html?item=${encodeURIComponent(it.id)}`);
+export const openLabel = (it) => (it.type === "trade" ? "Open in Trade Machine" : it.type === "tierlist" ? "Open Tier List" : "Open in Mock Draft");
 
 /* ---------- module state ---------- */
 let me = null, counts = null, loaded = false;
@@ -176,7 +182,7 @@ export function saveFlow({ type, visibility, build }) {
       render(body) {
         if (mounted) return; mounted = true;
         body.innerHTML = `<form class="auth-form post-form">
-            <label>Headline (optional)<input name="title" type="text" maxlength="140" value="${esc(got.title || "")}" placeholder="${type === "trade" ? "e.g. Lakers go all in" : "e.g. My 2027 mock: Wizards land the #1 pick"}" /></label>
+            <label>Headline (optional)<input name="title" type="text" maxlength="140" value="${esc(got.title || "")}" placeholder="${type === "tierlist" ? "e.g. My point guard tiers" : type === "trade" ? "e.g. Lakers go all in" : "e.g. My 2027 mock: Wizards land the #1 pick"}" /></label>
             <div class="post-preview">${itemBody({ type, payloadJson: got.payload })}</div>
             <p class="auth-err" role="alert" hidden></p>
             <button class="btn primary auth-go press" type="submit">🌎 Save &amp; Post</button>
@@ -207,8 +213,8 @@ export function openProfile({ tab = "public" } = {}) {
     if (detail) {
       const it = detail;
       body.innerHTML = `<button class="link-back press" type="button" data-back>‹ Back</button>
-        <div class="it-detail"><div class="it-head"><span class="it-type ${it.type}">${it.type === "trade" ? "Trade" : "Mock Draft"}</span><span class="it-vis">${it.visibility === "public" ? "🌎 Public" : "🔒 Private"}</span><small>${esc(ago(it.createdAt))}${it.visibility === "public" ? ` · ▲ ${it.likesCount}` : ""}</small></div>
-          <h4 class="it-title">${esc(it.title || (it.type === "trade" ? "Untitled trade" : "Untitled mock draft"))}</h4>
+        <div class="it-detail"><div class="it-head"><span class="it-type ${it.type}">${it.type === "trade" ? "Trade" : it.type === "tierlist" ? "Tier List" : "Mock Draft"}</span><span class="it-vis">${it.visibility === "public" ? "🌎 Public" : "🔒 Private"}</span><small>${esc(ago(it.createdAt))}${it.visibility === "public" ? ` · ▲ ${it.likesCount}` : ""}</small></div>
+          <h4 class="it-title">${esc(it.title || (it.type === "trade" ? "Untitled trade" : it.type === "tierlist" ? "Untitled tier list" : "Untitled mock draft"))}</h4>
           ${itemBody(it, { full: true })}
           <div class="it-acts">
             <a class="btn primary press" href="${esc(openHref(it))}">Load into Sandbox</a>
@@ -224,7 +230,7 @@ export function openProfile({ tab = "public" } = {}) {
       <label class="prof-team">Favorite team<select data-team>${teamOptions(me.favoriteTeam || "")}</select></label>
       <div class="auth-seg seg2" role="tablist"><button type="button" role="tab" data-tab="public" aria-selected="${view === "public"}">Public Posts</button><button type="button" role="tab" data-tab="private" aria-selected="${view === "private"}">🔒 Private Vault</button></div>
       <div class="prof-list">${items == null ? `<div class="empty">Loading…</div>` : items.length ? items.map((it) => `<button class="it-row press" type="button" data-item="${esc(it.id)}">
-          <span class="it-type ${it.type}">${it.type === "trade" ? "Trade" : "Draft"}</span><span class="it-t"><b>${esc(it.title || (it.type === "trade" ? (it.payloadJson?.teams || []).join(" ⇄ ") : `${it.payloadJson?.year} mock draft`))}</b><small>${esc(ago(it.createdAt))}${it.visibility === "public" ? ` · ▲ ${it.likesCount}` : ""}</small></span><span aria-hidden="true">›</span></button>`).join("")
+          <span class="it-type ${it.type}">${it.type === "trade" ? "Trade" : it.type === "tierlist" ? "Tiers" : "Draft"}</span><span class="it-t"><b>${esc(it.title || (it.type === "trade" ? (it.payloadJson?.teams || []).join(" ⇄ ") : `${it.payloadJson?.year} mock draft`))}</b><small>${esc(ago(it.createdAt))}${it.visibility === "public" ? ` · ▲ ${it.likesCount}` : ""}</small></span><span aria-hidden="true">›</span></button>`).join("")
         : `<div class="empty">${view === "public" ? "Nothing posted yet. Use 🌎 Save &amp; Post in the Trade Machine or Mock Draft." : "Nothing saved yet. Use 🔒 Save Privately in the Trade Machine or Mock Draft."}</div>`}</div>`;
   };
   S().open({

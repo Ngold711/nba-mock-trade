@@ -604,7 +604,7 @@ const aiThreadsRoute = requireUser(async (req, res, m, q, user) => {
 async function feedRoute(req, res, m, q) {
   noStore(res);
   const store = await acct();
-  const type = ["trade", "draft"].includes(q.get("type")) ? q.get("type") : null;
+  const type = ["trade", "draft", "tierlist"].includes(q.get("type")) ? q.get("type") : null;
   const sort = q.get("sort") === "top" ? "top" : "new";
   const offset = Math.max(0, Math.min(5000, Number(q.get("offset")) || 0));
   const user = await currentUser(req).catch(() => null);
