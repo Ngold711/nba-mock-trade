@@ -7,7 +7,7 @@ import { extname, join, normalize as normPath, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createStore } from "./service/store.js";
 import { setResolver, setRatingsFeedProvider, transactionsStatus } from "./service/espn.js";
-import { parseRatingsFeed, fetchRatingsFeed } from "./service/ratings-feed.js";
+import { syncRatings, ratingsSyncStatus } from "./service/ratings2k.js";
 
 const ROOT = fileURLToPath(new URL(".", import.meta.url));
 // .env (local only, git-ignored): KEY=VALUE lines; real environment variables win.
@@ -24,26 +24,12 @@ const log = (...a) => { if (!QUIET) console.log(new Date().toISOString(), ...a);
 
 export const store = createStore({ log: (m) => log("[store]", m) });
 setResolver((resource, params) => store.get(resource, params).then((r) => r.data));
-// NBA 2K27 ratings: a live feed (RATINGS_FEED_URL) when configured, re-read on every ratings refresh; the last good
-// copy survives restarts in data/ratings-feed.json; otherwise the bundled ratings_2k27.json snapshot.
+// Official NBA 2K27 ratings (service/ratings2k.js): RATINGS_FEED_URL (+ RATINGS_FEED_URL_2 cross-check), synced every
+// 30 minutes, at start-up and after finals; the last verified sync survives restarts in data/ratings-feed.json.
 setRatingsFeedProvider(async () => {
-  const dir = new URL("./data/", import.meta.url), cacheFile = new URL("./data/ratings-feed.json", import.meta.url);
-  const url = process.env.RATINGS_FEED_URL;
-  if (url) {
-    try {
-      const feed = await fetchRatingsFeed(url);
-      const { mkdir: mk, writeFile: wf } = await import("node:fs/promises");
-      await mk(dir, { recursive: true }).catch(() => {}); await wf(cacheFile, JSON.stringify({ ...feed, fetchedAt: new Date().toISOString() })).catch(() => {});
-      return { ...feed, live: true };
-    } catch (e) {
-      console.warn(`[ratings] feed unavailable (${e.message}); using the last good copy or the bundled snapshot`);
-      const { readFile: rf } = await import("node:fs/promises");
-      const last = await rf(cacheFile, "utf8").then(JSON.parse).catch(() => null);
-      if (last?.players?.length) return { ...parseRatingsFeed(last), live: true };
-    }
-  }
-  const { readFile: rf } = await import("node:fs/promises");
-  return parseRatingsFeed(JSON.parse(await rf(new URL("./ratings_2k27.json", import.meta.url), "utf8")));
+  const fsp = await import("node:fs/promises");
+  return syncRatings({ env: process.env, io: fsp, cacheDir: new URL("./data/", import.meta.url), cacheFile: new URL("./data/ratings-feed.json", import.meta.url),
+    snapshotFile: new URL("./ratings_2k27.json", import.meta.url), log: (m) => log(m) });
 });
 
 // Common abbreviations → ESPN's own (ESPN uses GS, NO, NY, SA, UTAH, WSH).
@@ -826,6 +812,9 @@ const routes = [
   [/^\/api\/coaches$/, (req, res) => serve(res, "coaches", {})],
   [/^\/api\/league$/, (req, res) => serve(res, "league", {})],
   [/^\/api\/2k-ratings$/, (req, res) => serve(res, "ratings", {})],
+  [/^\/api\/2k27-ratings$/, (req, res) => serve(res, "ratings", {})],
+  [/^\/api\/2k27-ratings\/status$/, (req, res) => json(res, 200, { data: ratingsSyncStatus() })],
+  [/^\/api\/starters$/, (req, res) => serve(res, "depth", {})],
   [/^\/api\/team-stats$/, (req, res) => serve(res, "teamstats", {})],
   [/^\/api\/sos$/, (req, res) => serve(res, "sos", {})],
   [/^\/api\/bio\/(\d{1,12})$/, (req, res, m) => serve(res, "bio", { id: m[1] })],

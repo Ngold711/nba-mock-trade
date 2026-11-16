@@ -126,7 +126,7 @@ export function mountEncyclopedia({ sheet, openCompare = () => {}, toast = () =>
       const draftTxt = draftLine(d);
       const hero = `<button class="link-back press" type="button" data-eback>‹ Search</button>
         <div class="enc-hero">
-          <div class="enc-face">${avatar({ name: p.name, headshot: p.headshot }, { size: "5.5rem", color: p.team?.color || "#475569", full: true })}${p.ovr ? `<span class="enc-ovr" title="NBA 2K27 OVR${p.ovr.official ? " (official)" : " (Hooptrax estimate)"}">${p.ovr.value}</span>` : ""}</div>
+          <div class="enc-face">${avatar({ name: p.name, headshot: p.headshot }, { size: "5.5rem", color: p.team?.color || "#475569", full: true })}${p.ovr ? `<span class="enc-ovr" title="Official NBA 2K27 OVR">${p.ovr.value}</span>` : ""}</div>
           <div class="enc-id"><h3>${esc(p.name)}</h3>
             <div class="enc-sub">${badge}${p.jersey ? `<span>#${esc(p.jersey)}</span>` : ""}${p.position ? `<span>${esc(p.position)}</span>` : ""}${p.height ? `<span>${esc(p.height)}</span>` : ""}${p.weight ? `<span>${esc(p.weight)}</span>` : ""}</div></div>
         </div>
@@ -136,7 +136,7 @@ export function mountEncyclopedia({ sheet, openCompare = () => {}, toast = () =>
           ${fact("Draft", draftTxt)}
           ${fact("Years Pro", p.yearsPro ? `${p.yearsPro}${p.span ? ` <small>(${esc(p.span)})</small>` : ""}` : esc(p.span))}
           ${p.active ? fact("2026–27 Salary", p.salary ? `${money(p.salary.amount)}${p.salary.estimate ? " <small>est.</small>" : ""}` : "—") : ""}
-          ${p.active && p.ovr ? fact("NBA 2K27 OVR", `${p.ovr.value}${p.ovr.official ? "" : " <small>est.</small>"}`) : ""}
+          ${p.active && p.ovr ? fact("NBA 2K27 OVR", `${p.ovr.value}`) : ""}
         </div>`;
       const shelf = (p.trophies.length || p.retired.length) ? `<div class="enc-shelf" aria-label="Trophies and honors">
           ${p.trophies.map((t) => `<div class="tro ${t.key}" title="${esc(t.label)}: ${t.years.join(", ")}"><span class="tro-i">${ICON[t.key] || "🏆"}</span><b>${t.count > 1 ? `${t.count}×` : ""} ${esc(t.label)}</b><small>${esc(yearsTxt(t.years))}</small></div>`).join("")}

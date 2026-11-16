@@ -85,3 +85,19 @@
 }
 .hl-actions[hidden] { display: none; }
 .tierlist .tl-board, .tierlist .tl-tray, .tierlist .tl-badge { user-select: none; -webkit-user-select: none; }
+
+/* Who He Play For?: face-only crop + grayscale while the clock runs (no collar, trim or team colors) */
+.wp-face .avatar-img { object-position: center 14%; transform-origin: 50% 24%; transition: opacity 200ms ease, filter 450ms ease, transform 450ms cubic-bezier(.2,.8,.2,1); }
+.wp-face.hidden-team .avatar-img { filter: grayscale(100%) contrast(1.08); transform: scale(1.42); }
+.wp-face.hidden-team .avatar::before { background: #334155; }
+.wp-mode { margin: 0 0 0.4rem; font-size: 0.8125rem; min-height: 0; }
+.wp-final small { color: var(--label-3); font-size: 0.75rem; }
+@media (prefers-reduced-motion: reduce) { .wp-face .avatar-img { transition: opacity 200ms ease; } }
+
+/* Tier List Maker: + Add any player */
+.tl-add { position: relative; margin: 0.25rem 0 0.5rem; }
+.tl-add .search { width: 100%; min-height: 2.75rem; box-sizing: border-box; }
+.tl-results { position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 0.25rem); margin: 0; padding: 0.3rem; list-style: none; border-radius: 0.9rem; background: var(--surface-2); box-shadow: var(--shadow-lg); max-height: 20rem; overflow: auto; }
+.tl-results button { display: grid; width: 100%; min-height: 2.75rem; padding: 0.4rem 0.6rem; border: 0; border-radius: 0.6rem; background: transparent; color: var(--label); text-align: left; cursor: pointer; font: inherit; }
+.tl-results button:hover, .tl-results button:focus-visible { background: var(--fill); }
+.tl-results small { color: var(--label-3); font-size: 0.75rem; }

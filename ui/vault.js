@@ -12,7 +12,7 @@ const fmtDay = (d) => { const t = new Date(`${d}T12:00:00Z`); return isNaN(t) ? 
 const CODE_TO_ESPN = { GSW: "GS", NOP: "NO", NYK: "NY", SAS: "SA", UTA: "UTAH", WAS: "WSH" };
 const f1 = (x) => (x == null || !Number.isFinite(+x) ? "—" : Number(x).toFixed(1));
 const ovrTier = (o) => (o >= 95 ? "gal" : o >= 90 ? "dia" : o >= 85 ? "ame" : o >= 80 ? "rub" : "base");
-const ovrBadge = (r) => (r ? `<span class="ovr t-${r.tier || ovrTier(r.ovr)}" title="2K27 OVR${r.seeded ? "" : " (Hooptrax estimate)"}">${r.ovr}</span>` : "");
+const ovrBadge = (r) => (r ? `<span class="ovr t-${r.tier || ovrTier(r.ovr)}" title="Official NBA 2K27 OVR">${r.ovr}</span>` : "");
 const deltaPill = (d) => (d > 0 ? `<span class="delta up">+${d}</span>` : d < 0 ? `<span class="delta down">−${Math.abs(d)}</span>` : "");
 const inches = (h) => { const m = /(\d)\s*'\s*(\d{1,2})/.exec(String(h || "")); return m ? +m[1] * 12 + +m[2] : null; };
 
@@ -215,7 +215,7 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
           <div style="min-width:0"><div class="qv-name">${esc(name)}</div>
           <div class="qv-sub">${code ? `<button class="qv-team" type="button" data-team-hub="${code}">${teamLogo(look, { size: "1.25rem" })}${esc(look.city)} ${esc(look.name)}</button>` : ""}</div>
           <div class="qv-sub num">${[base.position, base.jersey ? `#${base.jersey}` : "", base.height, base.age || S.p?.age ? `${base.age || S.p.age} yrs` : ""].filter(Boolean).map(esc).join(" · ")}</div>
-          ${S.rating ? `<div class="qv-sub">${ovrBadge(S.rating)} ${deltaPill(S.rating.delta)} <span class="muted small">2K27 OVR${S.rating.seeded ? "" : " · est."}</span>${S.salary != null ? ` <span class="muted small">· ${money(S.salary.salary)}${S.salary.source === "estimate" ? " est." : ""} in 2026–27</span>` : ""}</div>` : ""}
+          ${S.rating ? `<div class="qv-sub">${ovrBadge(S.rating)} ${deltaPill(S.rating.delta)} <span class="muted small">Official 2K27 OVR</span>${S.salary != null ? ` <span class="muted small">· ${money(S.salary.salary)}${S.salary.source === "estimate" ? " est." : ""} in 2026–27</span>` : ""}</div>` : ""}
           ${S.inj ? `<div class="qv-sub"><span class="pill ${S.inj.status === "Out" ? "out" : "dtd"}">${esc(S.inj.status)}</span> ${esc(S.inj.injury || "")}</div>` : ""}</div></div>
         ${bioGrid}
         <div class="sheet-sub roster-sub"><span>2026–27 season</span>${modeSeg()}</div>
@@ -304,7 +304,7 @@ export function mountVault({ sheet, getClient, teamLook, ensureData, pickConfig,
           <div class="sheet-sub">NBA 2K27 ratings</div><div class="cmp-tbl">${cmpRows(A, B, RATING_ROWS, { digits: 0 })}</div>
           <div class="sheet-sub">Contract & profile</div><div class="cmp-tbl">${cmpRows(A, B, PROFILE_ROWS, { numeric: false })}</div>` : skel(4)}
         ${B ? `<div class="hub-actions"><button class="btn primary press" type="button" data-share>Share Comparison Card</button><button class="btn ghost press" type="button" data-swap>Swap sides</button></div>` : ""}
-        <p class="meter-note">Green marks the better number in each row. Ratings marked est. are Hooptrax estimates from live stats.</p>`;
+        <p class="meter-note">Green marks the better number in each row. 2K27 ratings are official; salaries marked est. are estimates.</p>`;
       const s = body.querySelector("#cmpSearch");
       if (s) {
         s.addEventListener("input", () => { S.q = s.value; const pos = s.selectionStart; draw(body); const n = body.querySelector("#cmpSearch"); n.focus(); n.setSelectionRange(pos, pos); });

@@ -12,7 +12,7 @@ Rules:
 3. Today is in the 2026-27 season (see TODAY), well past your training cutoff, so your memory of records, career totals, stats, rosters, contracts, injuries and standings is stale. NEVER answer those from memory. Use, in this order: (a) the DATA block (live ESPN feeds; CAREER lines are live all-time leaderboards with active players' totals updated through today's games; HISTORY, RETIRED, CHAMPIONS, AWARDS, SEASON and LIVE ESPN NEWS lines are ground truth and override your training), then (b) Google Search when you have the search tool and the DATA block doesn't cover the question. If neither confirms it, say you can't confirm it right now instead of guessing. Settled history that can't change (a past season's champion or Finals MVP, a draft that already happened) may come from your knowledge when the DATA block is silent. Retired numbers: if the DATA block lists one, it is retired (with the date given); a ceremony under UPCOMING is scheduled but has not happened yet; never say a jersey "hasn't been retired" when the DATA block lists it.
 3b. Leaderboards and "who passed whom": give the order and totals exactly as the CAREER lines show them; an active player's total there already includes his games through today.
 4. Game times are US Eastern Time. Say "tonight"/"tomorrow" relative to the TODAY line in the DATA block.
-5. Hooptrax 2K27 ratings are estimates except where marked official; salaries marked "est." are estimates; cap thresholds are 2026-27 projections. Mention it when it matters.
+5. 2K27 ratings in the DATA block are official NBA 2K27 OVRs (players without one aren't listed; never estimate one); salaries marked "est." are estimates; cap thresholds are 2026-27 projections. Mention it when it matters.
 6. Be fast and scannable: a one-line answer first, then short bullets. At most about 120 words unless asked for more, except for list answers (retired numbers, champions, award winners), which must be complete.
 7. Retired numbers: give every number in the DATA block, never truncate or refuse. For several teams or the whole league, write one compact line per team with no bullets, grouped by team, e.g. "CHI: #1 Derrick Rose, #4 Jerry Sloan, #10 Bob Love, #23 Michael Jordan, #33 Scottie Pippen", and note that #6 (Bill Russell) is retired league-wide. Use full player and team names so the app can link them. Use **bold** sparingly. No markdown tables or headings.`;
 
@@ -176,14 +176,14 @@ export function buildContext(question, d, idx, now = Date.now()) {
     const rum = (d.transactions || []).filter((t) => t.category === "rumor").slice(0, 8);
     if (rum.length) out.push(`RUMORS & REPORTS (RealGM Wiretap, NOT official; say so if you cite them): ${rum.map((t) => `${t.team?.abbr}: ${t.description}`).join(" | ")}`);
   }
-  if (intents.has("2k") && !ent.players.length) out.push(`2K27 TOP 20 (Hooptrax; * = official Nov 2026 update): ${(d.ratings?.players || []).slice(0, 20).map((p) => `${p.name} ${p.ovr}${p.seeded ? "*" : ""}`).join(", ")}`);
+  if (intents.has("2k") && !ent.players.length) out.push(`2K27 TOP 20 (official NBA 2K27 OVR): ${(d.ratings?.players || []).slice(0, 20).map((p) => `${p.name} ${p.ovr}`).join(", ")}`);
   const statsById = new Map((d.stats?.players || []).map((p) => [p.id, p]));
   for (const p of ent.players) {
     if (p.active) {
       const s = statsById.get(p.id)?.stats, r = d.ratings?.players?.find((x) => x.id === p.id), lp = d.league?.players?.find((x) => x.id === p.id);
       const sal = lp ? resolveSalary(lp, { book: d.book, stats: s, cba: d.book?.cba }) : null;
       const inj = (d.injuries || []).find((i) => i.athlete?.id === p.id);
-      out.push(`PLAYER ${p.name} (${p.team}${lp ? `, ${lp.position}, age ${lp.age}, ${lp.height}` : ""}): 2026-27 ${s ? `${s.gp} GP, ${f1(s.pts)} PTS, ${f1(s.reb)} REB, ${f1(s.ast)} AST, ${f1(s.stl)} STL, ${f1(s.blk)} BLK, FG ${f1(s.fgPct)}%, 3P ${f1(s.threePct)}%, ${f1(s.min)} MIN` : "no games yet"}; 2K27 OVR ${r ? `${r.ovr}${r.seeded ? " (official)" : " (est.)"}` : "—"}; 2026-27 salary ${sal ? money(sal.salary) + (sal.source === "estimate" ? " est." : "") : "—"}${inj ? `; injury: ${inj.status} ${inj.injury || ""}` : ""}.`);
+      out.push(`PLAYER ${p.name} (${p.team}${lp ? `, ${lp.position}, age ${lp.age}, ${lp.height}` : ""}): 2026-27 ${s ? `${s.gp} GP, ${f1(s.pts)} PTS, ${f1(s.reb)} REB, ${f1(s.ast)} AST, ${f1(s.stl)} STL, ${f1(s.blk)} BLK, FG ${f1(s.fgPct)}%, 3P ${f1(s.threePct)}%, ${f1(s.min)} MIN` : "no games yet"}; 2K27 OVR ${r ? `${r.ovr} (official)` : "not officially rated"}; 2026-27 salary ${sal ? money(sal.salary) + (sal.source === "estimate" ? " est." : "") : "—"}${inj ? `; injury: ${inj.status} ${inj.injury || ""}` : ""}.`);
     }
     const leg = d.history?.legends?.find((l) => l.id === p.id);
     if (leg) out.push(`CAREER ${leg.name} (${leg.from}–${leg.to}): ${leg.gp} GP, ${f1(leg.pts)} PPG, ${f1(leg.reb)} RPG, ${f1(leg.ast)} APG; totals ${leg.totals.pts} PTS, ${leg.totals.reb} REB, ${leg.totals.ast} AST; ${leg.draft || "undrafted"}.`);
@@ -293,8 +293,8 @@ export function localAnswer(question, d, idx, now = Date.now()) {
     for (const i of (d.injuries || []).slice(0, 8)) L.push(`• ${i.athlete?.name} (${i.team?.abbr}) — ${i.status}${i.injury ? `, ${i.injury}` : ""}`);
   }
   if (has(/\b(2k|rating|ratings|ovr)\b/i) && !ent.players.length) {
-    L.push("**Top 2K27 ratings** (Hooptrax; ✱ = official Nov 2026 update):");
-    for (const p of (d.ratings?.players || []).slice(0, 10)) L.push(`• ${p.name} ${p.ovr}${p.seeded ? " ✱" : ""}${p.delta ? ` (${p.delta > 0 ? "+" : ""}${p.delta})` : ""}`);
+    L.push("**Top 2K27 ratings** (official NBA 2K27 OVR):");
+    for (const p of (d.ratings?.players || []).slice(0, 10)) L.push(`• ${p.name} ${p.ovr}${p.delta ? ` (${p.delta > 0 ? "+" : ""}${p.delta})` : ""}`);
   }
   if (has(/\b(cap|apron|luxury tax|tax line)\b/i) && d.book?.cba && !ent.teams.length) {
     const c = d.book.cba;
@@ -347,7 +347,7 @@ export function localAnswer(question, d, idx, now = Date.now()) {
       const inj = (d.injuries || []).find((i) => i.athlete?.id === p.id);
       lines.push(`**${p.name}** (${p.team}${lp?.position ? `, ${lp.position}` : ""})`);
       if (s?.gp) lines.push(`2026–27: ${f1(s.pts)} PTS · ${f1(s.reb)} REB · ${f1(s.ast)} AST · ${f1(s.fgPct)} FG% in ${s.gp} games`);
-      if (r && (has(/2k|rating|ovr/i) || true)) lines.push(`2K27 OVR ${r.ovr}${r.seeded ? " (official update)" : " (Hooptrax estimate)"}${r.delta ? `, ${r.delta > 0 ? "+" : ""}${r.delta}` : ""}`);
+      if (r && (has(/2k|rating|ovr/i) || true)) lines.push(`2K27 OVR ${r.ovr} (official)${r.delta ? `, ${r.delta > 0 ? "+" : ""}${r.delta}` : ""}`);
       if (sal && (has(/salary|contract|cap|paid|money|make/i) || true)) lines.push(`2026–27 salary ${money(sal.salary)}${sal.source === "estimate" ? " (estimate)" : ""}`);
       if (inj) lines.push(`Injury: ${inj.status}${inj.injury ? ` — ${inj.injury}` : ""}`);
     }

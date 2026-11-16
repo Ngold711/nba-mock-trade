@@ -1094,3 +1094,37 @@ body.has-shell, body.has-orb, body.has-shell.has-orb { padding-bottom: 0; }
 .game-card .gb b { font-size: 1.05rem; letter-spacing: -0.01em; }
 .game-card .gb small { color: var(--label-2); font-size: 0.8125rem; line-height: 1.35; }
 .game-card .gk { font: 700 0.625rem/1 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+
+/* ---------- Arcade card art: mini UI previews ---------- */
+.mc-art { display: grid; align-content: center; justify-items: center; gap: 0.22rem; padding: 0.4rem; }
+.mc-row { display: grid; grid-template-columns: repeat(5, 0.82rem); gap: 0.16rem; }
+.mc-row i { display: grid; place-items: center; height: 0.82rem; border-radius: 0.2rem; font: 800 0.5rem/1 var(--font-mono); font-style: normal; color: #fff; background: rgba(255,255,255,.14); box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); }
+.mc-row i.g { background: #22C55E; box-shadow: none; } .mc-row i.y { background: #F59E0B; box-shadow: none; }
+.mc-row:last-child i { animation: mc-pop 2.4s ease-in-out infinite; }
+.mc-row:last-child i:nth-child(2) { animation-delay: .12s; } .mc-row:last-child i:nth-child(3) { animation-delay: .24s; } .mc-row:last-child i:nth-child(4) { animation-delay: .36s; } .mc-row:last-child i:nth-child(5) { animation-delay: .48s; }
+@keyframes mc-pop { 0%, 70%, 100% { transform: none; } 80% { transform: scale(1.18); } }
+@media (min-width: 40rem) { .mc-row { grid-template-columns: repeat(5, 1rem); } .mc-row i { height: 1rem; font-size: 0.6rem; } }
+
+.game-card .ga.hilo { display: block; }
+.hl-mini { position: absolute; top: 18%; width: 44%; height: 64%; border-radius: 0.45rem; background: rgba(255,255,255,.95); display: grid; place-content: center; text-align: center; box-shadow: 0 6px 14px rgba(15,23,42,.35); color: #0B0E14; }
+.hl-mini b { font: 900 1.05rem/1 var(--font-mono); } .hl-mini small { font: 700 0.42rem/1.2 var(--font-mono); letter-spacing: 0.08em; color: #64748B; }
+.hl-mini.a { left: 9%; transform: rotate(-6deg); } .hl-mini.b { right: 9%; transform: rotate(6deg); background: #1E293B; color: #fff; }
+.hl-mini.b b { color: #FBBF24; }
+.hl-arrows { position: absolute; left: 50%; top: 88%; transform: translate(-50%, -50%); display: grid; gap: 0.12rem; z-index: 1; }
+.hl-arrows i { width: 0; height: 0; border-left: 0.32rem solid transparent; border-right: 0.32rem solid transparent; }
+.hl-arrows .up { border-bottom: 0.42rem solid #22C55E; } .hl-arrows .dn { border-top: 0.42rem solid #EF4444; }
+
+.wp-ring { position: relative; width: 72%; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center;
+  background: conic-gradient(#FDE68A 0 72%, rgba(255,255,255,.18) 72% 100%); box-shadow: 0 0 14px rgba(253,230,138,.65); animation: wp-tick 10s linear infinite; }
+.wp-ring::before { content: ""; position: absolute; inset: 9%; border-radius: 50%; background: #3B0A2A; }
+.wp-sil { position: relative; width: 62%; height: 62%; border-radius: 50%; overflow: hidden; }
+.wp-sil .head { position: absolute; left: 32%; top: 14%; width: 36%; height: 36%; border-radius: 50%; background: rgba(255,255,255,.88); }
+.wp-sil .body { position: absolute; left: 14%; top: 56%; width: 72%; height: 60%; border-radius: 50% 50% 0 0; background: rgba(255,255,255,.88); }
+.wp-secs { position: absolute; right: 6%; bottom: 6%; padding: 0.1rem 0.25rem; border-radius: 0.3rem; background: #0B0E14; color: #FB923C; font: 800 0.55rem/1 var(--font-mono); }
+@keyframes wp-tick { from { filter: hue-rotate(0deg); } 85% { filter: hue-rotate(0deg); } to { filter: hue-rotate(-40deg); } }
+.game-card .ga.tier { background: #1E293B; display: grid; align-content: center; justify-items: stretch; place-items: center stretch; gap: 0.18rem; padding: 0.45rem; color: #fff; }
+.tm-row { display: flex; align-items: center; gap: 0.18rem; height: 0.95rem; border-radius: 0.25rem; background: rgba(255,255,255,.07); padding: 0.1rem; }
+.tm-row i { flex: none; display: grid; place-items: center; width: 0.95rem; height: 0.95rem; border-radius: 0.2rem; font: 900 0.55rem/1 var(--font-mono); font-style: normal; color: #0B0E14; }
+.tm-row i.t-S { background: #FF6B6B; } .tm-row i.t-A { background: #FB923C; } .tm-row i.t-B { background: #FACC15; }
+.tm-row b { flex: none; width: 0.62rem; height: 0.62rem; border-radius: 50%; background: rgba(255,255,255,.55); }
+@media (prefers-reduced-motion: reduce) { .mc-row i, .wp-ring { animation: none !important; } }

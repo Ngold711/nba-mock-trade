@@ -43,10 +43,14 @@
 <main class="hub-page game tierlist">
   <h1 class="large-title">Tier List Maker</h1>
   <label class="tl-cat"><span>Category</span><select id="cat">
-    <option value="pg">Current Point Guards</option><option value="sg">Current Shooting Guards</option><option value="sf">Current Small Forwards</option>
-    <option value="pf">Current Power Forwards</option><option value="c">Current Centers</option><option value="top25" selected>Top 25 NBA Players Right Now</option>
+    <option value="pg">30 Starting Point Guards</option><option value="sg">30 Starting Shooting Guards</option><option value="sf">30 Starting Small Forwards</option>
+    <option value="pf">30 Starting Power Forwards</option><option value="c">30 Starting Centers</option><option value="top25" selected>Top 25 NBA Players Right Now</option>
     <option value="rookies">2026–27 Rookie Class</option><option value="top75">All-Time Top 75 Legends</option><option value="teams">All 30 NBA Teams</option></select></label>
   <p class="g-note" id="hint">Tap a player, then tap a tier. Or drag. Tap a ranked player to send them back.</p>
+  <div class="tl-add">
+    <input class="search" id="addQ" type="search" placeholder="+ Add any player (5,400+ in the archive)" autocomplete="off" aria-label="Add any player" />
+    <ul class="tl-results" id="addRes" hidden></ul>
+  </div>
   <div class="tl-board" id="board"></div>
   <div class="tl-tray-wrap"><div class="tl-tray-h"><b>Unranked</b><span id="left"></span></div><div class="tl-tray" id="tray" data-zone="tray"></div></div>
   <div class="tl-actions">
@@ -69,51 +73,66 @@ const ESPN = { GSW: "gs", NOP: "no", NYK: "ny", SAS: "sa", UTA: "utah", WAS: "ws
 const logo = (abbr) => `https://a.espncdn.com/i/teamlogos/nba/500/${ESPN[abbr] || String(abbr || "").toLowerCase()}.png`;
 const ini = (n) => String(n).split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 const toast = (m) => shell.toast?.(m);
-let data = { ratings: null, league: null, top75: null }, cat = LS.get("tiers:cat", "top25"), items = {}, st = null, sel = null;
+let data = { ratings: null, league: null, top75: null, starters: null, stats: null }, cat = LS.get("tiers:cat", "top25"), items = {}, st = null, sel = null;
 
 /* ---------- categories (live data) ---------- */
-const CATS = { pg: "Current Point Guards", sg: "Current Shooting Guards", sf: "Current Small Forwards", pf: "Current Power Forwards", c: "Current Centers",
+const CATS = { pg: "30 Starting Point Guards", sg: "30 Starting Shooting Guards", sf: "30 Starting Small Forwards", pf: "30 Starting Power Forwards", c: "30 Starting Centers",
   top25: "Top 25 NBA Players Right Now", rookies: "2026–27 Rookie Class", top75: "All-Time Top 75 Legends", teams: "All 30 NBA Teams" };
+const nk = (n) => String(n || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[.'’]/g, "").replace(/\b(jr|sr|ii|iii|iv)\b/g, "").replace(/[^a-z0-9]+/g, "");
+/** Strict de-duplication: by player id, then by normalized full name. */
+function dedupe(list) {
+  const ids = new Set(), names = new Set();
+  return list.filter((x) => { const i = String(x.id), n = nk(x.n); if (ids.has(i) || (!x.team && names.has(n))) return false; ids.add(i); names.add(n); return true; });
+}
 function build(key) {
-  const R = (data.ratings?.players || []).filter((p) => p.teamAbbr);
-  const P = (p) => ({ id: p.id, n: p.name, t: p.teamAbbr, img: p.headshotSmall || p.headshot || null });
-  const top = (arr, n = 25) => [...arr].sort((a, b) => b.ovr - a.ovr).slice(0, n).map(P);
-  const fwd = R.filter((p) => /F/.test(p.position) && p.pos !== "C");
-  const bigness = (p) => (p.attrs?.rebounding || 0) - (p.attrs?.threePt || 0);   // ESPN lists only F: split by profile
-  const byBig = [...fwd].sort((a, b) => bigness(b) - bigness(a));
+  const L = (data.league?.players || []).filter((p) => p.teamAbbr);
+  const ovr = new Map((data.ratings?.players || []).map((p) => [String(p.id), p.ovr]));          // official 2K27 OVR only
+  const st = new Map((data.stats?.players || []).map((p) => [String(p.id), p.stats || {}]));
+  const prod = (p) => { const s = st.get(String(p.id)) || {}; return s.gp ? (s.pts || 0) + (s.reb || 0) + (s.ast || 0) : 0; };
+  const P = (p) => ({ id: String(p.id), n: p.name, t: p.teamAbbr, img: p.headshot || null });
+  const byOvrThenProd = (a, b) => (ovr.get(String(b.id)) ?? -1) - (ovr.get(String(a.id)) ?? -1) || prod(b) - prod(a);
+  const SLOT = { pg: "PG", sg: "SG", sf: "SF", pf: "PF", c: "C" };
+  if (SLOT[key]) return dedupe((data.starters?.positions?.[SLOT[key]] || []).map(P));
   switch (key) {
-    case "pg": return top(R.filter((p) => p.pos === "PG").concat(R.filter((p) => p.pos === "SG" && (p.attrs?.playmaking || 0) >= 68)), 25);
-    case "sg": return top(R.filter((p) => p.pos === "SG" && (p.attrs?.playmaking || 0) < 68), 25);
-    case "sf": return top(byBig.slice(Math.floor(byBig.length / 2)), 25);
-    case "pf": return top(byBig.slice(0, Math.floor(byBig.length / 2)).concat(R.filter((p) => p.pos === "PF")), 25);
-    case "c": return top(R.filter((p) => p.pos === "C"), 25);
-    case "top25": return top(R, 25);
-    case "rookies": { const rk = new Set((data.league?.players || []).filter((p) => p.experience === 0).map((p) => String(p.id))); return top(R.filter((p) => rk.has(String(p.id))), 25); }
-    case "top75": return (data.top75 || []).map((p) => ({ id: p.id, n: p.name, t: "", img: p.headshot || null }));
+    case "top25": return dedupe([...L].sort(byOvrThenProd).map(P)).slice(0, 25);
+    case "rookies": return dedupe(L.filter((p) => p.experience === 0).sort((a, b) => byOvrThenProd(a, b) || ((st.get(String(b.id))?.pts || 0) - (st.get(String(a.id))?.pts || 0))).map(P)).slice(0, 25);
+    case "top75": return dedupe((data.top75 || []).map((p) => ({ id: String(p.id), n: p.name, t: "", img: p.headshot || null })));
     case "teams": return Object.values(data.league?.teams || {}).filter((t) => t.displayName).map((t) => ({ id: `team:${t.abbr}`, n: t.displayName, t: t.abbr, img: t.logo, team: true }))
       .sort((a, b) => a.n.localeCompare(b.n));
   }
   return [];
 }
-const SRC = { teams: "From live ESPN team data.", top75: "The NBA's 75th Anniversary Team (76 players).", rookies: "Rookies on live ESPN rosters, by 2K27 rating.",
-  pf: "Positions are approximate: ESPN lists forwards as F, so they're split by rebounding vs. shooting profile." };
+const SRC = { teams: "From live ESPN team data.", top75: "The NBA's 75th Anniversary Team (76 players).",
+  rookies: "Rookies on live ESPN rosters, by official 2K27 OVR where synced, then 2026–27 scoring.",
+  top25: "Sorted by official NBA 2K27 OVR where synced, then 2026–27 PTS + REB + AST.",
+  pg: "starters", sg: "starters", sf: "starters", pf: "starters", c: "starters" };
 
 /* ---------- state ---------- */
-const key = () => `tiers:v1:${cat}`;
+const key = () => `tiers:v2:${cat}`;
 function load() {
-  const list = build(cat); items = Object.fromEntries(list.map((x) => [x.id, x]));
   const saved = LS.get(key(), null);
-  st = { S: [], A: [], B: [], C: [], D: [], F: [], tray: [] };
-  if (saved) for (const k of [...TIERS, "tray"]) st[k] = (saved[k] || []).filter((id) => items[id]);
-  const placed = new Set(Object.values(st).flat());
+  const extra = dedupe(saved?.extra || []);
+  const list = dedupe([...build(cat), ...extra]);
+  items = Object.fromEntries(list.map((x) => [x.id, x]));
+  st = { S: [], A: [], B: [], C: [], D: [], F: [], tray: [], extra };
+  const placed = new Set();
+  if (saved) for (const k of [...TIERS, "tray"]) st[k] = (saved[k] || []).filter((id) => items[id] && !placed.has(id) && placed.add(id));
   st.tray.push(...list.map((x) => x.id).filter((id) => !placed.has(id)));
   sel = null; render();
-  $("#srcNote").textContent = SRC[cat] || "Ranked by the live NBA 2K27 ratings feed, refreshed through the season.";
+  const s = SRC[cat];
+  $("#srcNote").textContent = s === "starters" ? `Each team's #1 ${CATS[cat].replace("30 Starting ", "").replace(/s$/, "")} on today's ESPN depth chart: one per team, 30 total.` : s || "";
 }
 const persist = () => LS.set(key(), st);
 function move(id, to) {
-  for (const k of Object.keys(st)) st[k] = st[k].filter((x) => x !== id);
+  for (const k of [...TIERS, "tray"]) st[k] = st[k].filter((x) => x !== id);
   st[to].push(id); sel = null; persist(); render();
+}
+function addPlayer(p) {
+  const id = String(p.id);
+  const dupe = items[id] || Object.values(items).find((x) => !x.team && nk(x.n) === nk(p.name));
+  if (dupe) { toast(`${p.name} is already on this list`); return; }
+  const x = { id, n: p.name, t: p.team || "", img: p.headshot || null };
+  items[id] = x; st.extra = [...(st.extra || []), x]; st.tray.unshift(id); persist(); render(); toast(`Added ${p.name}`);
 }
 
 /* ---------- render ---------- */
@@ -163,19 +182,36 @@ document.addEventListener("click", (e) => {
 
 /* ---------- actions ---------- */
 const summary = () => `${CATS[cat]} — Hooptrax tier list\n${TIERS.filter((k) => st[k].length).map((k) => `${k}: ${st[k].map((id) => items[id].n).join(", ")}`).join("\n")}`;
-$("#reset").addEventListener("click", () => { st = { S: [], A: [], B: [], C: [], D: [], F: [], tray: build(cat).map((x) => x.id) }; sel = null; persist(); render(); toast("Tier list reset"); });
+$("#reset").addEventListener("click", () => { LS.set(key(), null); load(); toast("Tier list reset"); });
 $("#copy").addEventListener("click", async () => { try { await navigator.clipboard.writeText(summary()); toast("Copied to clipboard"); } catch { toast("Couldn't copy"); } });
 $("#post").addEventListener("click", () => {
   if (!TIERS.some((k) => st[k].length)) return toast("Rank at least one player first");
   saveFlow({ type: "tierlist", visibility: "public", build: () => ({ title: "My tier list", payload: { category: CATS[cat], key: cat,
     tiers: Object.fromEntries(TIERS.map((k) => [k, st[k].map((id) => ({ n: items[id].n, id: String(id), t: items[id].t || "" }))])) } }) });
 });
+/* ---------- + Add any player (the full NBA/ABA/BAA archive) ---------- */
+let qTimer = 0, qSeq = 0;
+$("#addQ").addEventListener("input", (e) => {
+  clearTimeout(qTimer); const q = e.target.value.trim();
+  if (q.length < 2) { $("#addRes").hidden = true; return; }
+  qTimer = setTimeout(async () => {
+    const seq = ++qSeq;
+    const j = await fetch(`/api/players/directory?q=${encodeURIComponent(q)}&limit=60`).then((x) => x.json()).catch(() => null);
+    if (seq !== qSeq) return;
+    const k = nk(q), rank = (p) => (nk(p.name) === k ? 0 : nk(p.name).startsWith(k) ? 1 : nk(p.name.split(" ").slice(-1)[0]) === k ? 2 : 3) * 4 - (p.active ? 2 : 0) - (p.hof || p.top75 ? 1 : 0);
+    const res = (j?.data?.players || []).sort((a, b) => rank(a) - rank(b)).slice(0, 8);
+    $("#addRes").innerHTML = res.map((p, i) => `<li><button type="button" class="press" data-add="${i}"><b>${esc(p.name)}</b><small>${esc([p.team, p.pos, p.years].filter(Boolean).join(" · ") || (p.active ? "Active" : ""))}</small></button></li>`).join("") || `<li class="tl-empty">No players found</li>`;
+    $("#addRes").hidden = false;
+    $("#addRes").onclick = (ev) => { const b = ev.target.closest("[data-add]"); if (!b) return; addPlayer(res[+b.dataset.add]); $("#addQ").value = ""; $("#addRes").hidden = true; };
+  }, 180);
+});
+
 $("#cat").addEventListener("change", (e) => { cat = e.target.value; LS.set("tiers:cat", cat); load(); });
 
 /* ---------- data ---------- */
 $("#cat").value = cat;
-const [r, l, t75] = await Promise.all(["/api/2k-ratings", "/api/league", "/api/players/directory?filter=top75&limit=100"].map((u) => fetch(u).then((x) => x.json()).then((j) => j.data).catch(() => null)));
-data = { ratings: r, league: l, top75: t75?.players || [] };
+const [r, l, t75, sp, pl] = await Promise.all(["/api/2k27-ratings", "/api/league", "/api/players/directory?filter=top75&limit=100", "/api/starters", "/api/players"].map((u) => fetch(u).then((x) => x.json()).then((j) => j.data).catch(() => null)));
+data = { ratings: r, league: l, top75: t75?.players || [], starters: sp, stats: pl };
 // opened from the Community Feed: ?item=<id> loads that list read-only into the board
 const itemId = new URLSearchParams(location.search).get("item");
 if (itemId) {

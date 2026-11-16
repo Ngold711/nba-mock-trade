@@ -513,7 +513,7 @@ const assetFace = (asset, size = "2.25rem") => asset.kind === "pick"
 const tierPill = (k) => `<span class="tier ${k}">${TIERS[k]}</span>`;
 let RATINGS = new Map();
 const ovrTier = (o) => (o >= 95 ? "gal" : o >= 90 ? "dia" : o >= 85 ? "ame" : o >= 80 ? "rub" : "base");
-const ovrOf = (a) => { const r = a.espnId && RATINGS.get(String(a.espnId)); return r ? `<span class="ovr t-${ovrTier(r.ovr)}" title="2K27 OVR${r.seeded ? "" : " (est.)"}">${r.ovr}</span>` : ""; };
+const ovrOf = (a) => { const r = a.espnId && RATINGS.get(String(a.espnId)); return r ? `<span class="ovr t-${ovrTier(r.ovr)}" title="Official NBA 2K27 OVR">${r.ovr}</span>` : ""; };
 /** "2027 1st • Unprotected" style label from the pick-obligation config. */
 function pickLabel(a) {
   const base = `${a.year} ${a.round === 1 ? "1st" : "2nd"}`;

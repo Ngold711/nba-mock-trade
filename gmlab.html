@@ -98,7 +98,7 @@ fetch("/api/standings").then((r) => r.json()).then(({ data }) => {
 }).catch(() => clear("oddsBadge"));
 
 // 2K27: the highest-rated player
-fetch("/api/2k-ratings").then((r) => r.json()).then(({ data }) => {
+fetch("/api/2k27-ratings").then((r) => r.json()).then(({ data }) => {
   const p = data?.players?.[0]; if (!p) return clear("leadTag");
   $("ovrBadge").innerHTML = `<b>${esc(p.ovr)}</b><small>OVR</small>`;
   $("leadTag").innerHTML = `<span class="tg"><small>2K27 #1</small><b>${esc(p.name)}</b></span>`;

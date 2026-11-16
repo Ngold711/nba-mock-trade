@@ -42,6 +42,8 @@
 <header class="bar" id="bar"></header>
 <main class="hub-page game whoplays">
   <h1 class="large-title">Who He Play For?</h1>
+  <div class="g-seg" role="tablist" aria-label="Difficulty"><button type="button" role="tab" data-diff="easy" aria-selected="false">Easy</button><button type="button" role="tab" data-diff="medium" aria-selected="true">Medium</button><button type="button" role="tab" data-diff="hard" aria-selected="false">Hard</button></div>
+  <p class="g-note wp-mode" id="modeNote"></p>
   <div class="g-score"><span>Round <b id="round">1</b>/10</span><span>Score <b id="score">0</b></span><span>Streak <b id="wstreak">0</b></span><span>Best <b id="wbest">0</b></span></div>
   <div class="wp-clock" aria-hidden="true"><i id="clock"></i></div>
   <div id="wpStage"><div class="sk" style="height:22rem;border-radius:1.2rem"></div></div>
@@ -53,7 +55,15 @@ import { avatar, teamLogo, esc } from "./ui/avatar.js";
 mountShell({ active: "whoplays" });
 const $ = (s) => document.querySelector(s);
 const LS = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
-const ROUNDS = 10, SHOT = 10000;
+const ROUNDS = 10;
+/** Difficulty: who's in the pool, the shot clock, what's shown before the reveal, and the points multiplier. */
+const MODES = {
+  easy:   { label: "Easy",   secs: 12, mult: 1,   info: "full", note: "Starters and high-minute rotation players · 12-second clock · 1× points" },
+  medium: { label: "Medium", secs: 10, mult: 1.5, info: "pos",  note: "Bench rotation players and recent movers · 10-second clock · 1.5× points" },
+  hard:   { label: "Hard",   secs: 8,  mult: 2,   info: "none", note: "Journeyman mode: deep bench, two-way and recent pickups · 8-second clock · 2× points" },
+};
+let diff = LS.get("whoplays:diff", "medium"); if (!MODES[diff]) diff = "medium";
+let SHOT = MODES[diff].secs * 1000, all = [];
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 let teams = {}, pool = [], moves = [], round = 0, score = 0, streak = 0, correct = 0, used = new Set(), cur = null, timer = 0, t0 = 0, answered = false;
 
@@ -71,6 +81,12 @@ function draw() {
   for (const p of left) { r -= p.w; if (r <= 0) return p; }
   return left[0];
 }
+const yrs = (p) => (p.experience != null ? (p.experience ? `${p.experience} yr${p.experience === 1 ? "" : "s"} pro` : "Rookie") : "");
+function subLine(p, info) {
+  if (info === "none") return "Position and experience revealed after your guess";
+  if (info === "pos") return esc(p.position || "");
+  return esc([p.position, yrs(p)].filter(Boolean).join(" · "));
+}
 function ask() {
   if (round >= ROUNDS) return finish();
   round++; answered = false;
@@ -79,8 +95,8 @@ function ask() {
   const opts = shuffle([cur.teamAbbr, ...others]);
   $("#round").textContent = round;
   $("#wpStage").innerHTML = `<div class="wp-card">
-      <div class="wp-face">${avatar({ name: cur.name, headshot: cur.headshot }, { size: "7rem", color: "#334155", full: true })}</div>
-      <b class="wp-name">${esc(cur.name)}</b><small class="wp-sub">${esc(cur.position || "")}${cur.experience != null ? ` · ${cur.experience ? `${cur.experience} yr${cur.experience === 1 ? "" : "s"} pro` : "Rookie"}` : ""}</small></div>
+      <div class="wp-face hidden-team" id="wpFace">${avatar({ name: cur.name, headshot: cur.headshot }, { size: "7rem", color: "#334155", full: true })}</div>
+      <b class="wp-name">${esc(cur.name)}</b><small class="wp-sub" id="wpSub">${subLine(cur, MODES[diff].info)}</small></div>
     <div class="wp-opts">${opts.map((a) => `<button class="wp-opt press" type="button" data-team="${esc(a)}">${teamLogo(teams[a], { size: "1.75rem" })}<span>${esc(teams[a].displayName || a)}</span></button>`).join("")}</div>
     <div class="wp-result" id="wpResult" aria-live="polite"></div>`;
   t0 = performance.now(); tick();
@@ -96,36 +112,60 @@ function answer(abbr) {
   if (answered) return; answered = true; cancelAnimationFrame(timer);
   const left = Math.max(0, SHOT - (performance.now() - t0));
   const ok = abbr === cur.teamAbbr;
-  if (ok) { streak++; correct++; score += Math.round((100 + Math.ceil(left / 1000) * 15) * (1 + 0.1 * (streak - 1))); } else streak = 0;
+  const pts = Math.round((100 + Math.ceil(left / 1000) * 15) * (1 + 0.1 * Math.max(0, streak)) * MODES[diff].mult);
+  if (ok) { streak++; correct++; score += pts; } else streak = 0;
+  $("#wpFace")?.classList.remove("hidden-team");                       // color + normal crop back on reveal
+  $("#wpSub").textContent = [cur.position, yrs(cur)].filter(Boolean).join(" · ");
   $("#score").textContent = score; $("#wstreak").textContent = streak;
   document.querySelectorAll(".wp-opt").forEach((b) => { b.disabled = true; b.classList.toggle("right", b.dataset.team === cur.teamAbbr); b.classList.toggle("wrong", b.dataset.team === abbr && !ok); });
   const t = teams[cur.teamAbbr], mv = moveNote(cur);
-  $("#wpResult").innerHTML = `<p class="${ok ? "ok" : "no"}">${ok ? `Bucket! +${Math.round((100 + Math.ceil(left / 1000) * 15) * (1 + 0.1 * (streak - 1)))}` : abbr ? "Brick." : "Shot-clock violation."} ${esc(cur.name)} plays for the <b>${esc(t.displayName)}</b>.</p>
+  $("#wpResult").innerHTML = `<p class="${ok ? "ok" : "no"}">${ok ? `Bucket! +${pts}` : abbr ? "Brick." : "Shot-clock violation."} ${esc(cur.name)} plays for the <b>${esc(t.displayName)}</b>.</p>
     ${mv ? `<p class="mv">Latest move: ${esc(mv.description)} <small>(${esc(new Date(mv.date).toLocaleDateString([], { month: "short", day: "numeric" }))})</small></p>` : ""}
     <button class="g-cta press" type="button" id="next">${round >= ROUNDS ? "See results" : "Next player"}</button>`;
 }
 function finish() {
-  const best = Math.max(score, LS.get("whoplays:best", 0)); LS.set("whoplays:best", best);
+  const bk = `whoplays:best:${diff}`, best = Math.max(score, LS.get(bk, 0)); LS.set(bk, best);
   $("#wbest").textContent = best; $("#clock").style.transform = "scaleX(0)";
   $("#wpStage").innerHTML = `<div class="wp-final"><b>${score.toLocaleString("en-US")}</b><span>${correct}/${ROUNDS} correct${score >= best && score > 0 ? " · new best!" : ""}</span>
-    <button class="g-cta press" type="button" id="restart">Play again</button></div>`;
+    <small>${MODES[diff].label} mode</small><button class="g-cta press" type="button" id="restart">Play again</button></div>`;
 }
-function start() { round = 0; score = 0; streak = 0; correct = 0; used = new Set(); $("#score").textContent = 0; $("#wstreak").textContent = 0; ask(); }
+function setDiff(d) {
+  diff = d; LS.set("whoplays:diff", d); SHOT = MODES[d].secs * 1000;
+  document.querySelectorAll("[data-diff]").forEach((x) => x.setAttribute("aria-selected", String(x.dataset.diff === d)));
+  $("#modeNote").textContent = MODES[d].note; $("#wbest").textContent = LS.get(`whoplays:best:${d}`, 0);
+  pool = all.filter((p) => p.band === d);
+}
+function start() { cancelAnimationFrame(timer); answered = true; round = 0; score = 0; streak = 0; correct = 0; used = new Set(); $("#score").textContent = 0; $("#wstreak").textContent = 0; ask(); }
 document.addEventListener("click", (e) => {
   const o = e.target.closest(".wp-opt"); if (o) return answer(o.dataset.team);
   if (e.target.closest("#next")) return ask();
   if (e.target.closest("#restart")) return start();
+  const d = e.target.closest("[data-diff]");
+  if (d && d.dataset.diff !== diff && all.length) { setDiff(d.dataset.diff); start(); }
 });
-$("#wbest").textContent = LS.get("whoplays:best", 0);
-const [l, r, tx] = await Promise.all(["/api/league", "/api/2k-ratings", "/api/transactions"].map((u) => fetch(u).then((x) => x.json()).then((j) => j.data).catch(() => null)));
+const [l, r, tx, st] = await Promise.all(["/api/league", "/api/2k27-ratings", "/api/transactions", "/api/players"].map((u) => fetch(u).then((x) => x.json()).then((j) => j.data).catch(() => null)));
 teams = Object.fromEntries(Object.entries(l?.teams || {}).filter(([, t]) => t.displayName));
 moves = (tx || []).filter((m) => m.category !== "rumor");
-const ovr = new Map((r?.players || []).map((p) => [String(p.id), p.ovr]));
-const recent = (p) => moveNote(p) && Date.now() - Date.parse(moveNote(p).date) < 45 * 864e5;
-// role players, recent movers and journeymen: no obvious stars (2K27 85+ OVR)
-pool = (l?.players || []).filter((p) => p.teamAbbr && teams[p.teamAbbr] && (ovr.get(String(p.id)) ?? 70) < 85)
-  .map((p) => ({ ...p, w: recent(p) ? 4 : (p.experience >= 6 && (ovr.get(String(p.id)) ?? 70) < 80) ? 2 : 1 }));
-if (pool.length < 20) $("#wpStage").innerHTML = `<div class="empty">Couldn't load NBA rosters right now.</div>`; else start();
+const ovr = new Map((r?.players || []).map((p) => [String(p.id), p.ovr]));            // official 2K27 OVR (where synced)
+const mpgOf = new Map((st?.players || []).map((p) => [String(p.id), p.stats?.gp ? p.stats.min : 0]));
+const ppg = new Map((st?.players || []).map((p) => [String(p.id), p.stats?.gp ? p.stats.pts : 0]));
+const recent = (p) => { const m = moveNote(p); return m && Date.now() - Date.parse(m.date) < 45 * 864e5; };
+// top-12 obvious superstars (official OVR first, then scoring) never appear in any mode
+const stars = new Set([...(l?.players || [])].sort((a, b) => (ovr.get(String(b.id)) || 0) - (ovr.get(String(a.id)) || 0) || (ppg.get(String(b.id)) || 0) - (ppg.get(String(a.id)) || 0)).slice(0, 12).map((p) => String(p.id)));
+/** Easy: OVR 80–89 or 26+ MPG · Medium: OVR 74–79 or 12–25 MPG (+ recent movers) · Hard: OVR < 74 or < 12 MPG (two-way, deep bench, pickups). */
+function bandOf(p) {
+  const o = ovr.get(String(p.id)), m = mpgOf.get(String(p.id)) || 0;
+  if (o != null) return o >= 90 ? null : o >= 80 ? "easy" : o >= 74 ? "medium" : "hard";
+  if (m >= 26) return "easy";
+  if (m >= 12) return "medium";
+  return "hard";
+}
+all = (l?.players || []).filter((p) => p.teamAbbr && teams[p.teamAbbr] && !stars.has(String(p.id)))
+  .map((p) => ({ ...p, band: bandOf(p), w: recent(p) ? 4 : p.experience >= 6 ? 2 : 1 })).filter((p) => p.band);
+// recent movers who'd land in Easy also count for Medium (the request: "bench rotation players & recent movers")
+for (const p of all) if (p.band === "easy" && recent(p) && (mpgOf.get(String(p.id)) || 0) < 30 && ovr.get(String(p.id)) == null) p.band = "medium";
+setDiff(diff);
+if (pool.length < 12) $("#wpStage").innerHTML = `<div class="empty">Couldn't load NBA rosters right now.</div>`; else start();
 </script>
 </body>
 </html>

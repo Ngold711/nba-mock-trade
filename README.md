@@ -717,3 +717,42 @@ Built by an offline generator that cross-checks editorial data against ESPN:
   - Each category's board is saved in localStorage. Reset and Copy (a text summary) are available.
   - **Post to Feed** saves a public `tierlist` item. Feed cards have a "Tier Lists" filter, and "Open Tier List" loads the list read-only.
 - New saved-item type `tierlist`. The Postgres CHECK constraint is migrated automatically on startup.
+
+## Round 25: official 2K27 sync, Who He Play For? difficulty, tier list starters, Arcade art
+
+**Official NBA 2K27 ratings only** (`service/ratings2k.js`, served at `/api/2k27-ratings`; the old `/api/2k-ratings` path still works).
+- Hooptrax no longer estimates any 2K rating from box scores. Players without an official OVR aren't listed anywhere.
+- Attribute bars, badge counts and team ratings appear only when the official feed supplies them.
+- Sources, in order:
+  1. `RATINGS_FEED_URL`: the primary official feed.
+  2. `RATINGS_FEED_URL_2`: an optional cross-check. It fills players the primary lacks, and every OVR disagreement is logged; the primary always wins.
+  3. The last verified sync, saved at `data/ratings-feed.json`.
+  4. The bundled `ratings_2k27.json` (18 official players from the Nov 2026 update).
+- Synced every 30 minutes (`RATINGS_TTL_MIN`), at start-up and after games go final. A failed upstream fetch keeps the last verified dataset.
+- Sync status is at `/api/2k27-ratings/status`. The GM Lab 2K27 tab shows "Last synced with Official 2K27".
+- Feed JSON: `{ source, asOf, players: [{ name, ovr, delta?, team?, attributes?, badges? }], teams?: [{ team, ovr, offense?, defense? }] }`.
+- Hooptrax doesn't scrape 2k.com or 2kratings.com. Point `RATINGS_FEED_URL` at an official export you're allowed to use.
+
+**Who He Play For?** has three difficulty modes, a face-only grayscale crop while the clock runs (no collar or team colors), color on reveal, and a separate best score per mode:
+
+| Mode | Pool | Clock | Shown before guessing | Points |
+|---|---|---|---|---|
+| Easy | 2K27 OVR 80–89 or 26+ MPG | 12 s | Position · years pro | 1× |
+| Medium | 2K27 OVR 74–79 or 12–25 MPG, plus recent movers | 10 s | Position | 1.5× |
+| Hard | 2K27 OVR < 74 or < 12 MPG (two-way, deep bench, pickups) | 8 s | Nothing | 2× |
+
+- The top 12 stars are never used. Official OVR decides the band when a player has one; otherwise minutes do.
+
+**Tier List Maker**
+- **30 Starting PGs / SGs / SFs / PFs / Cs:** each team's #1 at that slot on ESPN's live depth charts (`/api/starters`, `service/starters.js`).
+  - Exactly one player per team, and no player in two slots.
+  - If a team's depth chart is missing, its top-minute players fill the slots by listed position.
+- **Top 25:** official 2K27 OVR first, then 2026–27 PTS + REB + AST. Rookies are sorted the same way.
+- **Deduplication:** every pool is deduplicated by player id and normalized name.
+- **"+ Add any player":** searches the full NBA/ABA/BAA archive and blocks duplicates. Added players are saved with the list (storage key `tiers:v2:*`).
+
+**Arcade:** the four game cards show mini UI previews in place of plain squares:
+- McConnell: a Wordle guess row.
+- Higher or Lower: 97 vs ? rating cards.
+- Who He Play For?: a silhouette inside a shot-clock ring.
+- Tier List Maker: an S/A/B grid.

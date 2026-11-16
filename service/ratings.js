@@ -1,9 +1,7 @@
 // Hooptrax 2K27-style ratings. Pure: used by the service (/api/2k-ratings) and the tests.
 //
-// Players named in SEEDS carry the OVR (and +/- delta) from the November 2026 NBA 2K27 roster update as
-// supplied to Hooptrax. Every other active player is rated by the same model from live ESPN 2026–27 stats,
-// so all ~500 players and all 30 teams stay current as the season goes. Attribute ratings for every player
-// (seeded or not) come from the stat model; seeded OVRs are never overwritten.
+// Official NBA 2K27 ratings only (synced by service/ratings2k.js). SEEDS mirror the bundled official snapshot and
+// are used only if no feed is available at all. Nothing here estimates a 2K rating from box scores.
 // Not affiliated with 2K, the NBA or ESPN.
 
 export const SEEDS = [
@@ -13,7 +11,7 @@ export const SEEDS = [
   ["Jaylen Brown", 92, 1], ["Anthony Davis", 91, 1], ["Cooper Flagg", 90, 3], ["Alperen Sengun", 89, 2],
   ["Yaxel Lendeborg", 83, 10], ["Caleb Wilson", 82, 5],
 ];
-export const SEED_NOTE = "Seeded from the Nov 2026 NBA 2K27 roster update for listed players; all others estimated by Hooptrax from live ESPN 2026–27 stats. Not official 2K ratings.";
+export const SEED_NOTE = "Official NBA 2K27 OVR from the bundled roster update.";
 
 const nameKey = (n) => String(n || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ş/gi, "s").toLowerCase()
   .replace(/,?\s+(jr|sr|ii|iii|iv)\.?$/i, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -86,66 +84,54 @@ function feedAttrs(base, a) {
   return out;
 }
 /**
- * feed: parsed ratings feed ({ source, asOf, official, players }) from service/ratings-feed.js — the bundled
- * ratings_2k27.json snapshot or the live RATINGS_FEED_URL. Without one, the SEEDS above are used.
+ * Official NBA 2K27 ratings only. feed: the synced official dataset ({ source, asOf, syncedAt, official, players,
+ * teams }) from service/ratings2k.js. Only players with an official OVR are returned; nothing is estimated from
+ * box scores. Attributes, badges and team ratings appear only when the official feed supplies them.
+ * (`pos` is a PG/SG/SF/PF/C label for filtering, read from ESPN's listed position and role; it is not a rating.)
  */
-export function buildRatings({ players = null, prevPlayers = null, league = null, feed = null } = {}, now = new Date()) {
-  const seedBy = feed?.players?.length ? new Map(feed.players.map((p) => [nameKey(p.name), p])) : SEED_BY;
+export function buildRatings({ players = null, league = null, feed = null } = {}, now = new Date()) {
+  const official = feed?.players?.length ? feed : { source: "NBA 2K27 roster update (bundled)", asOf: null, official: true, players: SEEDS.map(([name, ovr, delta]) => ({ name, ovr, delta })) };
+  const seedBy = new Map(official.players.map((p) => [nameKey(p.name), p]));
   const stats = new Map((players?.players || []).map((p) => [String(p.id), p]));
-  const prev = new Map((prevPlayers?.players || []).map((p) => [String(p.id), p]));
   const roster = league?.players?.length ? league.players : (players?.players || []);
-  const pctNow = percentiler([...stats.values()].map((p) => production(p.stats)));
-  const pctPrev = percentiler([...prev.values()].map((p) => production(p.stats)));
   const out = [];
-  const seen = new Set();
+  const seen = new Set(), seenName = new Set();
   for (const r of roster) {
-    const id = String(r.id || ""); if (!id || seen.has(id)) continue; seen.add(id);
+    const id = String(r.id || ""), nk = nameKey(r.name);
+    if (!id || seen.has(id) || seenName.has(nk)) continue;
+    const seed = seedBy.get(nk);
+    if (!seed) continue;                                         // no official rating → not shown
+    seen.add(id); seenName.add(nk);
     const st = stats.get(id)?.stats || r.stats || null;
     const position = r.position || stats.get(id)?.position || "";
     const age = r.age ?? stats.get(id)?.age ?? null;
-    const seed = seedBy.get(nameKey(r.name));
-    const attrs = feedAttrs(attributes(st, { position, age }) || { shooting: 55, threePt: 50, playmaking: 45, finishing: 55, defense: 50, rebounding: 50, athleticism: age && age < 23 ? 70 : 60 }, seed?.attributes);
-    const model = modelOvr(st, pctNow);
-    let ovr = seed ? seed.ovr : model ?? (r.experience === 0 ? 66 : 64);
-    let delta = seed ? seed.delta : 0;
-    if (!seed && model != null) {
-      const pm = modelOvr(prev.get(id)?.stats, pctPrev);
-      if (pm != null) delta = clamp(Math.round((model - pm) / 3), -3, 3);
-    }
-    ovr = clamp(ovr, 55, 99);
-    const badges = Object.values(attrs).filter((v) => v >= 80).length + (ovr >= 90 ? 3 : ovr >= 85 ? 2 : ovr >= 80 ? 1 : 0);
-    // ESPN lists G / F / C only; split guards and forwards into 2K-style slots by role.
+    const attrs = seed.attributes ? feedAttrs(null, seed.attributes) : null;
+    const role = attrs || attributes(st, { position, age }) || {};
     const g = String(position).toUpperCase();
-    const pos = g.startsWith("C") ? "C" : g.startsWith("G") ? (attrs.playmaking >= 72 ? "PG" : "SG") : g.startsWith("F") ? (attrs.rebounding >= 72 || attrs.finishing >= 85 && attrs.threePt < 60 ? "PF" : "SF") : "SF";
+    const pos = g.startsWith("C") ? "C" : g.startsWith("G") ? ((role.playmaking ?? 0) >= 72 ? "PG" : "SG") : g.startsWith("F") ? ((role.rebounding ?? 0) >= 72 || (role.finishing ?? 0) >= 85 && (role.threePt ?? 99) < 60 ? "PF" : "SF") : "SF";
+    const ovr = clamp(seed.ovr, 40, 99);
     out.push({
       id, name: r.name, pos, teamAbbr: r.teamAbbr || stats.get(id)?.teamAbbr || "", position, age,
       headshot: r.headshot || null, headshotSmall: r.headshotSmall || r.headshot || null, initials: r.initials || "",
-      ovr, delta, tier: tierOf(ovr), seeded: !!seed, estimated: !seed, attrs, badges, gp: st?.gp || 0,
+      ovr, delta: seed.delta || 0, tier: tierOf(ovr), official: true, seeded: true, estimated: false, attrs, badges: seed.badges ?? null, gp: st?.gp || 0,
     });
   }
   out.sort((a, b) => b.ovr - a.ovr || a.name.localeCompare(b.name));
-  const nSeeded = out.filter((p) => p.seeded).length;
-  const note = feed?.players?.length
-    ? `${feed.official ? "Official NBA 2K27 OVR" : "NBA 2K27 OVR"} for ${nSeeded} players from ${feed.source || "the ratings feed"}${feed.asOf ? ` (${feed.asOf})` : ""}; all others estimated by Hooptrax from live ESPN 2026–27 stats.`
-    : SEED_NOTE;
-  return { asOf: now.toISOString(), note, source: feed ? { name: feed.source || "", asOf: feed.asOf || null, live: !!feed.live, players: feed.players.length } : null,
-    players: out, teams: teamRatings(out, league?.teams || {}) };
+  const rosterSize = new Set(roster.map((r) => String(r.id))).size;
+  const syncedAt = feed?.syncedAt || (official.asOf ? new Date(`${official.asOf}T12:00:00Z`).toISOString() : null);
+  const note = `Official NBA 2K27 OVR for ${out.length}${rosterSize ? ` of ${rosterSize}` : ""} active players from ${official.source || "the official ratings feed"}. Players without an official rating aren't shown; Hooptrax never estimates 2K ratings.`;
+  return { asOf: now.toISOString(), syncedAt, note, coverage: { official: out.length, roster: rosterSize, unmatched: official.players.length - out.length },
+    source: { name: official.source || "", asOf: official.asOf || null, live: !!feed?.live, players: official.players.length },
+    players: out, teams: teamRatings(official.teams || [], league?.teams || {}) };
 }
 
-/** 30-team ratings from each roster's top 10 (weighted toward the top of the rotation). */
-export function teamRatings(players, teamsInfo = {}) {
-  const by = new Map();
-  for (const p of players) { if (!p.teamAbbr) continue; (by.get(p.teamAbbr) || by.set(p.teamAbbr, []).get(p.teamAbbr)).push(p); }
-  const W = [0.2, 0.16, 0.13, 0.11, 0.1, 0.08, 0.07, 0.06, 0.05, 0.04];
-  const avg = (list, f) => list.reduce((s, p, i) => s + f(p) * W[i], 0) / W.slice(0, list.length).reduce((a, b) => a + b, 0);
-  const rows = [...by.entries()].map(([abbr, list]) => {
-    const top = list.slice().sort((a, b) => b.ovr - a.ovr).slice(0, 10);
-    const base = avg(top, (p) => p.ovr);
-    const off = avg(top, (p) => (p.attrs.shooting + p.attrs.playmaking + p.attrs.finishing + p.ovr * 2) / 5);
-    const def = avg(top, (p) => (p.attrs.defense * 2 + p.attrs.rebounding + p.attrs.athleticism + p.ovr * 2) / 6);
-    const t = teamsInfo[abbr] || {};
-    return { abbr, name: t.displayName || t.name || abbr, color: t.color || "#64748B", logo: t.logo || `https://a.espncdn.com/i/teamlogos/nba/500/${abbr.toLowerCase()}.png`,
-      overall: r0(clamp(70 + (base - 74) * 2.1, 65, 99)), offense: r0(clamp(70 + (off - 72) * 2, 60, 99)), defense: r0(clamp(70 + (def - 72) * 2, 60, 99)), best: top[0]?.name || "" };
-  });
-  return rows.sort((a, b) => b.overall - a.overall || b.offense - a.offense);
+/** Official 30-team ratings from the feed (by abbreviation or full name); [] when the feed has none. */
+export function teamRatings(rows, teamsInfo = {}) {
+  const ALIAS = { GSW: "GS", NOP: "NO", NYK: "NY", SAS: "SA", UTA: "UTAH", WAS: "WSH", PHO: "PHX", BRK: "BKN", CHO: "CHA" };
+  const find = (t) => { const u = String(t).toUpperCase(); const ab = ALIAS[u] || u; if (teamsInfo[ab]) return [ab, teamsInfo[ab]];
+    const hit = Object.entries(teamsInfo).find(([, x]) => [x.displayName, x.name, x.location].some((n) => n && n.toLowerCase() === String(t).toLowerCase()));
+    return hit || [ab, null]; };
+  return rows.map((r) => { const [abbr, t] = find(r.team); return { abbr, name: t?.displayName || r.team, color: t?.color || "#64748B", logo: t?.logo || `https://a.espncdn.com/i/teamlogos/nba/500/${abbr.toLowerCase()}.png`,
+      overall: r0(r.ovr), offense: r.offense != null ? r0(r.offense) : null, defense: r.defense != null ? r0(r.defense) : null, best: "" }; })
+    .sort((a, b) => b.overall - a.overall);
 }

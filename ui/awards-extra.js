@@ -150,11 +150,12 @@ function mondayKey(d = new Date()) {
 const SORTS = [["ovr", "Overall OVR"], ["shooting", "Shooting / 3PT"], ["playmaking", "Playmaking"], ["defense", "Defense"], ["finishing", "Finishing"], ["rebounding", "Rebounding"], ["risers", "Biggest Risers +"]];
 const POS = ["All", "PG", "SG", "SF", "PF", "C"];
 const MINS = [["0", "All"], ["90", "90+"], ["85", "85+"], ["80", "80+"]];
-export const ovrBadge = (p, cls = "") => `<span class="ovr t-${p.tier} ${cls}" title="2K27 OVR${p.seeded ? " (official update)" : " (Hooptrax estimate)"}">${p.ovr}</span>`;
+export const ovrBadge = (p, cls = "") => `<span class="ovr t-${p.tier} ${cls}" title="Official NBA 2K27 OVR">${p.ovr}</span>`;
 export const deltaPill = (d) => (d > 0 ? `<span class="delta up">+${d}</span>` : d < 0 ? `<span class="delta down">−${Math.abs(d)}</span>` : "");
-const valOf = (p, sort) => (sort === "ovr" ? p.ovr : sort === "risers" ? p.delta : sort === "shooting" ? Math.round((p.attrs.shooting + p.attrs.threePt) / 2) : p.attrs[sort]);
+const valOf = (p, sort) => (sort === "ovr" ? p.ovr : sort === "risers" ? p.delta : !p.attrs ? -1 : sort === "shooting" ? Math.round((p.attrs.shooting + p.attrs.threePt) / 2) : p.attrs[sort] ?? -1);
 
 export function attrBars(p) {
+  if (!p.attrs) return "";
   return `<div class="attr-bars">${ATTRS.map(([k, l]) => `<div class="ab"><span class="ab-l">${l}</span><span class="ab-t"><span class="ab-f t-${p.attrs[k] >= 90 ? "dia" : p.attrs[k] >= 80 ? "rub" : p.attrs[k] >= 70 ? "ok" : "lo"}" style="width:${p.attrs[k]}%"></span></span><span class="ab-v num">${p.attrs[k]}</span></div>`).join("")}</div>`;
 }
 
@@ -167,7 +168,7 @@ export function renderRatings(el, { ratings, sheet, openCompare, openPlayer }) {
   el.innerHTML = `
     <div class="rt-top"><span class="seg rt-tabs" id="rtTabs" style="--n:2"><span class="thumb" style="transform:translateX(${st.tab === "teams" ? 100 : 0}%)"></span>
       <button type="button" data-tab="players" aria-pressed="${st.tab === "players"}">Players</button><button type="button" data-tab="teams" aria-pressed="${st.tab === "teams"}">30 Teams</button></span>
-      <span class="rt-note">${esc(ratings.note)}</span></div>
+      <span class="rt-note">${esc(ratings.note)}${ratings.syncedAt ? `<br><b>Last synced with Official 2K27:</b> ${esc(new Date(ratings.syncedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }))}` : ""}</span></div>
     <div id="rtBody"></div>`;
   const body = el.querySelector("#rtBody");
   function drawPlayers() {
@@ -181,7 +182,7 @@ export function renderRatings(el, { ratings, sheet, openCompare, openPlayer }) {
         <select id="rtTeam" class="wk-sel" aria-label="Team"><option value="">All teams</option>${teams.map((t) => `<option ${st.team === t ? "selected" : ""}>${t}</option>`).join("")}</select>
       </div>
       <div class="pills" data-k="pos">${POS.map((p) => `<button type="button" data-v="${p}" aria-pressed="${st.pos === p}">${p}</button>`).join("")}</div>
-      <div class="pills" data-k="sort">${SORTS.map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${st.sort === k}">${l}</button>`).join("")}</div>
+      <div class="pills" data-k="sort">${SORTS.filter(([k]) => k === "ovr" || k === "risers" || ratings.players.some((p) => p.attrs)).map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${st.sort === k}">${l}</button>`).join("")}</div>
       <div class="pills" data-k="min">${MINS.map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${st.min === k}">${l}</button>`).join("")}</div>
       <div class="rt-count">${list.length} players · sorted by ${esc(lbl)}</div>
       <ul class="rt-list">${list.slice(0, limit).map((p, i) => `<li><button class="rt-row" type="button" data-rt="${esc(p.id)}">
@@ -200,10 +201,11 @@ export function renderRatings(el, { ratings, sheet, openCompare, openPlayer }) {
     body.querySelectorAll("[data-rt]").forEach((b) => b.addEventListener("click", () => drawer(ratings.players.find((p) => p.id === b.dataset.rt))));
   }
   function drawTeams() {
+    if (!ratings.teams?.length) { body.innerHTML = `<section class="card rt-card"><div class="empty">Official 2K27 team ratings haven't been synced yet. Hooptrax doesn't estimate them.</div></section>`; return; }
     body.innerHTML = `<section class="card rt-card"><table class="rt-teams"><thead><tr><th>#</th><th>Team</th><th>OVR</th><th>OFF</th><th>DEF</th></tr></thead><tbody>
       ${ratings.teams.map((t, i) => `<tr data-team-hub="${esc(t.abbr)}"><td class="num">${i + 1}</td><td><span class="rt-team">${teamLogo(t, { size: "1.6rem" })}<span><b>${esc(t.name)}</b><small>Best: ${esc(t.best)}</small></span></span></td>
-        <td>${ovrBadge({ ovr: t.overall, tier: t.overall >= 95 ? "gal" : t.overall >= 90 ? "dia" : t.overall >= 85 ? "ame" : t.overall >= 80 ? "rub" : "base", seeded: false })}</td><td class="num">${t.offense}</td><td class="num">${t.defense}</td></tr>`).join("")}</tbody></table>
-      <p class="poll-foot">Team ratings weight each roster's top 10 by 2K27 OVR and attributes. Tap a team for its Team Vault.</p></section>`;
+        <td>${ovrBadge({ ovr: t.overall, tier: t.overall >= 95 ? "gal" : t.overall >= 90 ? "dia" : t.overall >= 85 ? "ame" : t.overall >= 80 ? "rub" : "base", seeded: false })}</td><td class="num">${t.offense ?? "—"}</td><td class="num">${t.defense ?? "—"}</td></tr>`).join("")}</tbody></table>
+      <p class="poll-foot">Official NBA 2K27 team ratings. Tap a team for its Team Vault.</p></section>`;
   }
   function drawer(p) {
     if (!p) return;
@@ -212,7 +214,7 @@ export function renderRatings(el, { ratings, sheet, openCompare, openPlayer }) {
       render(b) {
         b.innerHTML = `<div class="rt-dh">${avatar(p, { size: "4.5rem", color: "#64748B", full: true })}<div><div class="qv-name">${esc(p.name)}</div>
           <div class="qv-sub">${teamLogo(logoOf(p.teamAbbr), { size: "1.1rem" })}${esc(p.teamAbbr)} · ${esc(p.pos)}${p.age ? ` · ${p.age} yrs` : ""}</div>
-          <div class="qv-sub">${ovrBadge(p, "big")} ${deltaPill(p.delta)} <span class="muted small">${p.badges} badges · ${p.seeded ? "official Nov 2026 update" : "Hooptrax estimate"}</span></div></div></div>
+          <div class="qv-sub">${ovrBadge(p, "big")} ${deltaPill(p.delta)} <span class="muted small">${p.badges != null ? `${p.badges} badges · ` : ""}Official NBA 2K27</span></div></div></div>
           ${attrBars(p)}
           <div class="hub-actions"><button class="btn primary press" type="button" data-cmp>Compare</button><button class="btn ghost press" type="button" data-pcard>Player card</button></div>`;
         b.querySelector("[data-cmp]").addEventListener("click", () => openCompare?.(p.id));

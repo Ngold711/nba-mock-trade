@@ -192,9 +192,18 @@ export function setRatingsFeedProvider(fn) { ratingsFeed = fn; }
 const dep = (r, p = {}) => (resolver ? resolver(r, p) : load(r, p));
 async function loadRatings() {
   const { buildRatings } = await import("./ratings.js");
-  const [players, league, prevPlayers, feed] = await Promise.all([dep("players"), dep("league").catch(() => null), dep("players", { season: "2026" }).catch(() => null),
-    ratingsFeed ? ratingsFeed().catch(() => null) : null]);
-  return buildRatings({ players, league, prevPlayers, feed });
+  const [players, league, feed] = await Promise.all([dep("players").catch(() => null), dep("league").catch(() => null), ratingsFeed ? ratingsFeed().catch(() => null) : null]);
+  return buildRatings({ players, league, feed });
+}
+/* Starting lineups: ESPN's team depth charts (#1 at PG/SG/SF/PF/C for all 30 teams). */
+const DEPTH = (id) => `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${id}/depthcharts`;
+async function loadDepth(_p, opts) {
+  const league = await dep("league");
+  const teams = Object.values(league?.teams || {}).filter((t) => t.id);
+  const settled = await Promise.allSettled(teams.map((t) => fetchJson(DEPTH(t.id), opts)));
+  if (!settled.some((r) => r.status === "fulfilled")) throw new Error("No depth charts could be loaded");
+  const { startersFrom } = await import("./starters.js");
+  return startersFrom(teams.map((t, i) => ({ team: t, depth: settled[i].status === "fulfilled" ? settled[i].value : null })), league, await dep("players").catch(() => null));
 }
 /* Transactions: ESPN + NBA.com player movement (server only; NBA.com doesn't allow browser CORS). */
 let txStatus = { syncedAt: null, sources: {} };
@@ -275,7 +284,7 @@ async function loadSos(_p, opts) {
   for (const conf of st?.conferences || []) for (const t of conf.teams) winPct[t.team.abbr] = t.pct;
   return { asOf: new Date().toISOString(), teams: scheduleStrength(schedules, winPct) };
 }
-const CUSTOM = { transactions: loadTransactions, teamstats: loadTeamStats, sos: loadSos, college: loadCollege, starts: loadStarts, coaches: loadCoaches, league: loadLeague, ratings: loadRatings };
+const CUSTOM = { transactions: loadTransactions, teamstats: loadTeamStats, sos: loadSos, college: loadCollege, starts: loadStarts, coaches: loadCoaches, league: loadLeague, ratings: loadRatings, depth: loadDepth };
 
 /** Fetch + normalize one resource. */
 export async function load(resource, params = {}, opts = {}) {
