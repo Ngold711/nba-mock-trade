@@ -629,3 +629,16 @@ Built by an offline generator that cross-checks editorial data against ESPN:
   - The count resets to 25 on any filter pill, A–Z letter or search change. In the Players view the search box filters the directory.
   - Headshots try NBA.com's CDN, then ESPN, then the initials badge.
   - Players ESPN knows open their full profile, found via `/api/players/resolve?name=`; the rest open a short index card.
+
+## Round 19: AwardScore and 65-game rule fixes, live re-ranking
+
+- **65-game rule** (`ruleStatus` in `service/awards.js`): a player only drops off the MVP, DPOY, Sixth Man, Most Improved and All-NBA ladders once 65 games are out of reach.
+  - That means an 18th missed game, or a confirmed long-term absence on ESPN's injury report (season-ending, "out indefinitely", or a return date that pushes the misses past 17).
+  - Before that, a borderline pace shows an informational "Pace NN" badge and the score isn't touched.
+  - Previously, projected games under 65 (e.g. Dončić, 11 of 14) demoted players in November.
+- **AwardScore:** live per-game production (Game Score blend), plus a TS% adjustment vs. league average (weighted by shot volume), × (0.75 + 0.5 × team win %), plus a top-6 seed bonus. The old `× √availability` term, which docked missed games a second time, is gone. ROY and DPOY no longer dock missed games either; small-sample guards remain. COY's change vs. last season is shrunk toward 0 until ~20 games.
+- **Live updates:**
+  - Stats and standings caches are now 15 min (from 30).
+  - The server watches the scoreboard every 2 minutes and force-refreshes stats, standings and injuries as soon as another game goes final.
+  - The page re-runs both models every 5 minutes (and when you return to the tab), and shows "Live model · stats & standings updated N min ago" above the model toggle.
+- **Audit:** neither the award nor the All-Star models contain hardcoded players or overrides. All-Star selection uses the same AwardScore with no 65-game rule.

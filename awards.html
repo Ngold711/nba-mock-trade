@@ -289,6 +289,10 @@ body.has-votebar main { padding-bottom: 6rem; }
 :root[data-theme="light"] .slot.filled:hover { border-color: #CBD5E1; }
 :root[data-theme="light"] .court::before { border-color: rgba(15,23,42,.08); }
 
+.pill.pace { background: var(--fill); color: var(--label-3); font-weight: 600; }
+.model-updated { display: flex; align-items: center; gap: 0.4rem; margin: 0.1rem 0 0.6rem; font-size: 0.75rem; color: var(--label-3); }
+.model-updated .dot { width: 0.45rem; height: 0.45rem; border-radius: 99px; background: var(--good, #22C55E); box-shadow: 0 0 0 3px rgba(34,197,94,.2); flex: none; }
+.model-updated time { color: var(--label-2); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -301,6 +305,7 @@ body.has-votebar main { padding-bottom: 6rem; }
   <div class="pills views" id="views" role="group" aria-label="Awards view">
     <button type="button" data-view="allstar" aria-pressed="true">All-Star</button><button type="button" data-view="awards" aria-pressed="false">Season Races</button><button type="button" data-view="weekly" aria-pressed="false">Weekly &amp; Polls</button><button type="button" data-view="ratings" aria-pressed="false">2K27 Ratings</button><button type="button" data-view="history" aria-pressed="false">History</button></div>
 
+  <p class="model-updated" id="modelUpdated" aria-live="polite"></p>
   <section id="view-allstar" aria-label="All-Star Voting">
     <div class="as-bar">
       <span class="seg mode" role="group" aria-label="Ballot mode" id="asMode"><span class="thumb"></span>
@@ -331,7 +336,7 @@ body.has-votebar main { padding-bottom: 6rem; }
   <section id="view-ratings" aria-label="2K27 ratings" hidden></section>
   <section id="view-history" aria-label="NBA history" hidden></section>
 
-  <p class="fine">AwardScore = a Game Score–style production blend (points, shooting efficiency, rebounds, assists, steals, blocks, turnovers) × team win % × availability. Projected games = games played ÷ team games × 82; players under 65 carry a “65-game risk” badge and are left off MVP, DPOY, Sixth Man, Most Improved and All-NBA ladders (All-Star and Rookie of the Year are exempt here). Games started come from ESPN box scores; rookies are inferred (no 2025–26 stats, age 24 or under). ESPN doesn’t publish All-Star selection counts, so career honors from ESPN are shown instead. A statistical model, not a prediction of votes. Not affiliated with the NBA or ESPN.</p>
+  <p class="fine">AwardScore = live 2026–27 per-game production (a Game Score blend of points, rebounds, assists, steals, blocks, turnovers and shooting) plus a true-shooting adjustment vs. league average, scaled by team win % with a bonus for a top-6 conference seed. Missed games are not docked. The 65-game rule only removes a player from the MVP, DPOY, Sixth Man, Most Improved and All-NBA ladders once 65 games are out of reach (an 18th missed game, or a confirmed long-term absence from the ESPN injury report); before that a “Pace” badge is shown for information only. All-Star and Rookie of the Year are exempt. Stats, standings and injuries refresh within minutes of each final and the models re-rank every 5 minutes. Games started come from ESPN box scores; rookies are inferred (no 2025–26 stats, age 24 or under). ESPN doesn’t publish All-Star selection counts, so career honors from ESPN are shown instead. A statistical model, not a prediction of votes. Not affiliated with the NBA or ESPN.</p>
 </main>
 <div class="vote-bar" id="voteBar" hidden><span class="vp" id="voteProgress"></span><button class="btn primary press" type="button" id="viewBallot">View &amp; Share Ballot</button></div>
 
@@ -394,7 +399,9 @@ const picks = store.get("awards:picks", {});        // award -> [ids]
 
 const f1 = (x) => (x == null ? "—" : Number(x).toFixed(1));
 const line = (p) => `${f1(p.stats.pts)} / ${f1(p.stats.reb)} / ${f1(p.stats.ast)}`;
-const riskPill = (p) => p.ruleRisk ? `<span class="pill risk" title="Projected ${p.projectedGames} of 82 games (${p.stats.gp} of ${p.team.gp} so far). Needs ${RULE_GAMES} for major awards.">65-game risk · ${p.projectedGames}</span>` : "";
+const riskPill = (p) => p.ruleRisk
+  ? `<span class="pill risk" title="${esc(p.ruleReason)} (${p.stats.gp} of ${p.team.gp} team games played). Major awards need ${RULE_GAMES} games.">65-game rule · out</span>`
+  : p.paceRisk ? `<span class="pill pace" title="On pace for ${p.projectedGames} of 82 games (${p.stats.gp} of ${p.team.gp}, ${p.missed} missed). Informational only: not docked, still eligible until an 18th missed game.">Pace ${p.projectedGames}</span>` : "";
 const honorsLine = (p) => {
   const h = honors[p.id];
   if (!h) return "";
@@ -705,7 +712,7 @@ function renderAwards() {
       body = `${mine.length ? `<ul class="plist">${mine.map((e, i) => awardRow(a, e, i + 1, { picksMode: true, idx: i, total: mine.length })).join("")}</ul>` : `<p class="empty-picks">No picks yet. Add up to 5.</p>`}
         ${mine.length < 5 ? `<button class="add press" type="button" data-addpick="${a.key}">Add pick</button>` : ""}`;
     }
-    return `<section class="card" data-award="${a.key}" data-tab="${a.key}"><div class="head"><div class="t"><h4>${a.title}</h4>${lad.note ? `<p class="note">${esc(lad.note)}</p>` : ""}${lad.ruleApplies ? `<p class="note">65-game rule applied</p>` : ""}</div>${toggle}</div>${body}</section>`;
+    return `<section class="card" data-award="${a.key}" data-tab="${a.key}"><div class="head"><div class="t"><h4>${a.title}</h4>${lad.note ? `<p class="note">${esc(lad.note)}</p>` : ""}${lad.ruleApplies ? `<p class="note">65-game rule: only players who can no longer reach 65 games are excluded</p>` : ""}</div>${toggle}</div>${body}</section>`;
   }).join("");
 
   const mode = awardMode.allNba || "model";
@@ -714,7 +721,7 @@ function renderAwards() {
   const myList = (picks.allNba || []).map((id) => byId[id]).filter(Boolean);
   const list = mode === "model" ? modelList : myList;
   const anRow = (p, i) => `<li><span class="rk">${i + 1}</span>${who(p)}<div class="val"><b>${line(p)}</b>Score ${f1(p.score)}</div>${mode === "picks" ? `<div class="ctrl"><button class="mini" type="button" data-up="allNba:${i}" ${i === 0 ? "disabled" : ""}>↑</button><button class="mini" type="button" data-down="allNba:${i}" ${i === myList.length - 1 ? "disabled" : ""}>↓</button><button class="mini" type="button" data-remove="allNba:${i}">Remove</button></div>` : ""}</li>`;
-  html += `<section class="card allnba" data-award="allNba" data-tab="allNba"><div class="head"><div class="t"><h4>All-NBA Teams</h4><p class="note">Positionless top 15 by AwardScore · 65-game rule applied</p></div>
+  html += `<section class="card allnba" data-award="allNba" data-tab="allNba"><div class="head"><div class="t"><h4>All-NBA Teams</h4><p class="note">Positionless top 15 by AwardScore · excludes players who can no longer reach 65 games</p></div>
     <span class="seg toggle" role="group" aria-label="All-NBA view"><span class="thumb" style="transform:translateX(${mode === "picks" ? 100 : 0}%)"></span>
       <button type="button" data-amode="allNba:model" aria-pressed="${mode === "model"}">Model</button><button type="button" data-amode="allNba:picks" aria-pressed="${mode === "picks"}">My picks</button></span></div>
     <div class="teams">${teamsOf(list).map(([t, ps], k) => `<div><div class="grp"><span>${t}</span><span>${ps.length}/5</span></div><ul class="plist">${ps.map((p, i) => anRow(p, k * 5 + i)).join("") || `<li class="empty-picks">${mode === "picks" ? "Empty" : "—"}</li>`}</ul></div>`).join("")}</div>
@@ -753,7 +760,7 @@ function pickSheet(key) {
         const extra = q ? model.players.filter((p) => p.name.toLowerCase().includes(q)) : [];
         const seen = new Set();
         rows = [...pool, ...extra].filter((p) => !chosen.has(p.id) && !seen.has(p.id) && seen.add(p.id) && (!q || p.name.toLowerCase().includes(q))).slice(0, 40)
-          .map((p) => `<li><button class="row" type="button" data-pick="${p.id}">${avatar(p, { size: "2.25rem", color: p.team.color })}<span class="meta"><span class="nm">${esc(p.name)}</span><span class="sub">${esc(p.team.abbr)} · ${line(p)}${p.ruleRisk ? ` · proj. ${p.projectedGames} games` : ""}</span></span></button></li>`);
+          .map((p) => `<li><button class="row" type="button" data-pick="${p.id}">${avatar(p, { size: "2.25rem", color: p.team.color })}<span class="meta"><span class="nm">${esc(p.name)}</span><span class="sub">${esc(p.team.abbr)} · ${line(p)}${p.ruleRisk ? ` · 65-game rule: out` : ""}</span></span></button></li>`);
       }
       body.innerHTML = rows.length ? `<ul class="list">${rows.join("")}</ul>` : `<div class="empty">No matches.</div>`;
       body.querySelectorAll("[data-pick]").forEach((btn) => btn.addEventListener("click", () => {
@@ -777,14 +784,29 @@ async function loadHonors() {
   await Promise.all([worker(), worker(), worker(), worker()]);
   renderAwards();
 }
+/* Live re-ranking: the models re-run on fresh stats/standings every 5 minutes while the page is open (the server
+   refreshes its feeds as soon as a game goes final), and the "Last updated" line ticks along. */
+let dataAt = 0;
+const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m <= 0 ? "just now" : m === 1 ? "1 min ago" : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`; };
+function paintUpdated() {
+  const el = $("#modelUpdated"); if (!el) return;
+  el.innerHTML = dataAt ? `<span class="dot" aria-hidden="true"></span>Live model · stats &amp; standings updated <time datetime="${new Date(dataAt).toISOString()}" title="${new Date(dataAt).toLocaleString()}">${ago(dataAt)}</time>` : "";
+}
+setInterval(paintUpdated, 30e3);
+setInterval(() => { if (!document.hidden) load(); }, 5 * 60e3);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && dataAt && Date.now() - dataAt > 5 * 60e3) load(); });
 let retry = 0;
 async function load() {
-  const names = [["players", {}], ["league", {}], ["standings", {}], ["players", { season: 2026 }], ["standings", { season: 2026 }], ["starts", {}], ["coaches", {}], ["news", {}], ["ratings", {}]];
+  const names = [["players", {}], ["league", {}], ["standings", {}], ["players", { season: 2026 }], ["standings", { season: 2026 }], ["starts", {}], ["coaches", {}], ["news", {}], ["ratings", {}], ["injuries", {}]];
   const res = await Promise.allSettled(names.map(([n, p]) => client.get(n, p)));
-  const [players, league, standings, prevPlayers, prevStandings, starts, coaches, news, ratings] = res.map((r) => (r.status === "fulfilled" ? r.value.data : null));
+  const [players, league, standings, prevPlayers, prevStandings, starts, coaches, news, ratings, injuries] = res.map((r) => (r.status === "fulfilled" ? r.value.data : null));
+  // "Last updated": when the live stats / standings feeding the models were last fetched from ESPN
+  const fetched = [0, 2].map((i) => res[i].status === "fulfilled" ? Date.parse(res[i].value.meta?.fetchedAt || "") : NaN).filter(Number.isFinite);
+  dataAt = fetched.length ? Math.min(...fetched) : Date.now();
   extra = { league, news, ratings };
   model = null;
-  try { if (players && standings) model = computeAwards({ players, prevPlayers, standings, prevStandings, starts, coaches }); } catch (e) { console.warn("awards model", e); }
+  try { if (players && standings) model = computeAwards({ players, prevPlayers, standings, prevStandings, starts, coaches, injuries }); } catch (e) { console.warn("awards model", e); }
+  paintUpdated();
   byId = model ? Object.fromEntries(model.players.map((p) => [p.id, p])) : {};
   // All-Star pool: stats + live rosters, falling back to the bundled snapshot so it is never empty.
   const scores = model ? Object.fromEntries(model.players.map((p) => [p.id, p.score])) : {};

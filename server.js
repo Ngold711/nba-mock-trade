@@ -167,6 +167,25 @@ export async function refreshSchedule() {
 }
 
 let staticData = null, indexMemo = { league: null, history: null, index: null };
+/**
+ * After-game refresh: when another game goes final, season stats, standings and injuries are re-fetched right
+ * away (instead of waiting out their cache), so the award and All-Star models re-rank minutes after the final buzzer.
+ */
+let finalsSeen = null;
+async function refreshAfterFinals() {
+  try {
+    const sb = (await store.get("scoreboard")).data;
+    const finals = (sb?.games || []).filter((g) => g.status?.completed).map((g) => g.id).sort().join(",");
+    if (finalsSeen != null && finals !== finalsSeen && finals.length >= finalsSeen.length) {
+      await Promise.allSettled(["players", "standings", "injuries"].map((r) => store.get(r, {}, { force: true })));
+      dirCache.at = 0; liveHist.at = 0;
+      log(`[awards] new final(s): stats, standings and injuries refreshed`);
+    }
+    finalsSeen = finals;
+  } catch { /* next tick */ }
+}
+if (!process.env.NO_WARM) setInterval(refreshAfterFinals, 2 * 60e3).unref?.();
+
 /** nba_history.json with the all-time career boards brought up to date (active players' live ESPN career totals). */
 let liveHist = { at: 0, p: null };
 async function liveHistory(history) {

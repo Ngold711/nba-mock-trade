@@ -16,14 +16,14 @@ export const TTL = {
   final: 60 * MIN,
   idle: 15 * MIN,          // nothing live, nothing soon
   injuries: 15 * MIN,
-  standings: 30 * MIN,
+  standings: 15 * MIN,
   transactions: 30 * MIN,
   roster: 60 * MIN,
   teams: 24 * 60 * MIN,
   historical: 10 * MIN,
   college: 30 * MIN,       // NCAA prospect stats
   news: 1 * MIN,
-  players: 30 * MIN,
+  players: 15 * MIN,
   playersPrev: 24 * 60 * MIN,
   starts: 6 * 60 * MIN,
   coaches: 12 * 60 * MIN,

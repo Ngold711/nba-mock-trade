@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildWire, relativeTime, WIRE_FILTERS } from "../service/wire.js";
-import { computeAwards, projectedGames, production, RULE_GAMES } from "../service/awards.js";
+import { computeAwards, projectedGames, production, RULE_GAMES, ruleStatus } from "../service/awards.js";
 import { normalizeNews, normalizePlayerStats, normalizeTransactions, normalizeInjuries, normalizeScoreboard } from "../service/normalize.js";
 
 const fx = (n) => JSON.parse(readFileSync(new URL(`./fixtures/${n}.json`, import.meta.url)));
@@ -76,17 +76,35 @@ function fixture() {
   return { players, prevPlayers, standings, prevStandings, starts, coaches };
 }
 
-test("projected games + 65-game rule", () => {
+test("65-game rule: no early-season demotion; out only once 65 is unreachable", () => {
   assert.equal(projectedGames(12, 20), 49);
-  assert.equal(projectedGames(20, 20), 82);
   assert.ok(projectedGames(16, 20) >= RULE_GAMES);
+  // 8 games missed after 20: on a sub-65 pace, but still eligible and NOT docked
   const r = computeAwards(fixture());
   const den0 = r.players.find((p) => p.name === "DEN Player 0");
-  assert.equal(den0.ruleRisk, true);
-  assert.ok(!r.awards.mvp.leaders.some((e) => e.player.id === den0.id), "rule-risk players are off MVP top 5");
-  assert.ok(![...r.awards.allNba.first, ...r.awards.allNba.second, ...r.awards.allNba.third].some((p) => p.ruleRisk));
+  assert.equal(den0.ruleRisk, false); assert.equal(den0.paceRisk, true);
+  assert.ok(r.awards.mvp.leaders.some((e) => e.player.id === den0.id), "a pace flag doesn't move a player off the MVP top 5");
+  // 18 missed games → 65 impossible → ineligible
+  assert.equal(ruleStatus(12, 30).out, true);
+  assert.equal(ruleStatus(13, 30).out, false);
+  // confirmed long-term absences
+  const now = Date.parse("2026-11-16T00:00:00Z");
+  assert.equal(ruleStatus(11, 14, { status: "Out", comment: "He will miss the rest of the season after surgery." }, now).out, true);
+  assert.equal(ruleStatus(11, 14, { status: "Out", returnDate: "2027-01-20" }, now).out, true);   // ~31 more games
+  assert.equal(ruleStatus(11, 14, { status: "Out", returnDate: "2026-11-20" }, now).out, false);  // a short absence
+  const long = computeAwards({ ...fixture(), injuries: [{ athlete: { id: den0.id }, status: "Out", comment: "out for the season" }] });
+  assert.ok(!long.awards.mvp.leaders.some((e) => e.player.id === den0.id));
+  assert.ok(![...long.awards.allNba.first, ...long.awards.allNba.second, ...long.awards.allNba.third].some((p) => p.ruleRisk));
   // All-Star ignores the rule
-  assert.ok([...r.allStar.West.starters, ...r.allStar.West.reserves].some((p) => p.id === den0.id));
+  assert.ok([...long.allStar.West.starters, ...long.allStar.West.reserves].some((p) => p.id === den0.id));
+});
+
+test("AwardScore: missed games aren't docked; efficiency and team success count", async () => {
+  const { awardScore } = await import("../service/awards.js");
+  const s = { pts: 30, fgm: 10, fga: 20, ftm: 8, fta: 9, reb: 8, ast: 8, stl: 1, blk: 1, tov: 3, gp: 10 };
+  assert.equal(awardScore(s, { winPct: 0.8, seed: 1 }), awardScore({ ...s, gp: 6 }, { winPct: 0.8, seed: 1 }));
+  assert.ok(awardScore(s, { winPct: 0.8, seed: 1 }) > awardScore(s, { winPct: 0.4, seed: 11 }));
+  assert.ok(awardScore({ ...s, fga: 26 }, { winPct: 0.6 }) < awardScore(s, { winPct: 0.6 }));
 });
 
 test("All-Star: 5 starters (2G/3FC), 7 reserves, 6 first cuts per conference", () => {
