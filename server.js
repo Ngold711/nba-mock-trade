@@ -6,7 +6,8 @@ import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize as normPath, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createStore } from "./service/store.js";
-import { setResolver } from "./service/espn.js";
+import { setResolver, setRatingsFeedProvider } from "./service/espn.js";
+import { parseRatingsFeed, fetchRatingsFeed } from "./service/ratings-feed.js";
 
 const ROOT = fileURLToPath(new URL(".", import.meta.url));
 // .env (local only, git-ignored): KEY=VALUE lines; real environment variables win.
@@ -23,6 +24,27 @@ const log = (...a) => { if (!QUIET) console.log(new Date().toISOString(), ...a);
 
 export const store = createStore({ log: (m) => log("[store]", m) });
 setResolver((resource, params) => store.get(resource, params).then((r) => r.data));
+// NBA 2K27 ratings: a live feed (RATINGS_FEED_URL) when configured, re-read on every ratings refresh; the last good
+// copy survives restarts in data/ratings-feed.json; otherwise the bundled ratings_2k27.json snapshot.
+setRatingsFeedProvider(async () => {
+  const dir = new URL("./data/", import.meta.url), cacheFile = new URL("./data/ratings-feed.json", import.meta.url);
+  const url = process.env.RATINGS_FEED_URL;
+  if (url) {
+    try {
+      const feed = await fetchRatingsFeed(url);
+      const { mkdir: mk, writeFile: wf } = await import("node:fs/promises");
+      await mk(dir, { recursive: true }).catch(() => {}); await wf(cacheFile, JSON.stringify({ ...feed, fetchedAt: new Date().toISOString() })).catch(() => {});
+      return { ...feed, live: true };
+    } catch (e) {
+      console.warn(`[ratings] feed unavailable (${e.message}); using the last good copy or the bundled snapshot`);
+      const { readFile: rf } = await import("node:fs/promises");
+      const last = await rf(cacheFile, "utf8").then(JSON.parse).catch(() => null);
+      if (last?.players?.length) return { ...parseRatingsFeed(last), live: true };
+    }
+  }
+  const { readFile: rf } = await import("node:fs/promises");
+  return parseRatingsFeed(JSON.parse(await rf(new URL("./ratings_2k27.json", import.meta.url), "utf8")));
+});
 
 // Common abbreviations → ESPN's own (ESPN uses GS, NO, NY, SA, UTAH, WSH).
 const ALIASES = { GSW: "GS", NOP: "NO", NYK: "NY", SAS: "SA", UTA: "UTAH", WAS: "WSH", PHO: "PHX", BRK: "BKN", CHO: "CHA" };
@@ -124,7 +146,7 @@ async function pollsRoute(req, res, m, q) {
 
 /* Hooptrax AI: Gemini (free tier, streamed) grounded in a question-sliced view of the live cache,
    with a zero-key local engine fallback that answers in milliseconds. */
-import { SYSTEM_PROMPT, buildIndex, buildContext, localAnswer, chipsFor, cardsFor, scheduleDates, isRetiredQ } from "./service/chat.js";
+import { SYSTEM_PROMPT, systemPrompt, buildIndex, buildContext, localAnswer, chipsFor, cardsFor, scheduleDates, isRetiredQ } from "./service/chat.js";
 import { projectLottery, lotteryTable, DEFAULT_FORMAT } from "./service/draft.js";
 // gemini-2.5-flash is closed to new API keys (404) and the free-tier flash models are often over quota (429),
 // so the fast flash-lite models lead. Override with GEMINI_MODELS.
@@ -145,12 +167,30 @@ export async function refreshSchedule() {
 }
 
 let staticData = null, indexMemo = { league: null, history: null, index: null };
+/** nba_history.json with the all-time career boards brought up to date (active players' live ESPN career totals). */
+let liveHist = { at: 0, p: null };
+async function liveHistory(history) {
+  if (!history) return history;
+  if (!liveHist.p || Date.now() - liveHist.at > 30 * 60e3) {
+    const careerOf = async (id) => {
+      const [career, stats, log] = await Promise.all([timeout(store.get("career", { id }).then((r) => r.data), 6000, null),
+        store.get("players").then((r) => r.data).catch(() => null), timeout(store.get("gamelog", { id }).then((r) => r.data).catch(() => null), 6000, null)]);
+      const seasonGp = stats?.players?.find((p) => String(p.id) === id)?.stats?.gp;
+      return withUnfoldedGames(career, seasonGp, log?.games);
+    };
+    liveHist = { at: Date.now(), p: liveCareerLeaders(history.careerLeaders, careerOf)
+      .then((careerLeaders) => ({ ...history, careerLeaders, careerLeadersAsOf: new Date().toISOString() }))
+      .catch(() => { liveHist.at = 0; return history; }) };
+  }
+  return liveHist.p;
+}
 async function chatData() {
   staticData ||= Promise.all([readFile(join(ROOT, "nba_history.json"), "utf8"), readFile(join(ROOT, "prospects.json"), "utf8"), readFile(join(ROOT, "salaries_2026_27.json"), "utf8")])
     .then(([h, p, b]) => ({ history: JSON.parse(h), prospects: JSON.parse(p), book: JSON.parse(b) })).catch(() => ({}));
   const names = ["scoreboard", "standings", "injuries", "transactions", "ratings", "league", "players"];
   const got = await Promise.allSettled(names.map((n) => store.get(n)));
   const d = { ...(await staticData) };
+  d.history = await liveHistory(d.history);
   names.forEach((n, i) => { d[n === "players" ? "stats" : n] = got[i].status === "fulfilled" ? got[i].value.data : null; });
   if (!schedule.length) await refreshSchedule().catch(() => {});
   // keep today's entry in step with the live scoreboard
@@ -169,6 +209,10 @@ async function chatData() {
 
 /** Stream a Gemini answer. Calls onDelta(text) per chunk; resolves { text, model } or { error }.
  *  Gives up (so the caller can answer locally) if no text arrives within FIRST_TOKEN_MS of `t0`. */
+const SEARCH_ON = process.env.GEMINI_SEARCH !== "0";
+const noSearch = new Set();     // models that rejected the google_search tool: retried and asked without it
+let searchDownUntil = 0;        // search grounding over quota (429): answer from the DATA block alone for a while
+const searchFor = (model) => SEARCH_ON && !noSearch.has(model) && Date.now() > searchDownUntil;
 async function askGemini(question, history, contextText, onDelta = () => {}, t0 = Date.now()) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return { error: "no-key" };
@@ -183,16 +227,22 @@ async function askGemini(question, history, contextText, onDelta = () => {}, t0 
     let firstTimer = setTimeout(() => ac.abort(new Error("first-token")), left);
     const hardTimer = setTimeout(() => ac.abort(new Error("max")), STREAM_MAX_MS);
     let text = "", finish = "";
+    const searched = searchFor(model);
     try {
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
         method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": key },
-        body: JSON.stringify({ systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }, contents, generationConfig: { temperature: 0.2, maxOutputTokens: 4096 } }),
+        // Google Search grounding: the model looks things up instead of answering current facts from memory.
+        // Turned off per model if that model rejects the tool (and globally with GEMINI_SEARCH=0).
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: systemPrompt() }] }, contents, generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
+          ...(searchFor(model) ? { tools: [{ google_search: {} }] } : {}) }),
         signal: ac.signal,
       });
       if (!r.ok) {
         const j = await r.json().catch(() => ({}));
         last = `${r.status} ${j?.error?.status || ""}`.trim();
         if (r.status === 400 && /API key/i.test(j?.error?.message || "")) return { error: "bad-key" };
+        if (searched && r.status === 400 && /tool|search|ground/i.test(j?.error?.message || "")) { noSearch.add(model); order.splice(order.indexOf(model) + 1, 0, model); clearTimeout(firstTimer); clearTimeout(hardTimer); continue; }
+        if (searched && r.status === 429) { searchDownUntil = Date.now() + 10 * 60e3; log("[ai] search grounding over quota; answering from live data only for 10 min"); order.splice(order.indexOf(model) + 1, 0, model); clearTimeout(firstTimer); clearTimeout(hardTimer); continue; }
         modelDownUntil.set(model, Date.now() + (r.status === 404 ? 6 * 3600e3 : r.status === 429 ? 90e3 : 30e3));
         continue;
       }
@@ -547,6 +597,8 @@ async function feedRoute(req, res, m, q) {
 import { searchLocal, mergeSearch, trophies, draftOf } from "./service/player.js";
 import { searchPeople, personProfile, frontOffices, byPlayerId, directory } from "./service/people.js";
 import { wikiLookup } from "./service/wiki.js";
+import { buildDirectory, filterDirectory } from "./service/directory.js";
+import { liveCareerLeaders, withUnfoldedGames } from "./service/live-leaders.js";
 let peopleData = null;
 const loadPeople = () => (peopleData ||= readFile(join(ROOT, "nba_people.json"), "utf8").then(JSON.parse).catch(() => ({ teams: {}, people: [] })));
 /** Editorial archive + a profile for every current coach (live ESPN), president/GM and owner. */
@@ -601,6 +653,26 @@ async function playerSearchRoute(req, res, m, q) {
 }
 /** ESPN's displayDOB is day/month/year ("17/2/1963") → "Feb 17, 1963". */
 const fmtDob = (d) => { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(d || "")); return m ? new Date(Date.UTC(+m[3], +m[2] - 1, +m[1])).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : String(d || ""); };
+/** Unified A–Z player directory (active + legends), paged: ?filter=all|active|hof|top75|G|F|C&letter=K&offset=0&limit=60 */
+let dirCache = { at: 0, list: null };
+async function playerDirectoryRoute(req, res, m, q) {
+  if (!dirCache.list || Date.now() - dirCache.at > 10 * 60e3) {
+    const [league, d] = await Promise.all([store.get("league").then((r) => r.data).catch(() => null), chatData().catch(() => ({}))]);
+    const list = buildDirectory({ league, legends: d.history?.legends || [] });
+    if (list.length) dirCache = { at: Date.now(), list };
+  }
+  const filter = ["all", "active", "hof", "top75", "G", "F", "C"].includes(q.get("filter")) ? q.get("filter") : "all";
+  const rows = filterDirectory(dirCache.list || [], filter);
+  const letters = {};
+  rows.forEach((p, i) => { if (letters[p.letter] == null) letters[p.letter] = i; });
+  const limit = Math.min(200, Math.max(1, +q.get("limit") || 60));
+  const L = String(q.get("letter") || "").toUpperCase();
+  let offset = Math.max(0, +q.get("offset") || 0);
+  if (/^[A-Z]$/.test(L)) offset = letters[L] ?? Object.entries(letters).find(([k]) => k > L)?.[1] ?? rows.length;
+  res.setHeader("cache-control", "public, max-age=120");
+  return json(res, 200, { data: { filter, total: rows.length, offset, letters,
+    players: rows.slice(offset, offset + limit).map(({ key, g, ...p }) => p) } });
+}
 async function personRoute(req, res, m) {
   const dir = await peopleDirectory();
   const p = dir.people.find((x) => x.id === m[1]);
@@ -617,7 +689,8 @@ async function frontOfficesRoute(req, res) {
 }
 async function playerFullRoute(req, res, m) {
   const id = m[1];
-  const get = (name, params) => store.get(name, params).then((r) => r.data).catch(() => null);
+  const espnId = /^\d+$/.test(id);       // "x-…" ids are archive-only legends: no ESPN athlete record to ask for
+  const get = (name, params) => (!espnId && params?.id ? Promise.resolve(null) : store.get(name, params).then((r) => r.data).catch(() => null));
   const [bio, career, honors, log, league, ratings, stats, d] = await Promise.all([
     get("bio", { id }), get("seasons", { id }), get("honors", { id }), timeout(get("gamelog", { id }), 4000, null),
     get("league"), get("ratings"), get("players"), chatData().catch(() => ({})),
@@ -666,7 +739,8 @@ const routes = [
   [/^\/api\/items(?:\/([A-Za-z0-9_-]{6,24})(?:\/(like|delete|update))?)?$/, itemsRoute],
   [/^\/api\/feed$/, feedRoute],
   [/^\/api\/players\/search$/, playerSearchRoute],
-  [/^\/api\/players\/(\d{1,12})\/full$/, playerFullRoute],
+  [/^\/api\/players\/directory$/, playerDirectoryRoute],
+  [/^\/api\/players\/(\d{1,12}|x-[a-z0-9-]{2,40})\/full$/, playerFullRoute],
   [/^\/api\/people\/([a-z0-9-]{3,40})$/, personRoute],
   [/^\/api\/front-offices$/, frontOfficesRoute],
   [/^\/api\/ai-threads(?:\/([A-Za-z0-9_-]{5,40})(?:\/(delete))?)?$/, aiThreadsRoute],
@@ -742,6 +816,10 @@ const routes = [
 const DENY = new Set(["package.json", "package-lock.json", "server.js"]);
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon" };
 async function serveStatic(req, res, pathname) {
+  if (pathname === "/nba_history.json") {          // the browser gets the same live career boards as Ask Hooptrax
+    const d = await chatData().catch(() => null);
+    if (d?.history) { res.writeHead(200, { "content-type": "application/json", "cache-control": "public, max-age=300" }); return res.end(JSON.stringify(d.history)); }
+  }
   const rel = pathname === "/" ? "/index.html" : pathname;
   const file = normPath(join(ROOT, decodeURIComponent(rel)));
   if (!file.startsWith(ROOT) || file.slice(ROOT.length).split(sep).some((p) => p.startsWith(".") || p === "node_modules" || p === "test" || p === "data") || !TYPES[extname(file)] || DENY.has(file.slice(ROOT.length).replace(/^[\\/]/, ""))) {

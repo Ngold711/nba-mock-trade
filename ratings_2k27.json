@@ -1,0 +1,97 @@
+{
+ "asOf": "2026-11-15",
+ "source": "NBA 2K27 November 2026 roster update, as supplied to Hooptrax",
+ "official": true,
+ "players": [
+  {
+   "name": "Shai Gilgeous-Alexander",
+   "ovr": 97,
+   "delta": 0
+  },
+  {
+   "name": "Victor Wembanyama",
+   "ovr": 97,
+   "delta": 0
+  },
+  {
+   "name": "Luka Doncic",
+   "ovr": 97,
+   "delta": 1
+  },
+  {
+   "name": "Nikola Jokic",
+   "ovr": 96,
+   "delta": 0
+  },
+  {
+   "name": "Giannis Antetokounmpo",
+   "ovr": 96,
+   "delta": 0
+  },
+  {
+   "name": "Jalen Brunson",
+   "ovr": 95,
+   "delta": 0
+  },
+  {
+   "name": "Anthony Edwards",
+   "ovr": 95,
+   "delta": 0
+  },
+  {
+   "name": "Stephen Curry",
+   "ovr": 95,
+   "delta": 2
+  },
+  {
+   "name": "Cade Cunningham",
+   "ovr": 94,
+   "delta": 0
+  },
+  {
+   "name": "Kevin Durant",
+   "ovr": 93,
+   "delta": 0
+  },
+  {
+   "name": "Jayson Tatum",
+   "ovr": 93,
+   "delta": 0
+  },
+  {
+   "name": "Tyrese Maxey",
+   "ovr": 93,
+   "delta": 1
+  },
+  {
+   "name": "Jaylen Brown",
+   "ovr": 92,
+   "delta": 1
+  },
+  {
+   "name": "Anthony Davis",
+   "ovr": 91,
+   "delta": 1
+  },
+  {
+   "name": "Cooper Flagg",
+   "ovr": 90,
+   "delta": 3
+  },
+  {
+   "name": "Alperen Sengun",
+   "ovr": 89,
+   "delta": 2
+  },
+  {
+   "name": "Yaxel Lendeborg",
+   "ovr": 83,
+   "delta": 10
+  },
+  {
+   "name": "Caleb Wilson",
+   "ovr": 82,
+   "delta": 5
+  }
+ ]
+}

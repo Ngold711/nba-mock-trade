@@ -1046,3 +1046,20 @@ body.has-shell, body.has-orb, body.has-shell.has-orb { padding-bottom: 0; }
 .odds-badge .tg b, .lead-tag .tg b { font-size: 0.8125rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bento-hero .bc-text { max-width: 56%; }
 .bv-face { height: 86%; }
+
+/* ---------- Archive → Players: unified A–Z directory ---------- */
+.pd-bar { display: grid; gap: 0.5rem; margin: 0.25rem 0 0.4rem; }
+.pd-filters, .pd-letters { display: flex; gap: 0.35rem; overflow-x: auto; scrollbar-width: none; margin: 0 -1rem; padding: 0 1rem; }
+.pd-filters::-webkit-scrollbar, .pd-letters::-webkit-scrollbar { display: none; }
+.pd-filters button { flex: none; border: 0; border-radius: 999px; min-height: 32px; padding: 0 0.8rem; background: transparent; color: var(--label-2); font: inherit; font-size: 0.8125rem; font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--sep); cursor: pointer; }
+.pd-filters button[aria-selected="true"] { background: var(--accent); color: #111; box-shadow: none; }
+.pd-letters button { flex: none; width: 1.75rem; min-height: 32px; border: 0; border-radius: 0.5rem; background: var(--fill); color: var(--label); font: 700 0.75rem/1 var(--font-mono, ui-monospace); cursor: pointer; }
+.pd-letters button:disabled { opacity: 0.3; cursor: default; }
+.pd-letters button:not(:disabled):hover { background: color-mix(in srgb, var(--accent) 22%, var(--fill)); }
+.pd-count { margin: 0.35rem 0 0.4rem; font-size: 0.75rem; color: var(--label-3); scroll-margin-top: 9rem; }
+.pd-more { height: 1px; }
+.pd-tags { flex: none; display: flex; gap: 0.25rem; }
+.pd-tag { font: 800 0.5625rem/1 var(--font-mono, ui-monospace); letter-spacing: 0.06em; padding: 0.3rem 0.35rem; border-radius: 0.35rem; }
+.pd-tag.hof { background: rgba(245,158,11,.16); color: #F59E0B; }
+.pd-tag.t75 { background: rgba(99,102,241,.16); color: #818CF8; }

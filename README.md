@@ -595,3 +595,23 @@ Built by an offline generator that cross-checks editorial data against ESPN:
   - It holds a 30px "Archive" title, the subtitle "Every player, coach, GM & owner since 1946", the rounded search bar, a single row of role pills, a 2×2 grid of quick tiles (recent searches once you have some) and one line of amber text links.
   - Typing, or picking Coaches / Front Office / Owners, docks the search to the top with a 380ms transition (none with reduced motion).
 - **Footer:** `.app-footer` keeps `pb-24` (6rem, plus the tab bar and any Ask-pill lift) under its badge and disclaimer, so the floating ✦ Ask Hooptrax pill never covers them. That includes the Trade Machine, where the pill sits higher above the trade tray.
+
+## Round 17: titles, unified Players directory, 2K27 ratings feed, grounded Ask Hooptrax, McConnell copy
+
+- **Titles:** "3-2-1 Draft Lottery and Mock Draft" (GM Lab card, draft page title) and "All-Star Voting, NBA Awards, and 2K27 Ratings" (GM Lab card, awards page title and header).
+- **Archive → Players:** opens straight into one unified A–Z directory (by last name) of every active player (live ESPN rosters) and every legend in the archive. That's 774 players today.
+  - `GET /api/players/directory?filter=all|active|hof|top75|G|F|C&letter=K&offset=&limit=` is paged and returns a letter index.
+  - The page shows filter pills (All, Active, Hall of Fame, Top 75, G, F, C), an A–Z jump bar and infinite scroll.
+  - Hall of Fame means inducted as a player; Top 75 is the NBA 75th Anniversary Team. Both lists are in `service/directory.js`.
+  - Search still reaches every NBA player through ESPN.
+  - Archive-only legends (`x-…` ids) now open profiles too.
+- **2K27 ratings:**
+  - Official OVRs come from a ratings feed instead of code: the bundled snapshot is `ratings_2k27.json`. Set `RATINGS_FEED_URL` to a JSON endpoint (format in `service/ratings-feed.js`) and it is re-read on every ratings refresh (6 h, or `RATINGS_TTL_MIN`).
+  - Feed values (OVR and any attributes) override the snapshot. The last good copy is kept in `data/ratings-feed.json`.
+  - `/api/2k-ratings` reports `source`. Players not in the feed are still estimated from live ESPN stats and labelled as estimates.
+- **Ask Hooptrax:**
+  - The system prompt starts with today's date (US Eastern). It forbids answering records, stats, rosters, injuries or standings from memory: use the DATA block, then Google Search, otherwise say it can't confirm.
+  - Gemini calls carry the `google_search` grounding tool (`GEMINI_SEARCH=0` turns it off). On a quota error it retries without search and pauses search for 10 minutes.
+  - All-time career leaderboards are live: active players' ESPN career totals, plus games the ESPN season line hasn't counted yet. They're re-sorted every 30 minutes and served to the chat and to `/nba_history.json`.
+  - Leader questions get live 2026-27 season leaders.
+- **McConnell card:** "Daily NBA Wordle — guess the mystery NBA player in 8 tries using team, conference, division, position, height, age and jersey-number clues."

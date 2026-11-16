@@ -76,7 +76,21 @@ export function modelOvr(s, pct) { const p = production(s); return p == null ? n
  * @param {{ players: {players: any[]}, prevPlayers?: {players:any[]}, league?: {players:any[], teams:object} }} src
  * @returns {{ asOf, note, players: Rating[], teams: TeamRating[] }}
  */
-export function buildRatings({ players = null, prevPlayers = null, league = null } = {}, now = new Date()) {
+const ATTR_ALIAS = { shooting: ["shooting", "outsideScoring"], threePt: ["threePt", "threePoint", "threePointShot"], playmaking: ["playmaking"], finishing: ["finishing", "insideScoring"],
+  defense: ["defense", "defending"], rebounding: ["rebounding"], athleticism: ["athleticism"] };
+/** Official attribute values from a feed row override the stat model's (only the 7 Hooptrax attributes, 25–99). */
+function feedAttrs(base, a) {
+  if (!a) return base;
+  const out = { ...base };
+  for (const [k, keys] of Object.entries(ATTR_ALIAS)) { const v = keys.map((x) => Number(a[x])).find((x) => Number.isFinite(x) && x >= 25 && x <= 99); if (v != null) out[k] = Math.round(v); }
+  return out;
+}
+/**
+ * feed: parsed ratings feed ({ source, asOf, official, players }) from service/ratings-feed.js — the bundled
+ * ratings_2k27.json snapshot or the live RATINGS_FEED_URL. Without one, the SEEDS above are used.
+ */
+export function buildRatings({ players = null, prevPlayers = null, league = null, feed = null } = {}, now = new Date()) {
+  const seedBy = feed?.players?.length ? new Map(feed.players.map((p) => [nameKey(p.name), p])) : SEED_BY;
   const stats = new Map((players?.players || []).map((p) => [String(p.id), p]));
   const prev = new Map((prevPlayers?.players || []).map((p) => [String(p.id), p]));
   const roster = league?.players?.length ? league.players : (players?.players || []);
@@ -89,8 +103,8 @@ export function buildRatings({ players = null, prevPlayers = null, league = null
     const st = stats.get(id)?.stats || r.stats || null;
     const position = r.position || stats.get(id)?.position || "";
     const age = r.age ?? stats.get(id)?.age ?? null;
-    const attrs = attributes(st, { position, age }) || { shooting: 55, threePt: 50, playmaking: 45, finishing: 55, defense: 50, rebounding: 50, athleticism: age && age < 23 ? 70 : 60 };
-    const seed = SEED_BY.get(nameKey(r.name));
+    const seed = seedBy.get(nameKey(r.name));
+    const attrs = feedAttrs(attributes(st, { position, age }) || { shooting: 55, threePt: 50, playmaking: 45, finishing: 55, defense: 50, rebounding: 50, athleticism: age && age < 23 ? 70 : 60 }, seed?.attributes);
     const model = modelOvr(st, pctNow);
     let ovr = seed ? seed.ovr : model ?? (r.experience === 0 ? 66 : 64);
     let delta = seed ? seed.delta : 0;
@@ -110,7 +124,12 @@ export function buildRatings({ players = null, prevPlayers = null, league = null
     });
   }
   out.sort((a, b) => b.ovr - a.ovr || a.name.localeCompare(b.name));
-  return { asOf: now.toISOString(), note: SEED_NOTE, players: out, teams: teamRatings(out, league?.teams || {}) };
+  const nSeeded = out.filter((p) => p.seeded).length;
+  const note = feed?.players?.length
+    ? `${feed.official ? "Official NBA 2K27 OVR" : "NBA 2K27 OVR"} for ${nSeeded} players from ${feed.source || "the ratings feed"}${feed.asOf ? ` (${feed.asOf})` : ""}; all others estimated by Hooptrax from live ESPN 2026–27 stats.`
+    : SEED_NOTE;
+  return { asOf: now.toISOString(), note, source: feed ? { name: feed.source || "", asOf: feed.asOf || null, live: !!feed.live, players: feed.players.length } : null,
+    players: out, teams: teamRatings(out, league?.teams || {}) };
 }
 
 /** 30-team ratings from each roster's top 10 (weighted toward the top of the rotation). */

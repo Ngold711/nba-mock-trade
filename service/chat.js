@@ -9,11 +9,18 @@ export const SYSTEM_PROMPT = `You are "Hooptrax AI", the NBA assistant inside th
 Rules:
 1. Only answer NBA basketball questions (players, teams, games, schedules, stats, standings, injuries, trades, contracts and the salary cap, the draft and lottery, awards, records, history back to 1946, and Hooptrax features). For anything else, reply in one short, friendly sentence that you only cover the NBA and suggest an NBA question.
 2. The DATA block is live (ESPN feeds plus Hooptrax models) and newer than your training. For the 2026-27 season, today's and upcoming games, injuries, standings, rosters, contracts, 2K27 ratings and prospects, use ONLY the DATA block; if it doesn't cover something current, say so briefly. Never invent current scores, stats, injuries, contracts or game times.
-3. Today is in the 2026-27 season (see TODAY), well past your training cutoff. For NBA history (1946 to 2026: champions, MVPs and other awards, drafts, records, retired numbers, legends, famous games) use your full NBA knowledge, BUT the Hooptrax dataset lines (HISTORY, RETIRED, CHAMPIONS, AWARDS, SEASON) and LIVE ESPN NEWS lines are ground truth and override your training: if they say a number is retired, it is retired (with the date given); if a ceremony is listed under UPCOMING, it is scheduled but has not happened yet. Never say a jersey "hasn't been retired" when the DATA block lists it.
+3. Today is in the 2026-27 season (see TODAY), well past your training cutoff, so your memory of records, career totals, stats, rosters, contracts, injuries and standings is stale. NEVER answer those from memory. Use, in this order: (a) the DATA block (live ESPN feeds; CAREER lines are live all-time leaderboards with active players' totals updated through today's games; HISTORY, RETIRED, CHAMPIONS, AWARDS, SEASON and LIVE ESPN NEWS lines are ground truth and override your training), then (b) Google Search when you have the search tool and the DATA block doesn't cover the question. If neither confirms it, say you can't confirm it right now instead of guessing. Settled history that can't change (a past season's champion or Finals MVP, a draft that already happened) may come from your knowledge when the DATA block is silent. Retired numbers: if the DATA block lists one, it is retired (with the date given); a ceremony under UPCOMING is scheduled but has not happened yet; never say a jersey "hasn't been retired" when the DATA block lists it.
+3b. Leaderboards and "who passed whom": give the order and totals exactly as the CAREER lines show them; an active player's total there already includes his games through today.
 4. Game times are US Eastern Time. Say "tonight"/"tomorrow" relative to the TODAY line in the DATA block.
 5. Hooptrax 2K27 ratings are estimates except where marked official; salaries marked "est." are estimates; cap thresholds are 2026-27 projections. Mention it when it matters.
 6. Be fast and scannable: a one-line answer first, then short bullets. At most about 120 words unless asked for more, except for list answers (retired numbers, champions, award winners), which must be complete.
 7. Retired numbers: give every number in the DATA block, never truncate or refuse. For several teams or the whole league, write one compact line per team with no bullets, grouped by team, e.g. "CHI: #1 Derrick Rose, #4 Jerry Sloan, #10 Bob Love, #23 Michael Jordan, #33 Scottie Pippen", and note that #6 (Bill Russell) is retired league-wide. Use full player and team names so the app can link them. Use **bold** sparingly. No markdown tables or headings.`;
+
+/** The system prompt with today's date (US Eastern) stamped in, so the model never assumes its training date. */
+export function systemPrompt(now = Date.now()) {
+  const today = new Date(now).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "America/New_York" });
+  return `TODAY'S DATE: ${today} (US Eastern). The current NBA season is 2026-27.\n\n${SYSTEM_PROMPT}`;
+}
 
 const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
 const CODE_OF = { GS: "GSW", NO: "NOP", NY: "NYK", SA: "SAS", UTAH: "UTA", WSH: "WAS" };
@@ -50,7 +57,7 @@ export function findEntities(text, idx, { maxPlayers = 4, maxTeams = 3 } = {}) {
 }
 const dedupe = (arr, k = "id") => arr.filter((x, i) => arr.findIndex((y) => y[k] === x[k]) === i);
 
-const isNba = (q) => /\b(nba|basketball|hoop|player|team|game|games|score|scores|tonight|today|tomorrow|schedule|plays|playing|upcoming|standings?|seed|playoffs?|injur|trade|salary|contract|cap|apron|draft|lottery|prospect|rookie|mvp|roy|dpoy|award|champion|finals|title|ring|retired|jersey|record|stats?|points|rebounds|assists|steals|blocks|three|2k|rating|ovr|coach|all.?star|leader|hooptrax|stepien|tank|odds)\b/i.test(q);
+const isNba = (q) => /\b(nba|basketball|hoop|player|team|game|games|score|scores|tonight|today|tomorrow|schedule|plays|playing|upcoming|standings?|seed|playoffs?|injur|trade|salary|contract|cap|apron|draft|lottery|prospect|rookie|mvp|roy|dpoy|award|champion|finals|title|ring|retired|jersey|records?|stats?|points?|rebounds?|assists?|steals?|blocks?|scor\w*|all.?time|career|passed|three|2k|rating|ovr|coach|all.?star|leaders?|hooptrax|stepien|tank|odds)\b/i.test(q);
 
 /* ---------------------------------------------------------- dates (US Eastern) */
 const ET_FMT = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" });
@@ -195,8 +202,16 @@ export function buildContext(question, d, idx, now = Date.now()) {
     const n1 = d.history?.draft?.no1?.find((x) => x.year === y);
     out.push(`SEASON ${y}: ${c ? `champion ${c.champion} def. ${c.runnerUp} ${c.series}${c.fmvp ? `, Finals MVP ${c.fmvp}` : ""}; ` : ""}${aw.join("; ")}${n1 ? `; #1 pick ${n1.name} (${n1.team})` : ""}`);
   }
+  // this season's league leaders (live ESPN per-game stats; qualifiers: 5+ games)
+  if (/\b(leads?|leading|leaders?|top scorer|scoring title|best (scorer|rebounder|passer)|most (points|rebounds|assists) (per|a) game|ppg|rpg|apg|this season)\b/i.test(question) && d.stats?.players?.length) {
+    const q = d.stats.players.filter((p) => (p.stats?.gp || 0) >= 5);
+    for (const [k, lbl] of [["pts", "PPG"], ["reb", "RPG"], ["ast", "APG"], ["stl", "SPG"], ["blk", "BPG"]]) {
+      const top = [...q].sort((a, b) => (b.stats[k] || 0) - (a.stats[k] || 0)).slice(0, 5);
+      out.push(`2026-27 LEADERS ${lbl} (live, min 5 GP): ${top.map((p, i) => `${i + 1}. ${p.name} (${p.teamAbbr}) ${f1(p.stats[k])}`).join(", ")}`);
+    }
+  }
   if (/all.?time|career|most (points|rebounds|assists|steals|blocks|threes)|leader/i.test(question) && d.history) {
-    for (const [c, l] of d.history.careerCategories) out.push(`CAREER ${l.toUpperCase()} TOP 10: ${d.history.careerLeaders[c].slice(0, 10).map((r) => `${r.name} ${r.total}`).join(", ")}`);
+    for (const [c, l] of d.history.careerCategories) out.push(`CAREER ${l.toUpperCase()} TOP 10 (live through today's games): ${d.history.careerLeaders[c].slice(0, 10).map((r, i) => `${i + 1}. ${r.name} ${r.total.toLocaleString("en-US")}${r.active ? " (active)" : ""}`).join(", ")}`);
   }
   if (/draft|prospect|2027|2028|2029|mock/i.test(question) && d.prospects) for (const y of ["2027", "2028", "2029"]) out.push(`${y} BIG BOARD TOP 10: ${(d.prospects[y] || []).slice(0, 10).map((p) => `${p.rank}. ${p.name} (${p.position}, ${p.school || p.type})`).join("; ")}`);
   if (/mvp|rookie|defensive|sixth|improved|coach of/i.test(question) && d.history) for (const k of ["mvp", "roy", "dpoy", "smoy", "mip", "coy"]) out.push(`${k.toUpperCase()} last 8: ${(d.history.awards[k] || []).slice(0, 8).map((a) => `${a.year} ${a.name}`).join("; ")}`);

@@ -86,7 +86,7 @@ const browserWiki = (term, r) => (wikiMod ||= import("./service/wiki.js")).then(
 const main = document.querySelector("main.archive");
 /** Hero (centered Spotlight) while nothing is typed on All/Players; docked to the top otherwise. */
 function updateMode() {
-  const hero = q.value.trim().length < 2 && (!role || role === "player");
+  const hero = q.value.trim().length < 2 && !role;
   if (main.classList.contains("is-hero") === hero) return;
   main.classList.toggle("is-hero", hero);
   if (!hero) window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
@@ -95,7 +95,7 @@ async function search() {
   const term = q.value.trim();
   updateMode();
   clear.hidden = !term;
-  if (term.length < 2) { res.hidden = true; dir.hidden = false; if (!role || role === "player") renderDir(); return; }
+  if (term.length < 2) { res.hidden = true; dir.hidden = false; if (!role) renderDir(); return; }
   res.hidden = false; dir.hidden = true;
   const my = ++seq;
   res.innerHTML = `<li class="empty">Searching…</li>`;
@@ -141,9 +141,56 @@ function remember(item) {
 const offices = () => (officesP ||= fetch("/api/front-offices").then((r) => r.json()).then((j) => j.data).catch(() => { officesP = null; return null; }));
 const face = (src, name) => `<span class="dir-face">${src ? `<img src="${esc(src)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}<span>${esc(String(name).split(" ").map((w) => w[0]).slice(0, 2).join(""))}</span></span>`;
 const sk = (n) => `<ul class="dir-list">${Array.from({ length: n }, () => `<li class="dir-row"><span class="sk" style="width:2.5rem;height:2.5rem;border-radius:99px"></span><span class="sk" style="height:1rem;flex:1"></span></li>`).join("")}</ul>`;
+/* ---------- Players: one unified A–Z directory (active + legends), filter pills, letter bar, infinite scroll ---------- */
+const PD_FILTERS = [["all", "All"], ["active", "Active"], ["hof", "Hall of Fame"], ["top75", "Top 75"], ["G", "G"], ["F", "F"], ["C", "C"]];
+const PD = { filter: "all", next: 0, total: 0, letters: {}, loading: false, seq: 0, io: null };
+const pdRow = (p) => `<li><button class="dir-row press" type="button" data-enc="${esc(p.id)}">${face(p.headshot, p.name)}
+  <span class="dir-who"><b>${esc(p.name)}</b><small>${p.active ? `${p.team ? `<img class="dir-badge" src="${esc(logo(p.team))}" alt="" width="16" height="16" loading="lazy" referrerpolicy="no-referrer">${esc(p.team)} · ` : ""}Active` : esc(p.years || "Retired")}${p.pos ? ` · ${esc(p.pos)}` : ""}</small></span>
+  <span class="pd-tags">${p.hof ? '<span class="pd-tag hof" title="Naismith Hall of Fame">HOF</span>' : ""}${p.top75 ? '<span class="pd-tag t75" title="NBA 75th Anniversary Team">75</span>' : ""}</span></button></li>`;
+function renderPlayerDir() {
+  $("#archQuick").innerHTML = "";
+  dir.innerHTML = `<div class="pd-bar">
+      <div class="pd-filters" role="tablist" aria-label="Filter players">${PD_FILTERS.map(([k, l]) => `<button type="button" role="tab" data-pdf="${k}" aria-selected="${k === PD.filter}">${l}</button>`).join("")}</div>
+      <nav class="pd-letters" aria-label="Jump to letter">${"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((L) => `<button type="button" data-pdl="${L}">${L}</button>`).join("")}</nav>
+    </div>
+    <p class="pd-count" id="pdCount"></p>
+    <ul class="dir-list pd-list" id="pdList">${Array.from({ length: 8 }, () => `<li class="dir-row"><span class="sk" style="width:2.5rem;height:2.5rem;border-radius:99px"></span><span class="sk" style="height:1rem;flex:1"></span></li>`).join("")}</ul>
+    <div class="pd-more" id="pdMore" aria-hidden="true"></div>`;
+  pdLoad({ reset: true });
+  PD.io?.disconnect();
+  PD.io = new IntersectionObserver((ents) => { if (ents.some((e) => e.isIntersecting)) pdLoad(); }, { rootMargin: "600px 0px" });
+  PD.io.observe($("#pdMore"));
+}
+async function pdLoad({ reset = false, letter = null } = {}) {
+  if (role !== "player") return;
+  if (!reset && (PD.loading || PD.next >= PD.total)) return;
+  const my = reset ? ++PD.seq : PD.seq;
+  PD.loading = true;
+  const qs = new URLSearchParams({ filter: PD.filter, limit: "60" });
+  if (letter) qs.set("letter", letter); else qs.set("offset", reset ? "0" : String(PD.next));
+  try {
+    const j = await fetch(`/api/players/directory?${qs}`).then((r) => r.json());
+    if (my !== PD.seq || role !== "player") return;
+    const d = j.data; const list = $("#pdList"); if (!list) return;
+    PD.total = d.total; PD.letters = d.letters; PD.next = d.offset + d.players.length;
+    if (reset || letter) list.innerHTML = "";
+    list.insertAdjacentHTML("beforeend", d.players.map(pdRow).join("") || `<li class="empty">No players match this filter.</li>`);
+    $("#pdCount").textContent = `${d.total.toLocaleString("en-US")} players · A–Z by last name${letter ? ` · from ${letter}` : ""}`;
+    document.querySelectorAll("[data-pdl]").forEach((b) => { b.disabled = d.letters[b.dataset.pdl] == null; });
+    if (letter) $("#pdCount").scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  } catch { if (my === PD.seq) $("#pdCount").textContent = "The directory is unavailable right now. Search still works."; }
+  finally { if (my === PD.seq) PD.loading = false; }
+}
+document.addEventListener("click", (e) => {
+  const f = e.target.closest("[data-pdf]");
+  if (f) { PD.filter = f.dataset.pdf; document.querySelectorAll("[data-pdf]").forEach((x) => x.setAttribute("aria-selected", String(x === f))); PD.next = 0; pdLoad({ reset: true }); return; }
+  const L = e.target.closest("[data-pdl]");
+  if (L && !L.disabled) { ++PD.seq; PD.loading = false; pdLoad({ letter: L.dataset.pdl }); }
+});
 async function renderDir() {
   const r = role;
-  if (!r || r === "player") {          // centered Spotlight hero: 2×2 quick tiles (recent searches when there are any)
+  if (r === "player") { renderPlayerDir(); return; }
+  if (!r) {          // centered Spotlight hero: 2×2 quick tiles (recent searches when there are any)
     dir.innerHTML = "";
     const rec = recent().slice(0, 4);
     $("#archQuick").innerHTML = rec.length

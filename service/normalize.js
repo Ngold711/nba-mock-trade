@@ -531,7 +531,8 @@ export function normalizeCareer(json) {
   return {
     gp: A("gamesPlayed"), min: A("avgMinutes"), pts: A("avgPoints"), reb: A("avgRebounds"), ast: A("avgAssists"), stl: A("avgSteals"), blk: A("avgBlocks"), tov: A("avgTurnovers"),
     fgm, fga, tpm, tpa, ftm, fta, fgPct: A("fieldGoalPct"), threePct: A("threePointFieldGoalPct"), ftPct: A("freeThrowPct"),
-    totals: { pts: num(T("points"), null), reb: num(T("totalRebounds"), null), ast: num(T("assists"), null) },
+    totals: { pts: num(T("points"), null), reb: num(T("totalRebounds"), null), ast: num(T("assists"), null), stl: num(T("steals"), null), blk: num(T("blocks"), null),
+      tpm: (() => { const v = String(T("threePointFieldGoalsMade-threePointFieldGoalsAttempted") ?? ""); const n = Number(v.split("-")[0]); return v && Number.isFinite(n) ? n : null; })() },
     from: years.length ? Math.min(...years) : null, to: years.length ? Math.max(...years) : null,
   };
 }

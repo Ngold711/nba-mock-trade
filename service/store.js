@@ -29,7 +29,7 @@ export const TTL = {
   coaches: 12 * 60 * MIN,
   honors: 24 * 60 * MIN,
   league: 30 * MIN,        // all 30 rosters, warmed at startup
-  ratings: 6 * 60 * MIN,   // 2K27-style ratings
+  ratings: (Number(typeof process !== "undefined" && process.env?.RATINGS_TTL_MIN) || 6 * 60) * MIN,   // 2K27 ratings (re-reads RATINGS_FEED_URL each cycle)
   schedule: 30 * MIN,
   teamstats: 60 * MIN,
   sos: 60 * MIN,

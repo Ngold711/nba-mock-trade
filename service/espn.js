@@ -187,11 +187,14 @@ async function loadLeague(_params, opts) {
    (setResolver); in the browser fallback they're loaded directly. */
 let resolver = null;
 export function setResolver(fn) { resolver = fn; }
+let ratingsFeed = null;               // () => Promise<parsed feed | null>; the server installs it (live URL / bundled snapshot)
+export function setRatingsFeedProvider(fn) { ratingsFeed = fn; }
 const dep = (r, p = {}) => (resolver ? resolver(r, p) : load(r, p));
 async function loadRatings() {
   const { buildRatings } = await import("./ratings.js");
-  const [players, league, prevPlayers] = await Promise.all([dep("players"), dep("league").catch(() => null), dep("players", { season: "2026" }).catch(() => null)]);
-  return buildRatings({ players, league, prevPlayers });
+  const [players, league, prevPlayers, feed] = await Promise.all([dep("players"), dep("league").catch(() => null), dep("players", { season: "2026" }).catch(() => null),
+    ratingsFeed ? ratingsFeed().catch(() => null) : null]);
+  return buildRatings({ players, league, prevPlayers, feed });
 }
 /* Team efficiency: season averages for all 30 teams (in parallel) + opponent scoring from standings. */
 async function loadTeamStats(_p, opts) {
