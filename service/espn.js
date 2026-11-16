@@ -195,15 +195,22 @@ async function loadRatings() {
   const [players, league, feed] = await Promise.all([dep("players").catch(() => null), dep("league").catch(() => null), ratingsFeed ? ratingsFeed().catch(() => null) : null]);
   return buildRatings({ players, league, feed });
 }
-/* Starting lineups: ESPN's team depth charts (#1 at PG/SG/SF/PF/C for all 30 teams). */
+/* Starting lineups + five-slot positions (service/lineups.js): latest box-score starters, depth charts, 2K27 positions. */
 const DEPTH = (id) => `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${id}/depthcharts`;
-async function loadDepth(_p, opts) {
-  const league = await dep("league");
+const TEAM_SCHEDULE = (id) => `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${id}/schedule`;
+const SUMMARY = (id) => `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${id}`;
+async function loadLineups(_p, opts) {
+  const { resolveLineups, lastCompleted, boxStarters } = await import("./lineups.js");
+  const [league, stats, ratings] = await Promise.all([dep("league"), dep("players").catch(() => null), dep("ratings").catch(() => null)]);
   const teams = Object.values(league?.teams || {}).filter((t) => t.id);
-  const settled = await Promise.allSettled(teams.map((t) => fetchJson(DEPTH(t.id), opts)));
-  if (!settled.some((r) => r.status === "fulfilled")) throw new Error("No depth charts could be loaded");
-  const { startersFrom } = await import("./starters.js");
-  return startersFrom(teams.map((t, i) => ({ team: t, depth: settled[i].status === "fulfilled" ? settled[i].value : null })), league, await dep("players").catch(() => null));
+  const get = (u) => fetchJson(u, opts).catch(() => null);
+  const [depths, scheds] = await Promise.all([Promise.all(teams.map((t) => get(DEPTH(t.id)))), Promise.all(teams.map((t) => get(TEAM_SCHEDULE(t.id))))]);
+  if (!depths.some(Boolean) && !scheds.some(Boolean)) throw new Error("No depth charts or schedules could be loaded");
+  const last = scheds.map((s) => lastCompleted(s));
+  const ids = [...new Set(last.filter(Boolean).map((g) => g.id))];
+  const sums = new Map(await Promise.all(ids.map(async (id) => [id, await get(SUMMARY(id))])));
+  const official = new Map((ratings?.players || []).filter((p) => p.officialPos).map((p) => [String(p.id), p.officialPos]));
+  return resolveLineups({ league, stats, official, teams: teams.map((t, i) => ({ team: t, depth: depths[i], lastGame: last[i], starters: last[i] ? boxStarters(sums.get(last[i].id), t.abbr) : null })) });
 }
 /* Transactions: ESPN + NBA.com player movement (server only; NBA.com doesn't allow browser CORS). */
 let txStatus = { syncedAt: null, sources: {} };
@@ -284,7 +291,7 @@ async function loadSos(_p, opts) {
   for (const conf of st?.conferences || []) for (const t of conf.teams) winPct[t.team.abbr] = t.pct;
   return { asOf: new Date().toISOString(), teams: scheduleStrength(schedules, winPct) };
 }
-const CUSTOM = { transactions: loadTransactions, teamstats: loadTeamStats, sos: loadSos, college: loadCollege, starts: loadStarts, coaches: loadCoaches, league: loadLeague, ratings: loadRatings, depth: loadDepth };
+const CUSTOM = { transactions: loadTransactions, teamstats: loadTeamStats, sos: loadSos, college: loadCollege, starts: loadStarts, coaches: loadCoaches, league: loadLeague, ratings: loadRatings, lineups: loadLineups };
 
 /** Fetch + normalize one resource. */
 export async function load(resource, params = {}, opts = {}) {

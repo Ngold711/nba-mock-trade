@@ -1019,8 +1019,9 @@ body.has-shell, body.has-orb, body.has-shell.has-orb { padding-bottom: calc(var(
 .arch-quick > button:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent); }
 .aq-h { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--label-3); }
 .aq-h .link { border: 0; background: none; color: var(--accent); font: inherit; letter-spacing: 0; text-transform: none; font-size: 0.8125rem; cursor: pointer; padding: 0.3rem 0; }
-.archive.is-hero .arch-links { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.15rem 0.45rem; margin-top: 1.1rem; font-size: 0.8125rem; color: color-mix(in srgb, #F59E0B 55%, transparent); }
-.arch-links button { border: 0; background: none; padding: 0.35rem 0.1rem; color: #F59E0B; font: inherit; font-weight: 550; cursor: pointer; }
+.archive.is-hero .arch-links { display: grid; grid-template-columns: repeat(2, minmax(0, max-content)); justify-content: center; gap: 0.1rem 1.4rem; margin-top: 1.1rem; font-size: 0.8125rem; }
+@media (min-width: 40rem) { .archive.is-hero .arch-links { grid-template-columns: repeat(4, max-content); } }
+.arch-links button { border: 0; background: none; padding: 0.55rem 0.1rem; min-height: 44px; white-space: nowrap; color: #F59E0B; font: inherit; font-weight: 550; cursor: pointer; }
 .arch-links button:hover { text-decoration: underline; text-underline-offset: 3px; }
 :root[data-theme="light"] .arch-links button { color: #B45309; }
 @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .arch-links button { color: #B45309; } }
@@ -1128,3 +1129,16 @@ body.has-shell, body.has-orb, body.has-shell.has-orb { padding-bottom: 0; }
 .tm-row i.t-S { background: #FF6B6B; } .tm-row i.t-A { background: #FB923C; } .tm-row i.t-B { background: #FACC15; }
 .tm-row b { flex: none; width: 0.62rem; height: 0.62rem; border-radius: 50%; background: rgba(255,255,255,.55); }
 @media (prefers-reduced-motion: reduce) { .mc-row i, .wp-ring { animation: none !important; } }
+
+/* Archive → Retired Jerseys */
+.rj-teams { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+.rj-team { padding: 0.6rem 0.7rem; border-radius: 0.9rem; background: var(--fill); }
+.rj-head { display: flex; align-items: center; gap: 0.5rem; }
+.rj-head b { flex: 1; min-width: 0; font-size: 0.95rem; }
+.rj-n { font: 700 0.75rem var(--font-mono); color: var(--label-3); }
+.rj-nums { list-style: none; margin: 0.45rem 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr)); gap: 0.35rem 0.75rem; }
+.rj-nums li { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.rj-num { flex: none; display: grid; place-items: center; min-width: 2.1rem; height: 2.1rem; padding: 0 0.25rem; border-radius: 0.5rem; background: var(--surface); box-shadow: inset 0 0 0 1px var(--sep); font-weight: 800; font-size: 0.9rem; color: var(--accent); }
+.rj-who { display: grid; min-width: 0; } .rj-who b { font-size: 0.85rem; overflow-wrap: anywhere; } .rj-who small { color: var(--label-3); font-size: 0.72rem; }
+.rj-none, .rj-up { margin: 0.4rem 0 0; font-size: 0.8rem; color: var(--label-3); } .rj-up { color: var(--accent); }
+.hist-tabs { flex-wrap: wrap; }

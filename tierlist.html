@@ -45,7 +45,9 @@
   <label class="tl-cat"><span>Category</span><select id="cat">
     <option value="pg">30 Starting Point Guards</option><option value="sg">30 Starting Shooting Guards</option><option value="sf">30 Starting Small Forwards</option>
     <option value="pf">30 Starting Power Forwards</option><option value="c">30 Starting Centers</option><option value="top25" selected>Top 25 NBA Players Right Now</option>
-    <option value="rookies">2026–27 Rookie Class</option><option value="top75">All-Time Top 75 Legends</option><option value="teams">All 30 NBA Teams</option></select></label>
+    <option value="rookies">2026–27 Rookie Class</option>
+    <option value="at_pg">All-Time Point Guards</option><option value="at_sg">All-Time Shooting Guards</option><option value="at_sf">All-Time Small Forwards</option>
+    <option value="at_pf">All-Time Power Forwards</option><option value="at_c">All-Time Centers</option><option value="top75">All-Time Top 75 Legends</option><option value="teams">All 30 NBA Teams</option></select></label>
   <p class="g-note" id="hint">Tap a player, then tap a tier. Or drag. Tap a ranked player to send them back.</p>
   <div class="tl-add">
     <input class="search" id="addQ" type="search" placeholder="+ Add any player (5,400+ in the archive)" autocomplete="off" aria-label="Add any player" />
@@ -77,7 +79,8 @@ let data = { ratings: null, league: null, top75: null, starters: null, stats: nu
 
 /* ---------- categories (live data) ---------- */
 const CATS = { pg: "30 Starting Point Guards", sg: "30 Starting Shooting Guards", sf: "30 Starting Small Forwards", pf: "30 Starting Power Forwards", c: "30 Starting Centers",
-  top25: "Top 25 NBA Players Right Now", rookies: "2026–27 Rookie Class", top75: "All-Time Top 75 Legends", teams: "All 30 NBA Teams" };
+  top25: "Top 25 NBA Players Right Now", rookies: "2026–27 Rookie Class", top75: "All-Time Top 75 Legends", teams: "All 30 NBA Teams",
+  at_pg: "All-Time Point Guards", at_sg: "All-Time Shooting Guards", at_sf: "All-Time Small Forwards", at_pf: "All-Time Power Forwards", at_c: "All-Time Centers" };
 const nk = (n) => String(n || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[.'’]/g, "").replace(/\b(jr|sr|ii|iii|iv)\b/g, "").replace(/[^a-z0-9]+/g, "");
 /** Strict de-duplication: by player id, then by normalized full name. */
 function dedupe(list) {
@@ -93,10 +96,11 @@ function build(key) {
   const byOvrThenProd = (a, b) => (ovr.get(String(b.id)) ?? -1) - (ovr.get(String(a.id)) ?? -1) || prod(b) - prod(a);
   const SLOT = { pg: "PG", sg: "SG", sf: "SF", pf: "PF", c: "C" };
   if (SLOT[key]) return dedupe((data.starters?.positions?.[SLOT[key]] || []).map(P));
+  if (key.startsWith("at_")) return dedupe((data.alltime?.[SLOT[key.slice(3)]] || []).map((p) => ({ id: String(p.id), n: p.name, t: p.active ? p.team : "", img: p.headshot, alt: p.alt })));
   switch (key) {
     case "top25": return dedupe([...L].sort(byOvrThenProd).map(P)).slice(0, 25);
     case "rookies": return dedupe(L.filter((p) => p.experience === 0).sort((a, b) => byOvrThenProd(a, b) || ((st.get(String(b.id))?.pts || 0) - (st.get(String(a.id))?.pts || 0))).map(P)).slice(0, 25);
-    case "top75": return dedupe((data.top75 || []).map((p) => ({ id: String(p.id), n: p.name, t: "", img: p.headshot || null })));
+    case "top75": return dedupe((data.top75 || []).map((p) => ({ id: String(p.id), n: p.name, t: "", img: p.headshot || null, alt: p.alt || null })));
     case "teams": return Object.values(data.league?.teams || {}).filter((t) => t.displayName).map((t) => ({ id: `team:${t.abbr}`, n: t.displayName, t: t.abbr, img: t.logo, team: true }))
       .sort((a, b) => a.n.localeCompare(b.n));
   }
@@ -105,7 +109,8 @@ function build(key) {
 const SRC = { teams: "From live ESPN team data.", top75: "The NBA's 75th Anniversary Team (76 players).",
   rookies: "Rookies on live ESPN rosters, by official 2K27 OVR where synced, then 2026–27 scoring.",
   top25: "Sorted by official NBA 2K27 OVR where synced, then 2026–27 PTS + REB + AST.",
-  pg: "starters", sg: "starters", sf: "starters", pf: "starters", c: "starters" };
+  pg: "starters", sg: "starters", sf: "starters", pf: "starters", c: "starters",
+  at_pg: "alltime", at_sg: "alltime", at_sf: "alltime", at_pf: "alltime", at_c: "alltime" };
 
 /* ---------- state ---------- */
 const key = () => `tiers:v2:${cat}`;
@@ -120,7 +125,8 @@ function load() {
   st.tray.push(...list.map((x) => x.id).filter((id) => !placed.has(id)));
   sel = null; render();
   const s = SRC[cat];
-  $("#srcNote").textContent = s === "starters" ? `Each team's #1 ${CATS[cat].replace("30 Starting ", "").replace(/s$/, "")} on today's ESPN depth chart: one per team, 30 total.` : s || "";
+  $("#srcNote").textContent = s === "starters" ? `One per team: each team's ${CATS[cat].replace("30 Starting ", "").replace(/s$/, "").toLowerCase()} from its latest box-score starting five (refreshed after every game), placed by the same positions used across Hooptrax.`
+    : s === "alltime" ? "Hooptrax's picks: legends and active greats at their primary position. Use + Add any player to bring in anyone else." : s || "";
 }
 const persist = () => LS.set(key(), st);
 function move(id, to) {
@@ -138,7 +144,7 @@ function addPlayer(p) {
 /* ---------- render ---------- */
 const tile = (id) => { const x = items[id]; if (!x) return "";
   return `<button class="tl-tile${x.team ? " team" : ""}${sel === id ? " sel" : ""}" type="button" data-id="${esc(id)}" aria-pressed="${sel === id}" aria-label="${esc(x.n)}">
-    <span class="tl-img"><span>${esc(ini(x.n))}</span>${x.img ? `<img src="${esc(x.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" draggable="false">` : ""}</span>
+    <span class="tl-img"><span>${esc(ini(x.n))}</span>${x.img ? `<img src="${esc(x.img)}"${x.alt ? ` data-alt="${esc(x.alt)}"` : ""} alt="" loading="lazy" referrerpolicy="no-referrer" draggable="false" onerror="if(this.dataset.alt){this.src=this.dataset.alt;delete this.dataset.alt}else{this.remove()}">` : ""}</span>
     <span class="tl-n">${esc(x.team ? x.t : x.n.split(" ").slice(-1)[0])}</span>${x.t && !x.team ? `<img class="tl-badge-logo" src="${logo(x.t)}" alt="" loading="lazy" referrerpolicy="no-referrer" draggable="false">` : ""}</button>`; };
 function render() {
   $("#board").innerHTML = TIERS.map((k) => `<div class="tl-row" data-zone="${k}"><span class="tl-badge t-${k}">${k}</span><div class="tl-drop">${st[k].map(tile).join("") || `<span class="tl-empty">${sel ? "Tap to place here" : ""}</span>`}</div></div>`).join("");
@@ -210,8 +216,8 @@ $("#cat").addEventListener("change", (e) => { cat = e.target.value; LS.set("tier
 
 /* ---------- data ---------- */
 $("#cat").value = cat;
-const [r, l, t75, sp, pl] = await Promise.all(["/api/2k27-ratings", "/api/league", "/api/players/directory?filter=top75&limit=100", "/api/starters", "/api/players"].map((u) => fetch(u).then((x) => x.json()).then((j) => j.data).catch(() => null)));
-data = { ratings: r, league: l, top75: t75?.players || [], starters: sp, stats: pl };
+const [r, l, t75, sp, pl, at] = await Promise.all(["/api/2k27-ratings", "/api/league", "/api/players/directory?filter=top75&limit=100", "/api/lineups", "/api/players", "/api/alltime-positions"].map((u) => fetch(u).then((x) => x.json()).then((j) => j.data).catch(() => null)));
+data = { ratings: r, league: l, top75: t75?.players || [], starters: sp, stats: pl, alltime: at };
 // opened from the Community Feed: ?item=<id> loads that list read-only into the board
 const itemId = new URLSearchParams(location.search).get("item");
 if (itemId) {

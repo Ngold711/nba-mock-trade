@@ -48,6 +48,14 @@ const json = (res, status, body) => {
   res.end(JSON.stringify(body));
 };
 
+/** 2K27 ratings with each player's position from the shared resolver (official 2K position kept when the feed has one). */
+async function ratingsRoute(req, res) {
+  try {
+    const [r, l] = await Promise.all([store.get("ratings"), store.get("lineups").catch(() => null)]);
+    const prim = l?.data?.primary || {};
+    return json(res, 200, { ...r, data: { ...r.data, players: r.data.players.map((p) => (p.officialPos || !prim[p.id] ? p : { ...p, pos: prim[p.id].pos })) } });
+  } catch (err) { return json(res, 502, { error: `Couldn't reach ESPN: ${err.message}`, resource: "ratings" }); }
+}
 async function serve(res, resource, params) {
   try {
     json(res, 200, await store.get(resource, params));
@@ -167,6 +175,7 @@ async function refreshAfterFinals() {
       // 2K27 ratings (stat model), rosters and the transactions wire
       await Promise.allSettled(["players", "standings", "injuries", "transactions"].map((r) => store.get(r, {}, { force: true })));
       await Promise.allSettled(["teamstats", "sos", "ratings", "league"].map((r) => store.get(r, {}, { force: true })));
+      await store.get("lineups", {}, { force: true }).catch(() => {});   // a starter back from injury re-enters the night he starts
       dirCache.at = 0; liveHist.at = 0;
       log(`[sync] new final(s): stats, standings, injuries, net ratings, SOS, ratings, rosters and transactions refreshed`);
     }
@@ -191,6 +200,21 @@ async function liveHistory(history) {
       .catch(() => { liveHist.at = 0; return history; }) };
   }
   return liveHist.p;
+}
+/** NBA.com person ids for history rows (by ESPN id, else by a unique name) so legends get official headshots. */
+export function withNbaIds(history, all) {
+  if (!history || !all?.players) return history;
+  const f = all.fields, I = (k) => f.indexOf(k);
+  const byEspn = new Map(), byName = new Map(), count = new Map();
+  for (const r of all.players) {
+    const nba = r[I("nba")]; if (!nba) continue;
+    if (r[I("espn")]) byEspn.set(String(r[I("espn")]), nba);
+    const k = String(r[I("name")]).toLowerCase(); count.set(k, (count.get(k) || 0) + 1); byName.set(k, nba);
+  }
+  const idOf = (row) => byEspn.get(String(row.id)) || (count.get(String(row.name).toLowerCase()) === 1 ? byName.get(String(row.name).toLowerCase()) : null) || null;
+  const tag = (rows) => (rows || []).map((r) => ({ ...r, nbaId: r.nbaId || idOf(r) }));
+  const map = (o) => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [k, tag(v)]));
+  return { ...history, legends: tag(history.legends), careerLeaders: map(history.careerLeaders), singleSeason: map(history.singleSeason) };
 }
 async function chatData() {
   staticData ||= Promise.all([readFile(join(ROOT, "nba_history.json"), "utf8"), readFile(join(ROOT, "prospects.json"), "utf8"), readFile(join(ROOT, "salaries_2026_27.json"), "utf8")])
@@ -665,13 +689,39 @@ const fmtDob = (d) => { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(
  *  ?filter=all|active|hof|top75|G|F|C&q=name&letter=K&offset=0&limit=25 */
 let dirCache = { at: 0, list: null };
 let allPlayers = null;
+/** NBA.com id for an ESPN id (or a unique name) from all_players.json. */
+async function nbaIdOf(espnId, name) {
+  const all = await loadAllPlayers(); if (!all) return null;
+  const f = all.fields, E = f.indexOf("espn"), N = f.indexOf("nba"), M = f.indexOf("name");
+  const hit = all.players.find((r) => String(r[E]) === String(espnId) && r[N]) || null;
+  if (hit) return hit[N];
+  const same = all.players.filter((r) => r[M] === name && r[N]);
+  return same.length === 1 ? same[0][N] : null;
+}
 const loadAllPlayers = () => (allPlayers ||= readFile(join(ROOT, "all_players.json"), "utf8").then(JSON.parse).catch(() => null));
-async function playerDirectoryRoute(req, res, m, q) {
+/** Tier List Maker: all-time position pools resolved against the directory (ids + NBA.com headshots). */
+async function allTimeRoute(req, res) {
+  await ensureDirectory().catch(() => {});
+  const { resolveAllTime } = await import("./service/alltime.js");
+  const { matchKey } = await import("./service/directory.js");
+  res.setHeader("cache-control", "public, max-age=600");
+  return json(res, 200, { data: resolveAllTime(dirCache.list || [], matchKey) });
+}
+/** The A–Z directory (cached 10 minutes): every NBA/ABA/BAA player, live rosters and resolved positions merged in. */
+async function ensureDirectory() {
   if (!dirCache.list || Date.now() - dirCache.at > 10 * 60e3) {
     const [league, d, all] = await Promise.all([store.get("league").then((r) => r.data).catch(() => null), chatData().catch(() => ({})), loadAllPlayers()]);
     const list = buildDirectory({ league, legends: d.history?.legends || [], all });
+    // active players: the resolved five-slot position (service/lineups.js), so Archive filters match every other page
+    const prim = (await timeout(store.get("lineups").then((r) => r.data).catch(() => null), 3000, null))?.primary || {};
+    const G5 = { PG: "G", SG: "G", SF: "F", PF: "F", C: "C" };
+    for (const p of list) if (p.active && prim[p.id]) { p.pos = prim[p.id].pos; p.g = [G5[p.pos]]; }
     if (list.length) dirCache = { at: league ? Date.now() : Date.now() - 9 * 60e3, list };   // retry soon if rosters weren't loaded yet
   }
+  return dirCache.list || [];
+}
+async function playerDirectoryRoute(req, res, m, q) {
+  await ensureDirectory();
   const filter = ["all", "active", "hof", "top75", "G", "F", "C"].includes(q.get("filter")) ? q.get("filter") : "all";
   const rows = filterDirectory(dirCache.list || [], filter, String(q.get("q") || "").slice(0, 40));
   const letters = {};
@@ -732,7 +782,8 @@ async function playerFullRoute(req, res, m) {
   const years = [...new Set(seasons.map((s) => s.year).filter(Boolean))];
   const profile = {
     id, name, active,
-    headshot: `https://a.espncdn.com/i/headshots/nba/players/full/${id}.png`,
+    headshot: !active && (await nbaIdOf(id, name)) ? `https://cdn.nba.com/headshots/nba/latest/1040x760/${await nbaIdOf(id, name)}.png` : `https://a.espncdn.com/i/headshots/nba/players/full/${id}.png`,
+    headshotAlt: `https://a.espncdn.com/i/headshots/nba/players/full/${id}.png`,
     jersey: lp?.jersey || bio?.jersey || "", position: lp?.position || bio?.position || leg?.position || "", positionName: bio?.positionName || "",
     height: bio?.height || lp?.height || leg?.height || "", weight: bio?.weight || lp?.weight || "",
     age: active ? bio?.age ?? lp?.age ?? null : null, dob: fmtDob(bio?.dob), birthPlace: bio?.birthPlace || leg?.birthPlace || "",
@@ -811,10 +862,14 @@ const routes = [
   [/^\/api\/starts$/, (req, res) => serve(res, "starts", {})],
   [/^\/api\/coaches$/, (req, res) => serve(res, "coaches", {})],
   [/^\/api\/league$/, (req, res) => serve(res, "league", {})],
-  [/^\/api\/2k-ratings$/, (req, res) => serve(res, "ratings", {})],
-  [/^\/api\/2k27-ratings$/, (req, res) => serve(res, "ratings", {})],
+  [/^\/api\/2k-ratings$/, ratingsRoute],
+  [/^\/api\/2k27-ratings$/, ratingsRoute],
+  [/^\/api\/alltime-positions$/, allTimeRoute],
+  [/^\/api\/positions$/, async (req, res) => { try { const l = await store.get("lineups"); res.setHeader("cache-control", "public, max-age=300");
+    return json(res, 200, { data: { asOf: l.data.asOf, positions: Object.fromEntries(Object.entries(l.data.primary).map(([id, v]) => [id, v.pos])) } }); } catch (e) { return json(res, 502, { error: e.message }); } }],
   [/^\/api\/2k27-ratings\/status$/, (req, res) => json(res, 200, { data: ratingsSyncStatus() })],
-  [/^\/api\/starters$/, (req, res) => serve(res, "depth", {})],
+  [/^\/api\/starters$/, (req, res) => serve(res, "lineups", {})],
+  [/^\/api\/lineups$/, (req, res) => serve(res, "lineups", {})],
   [/^\/api\/team-stats$/, (req, res) => serve(res, "teamstats", {})],
   [/^\/api\/sos$/, (req, res) => serve(res, "sos", {})],
   [/^\/api\/bio\/(\d{1,12})$/, (req, res, m) => serve(res, "bio", { id: m[1] })],
@@ -845,7 +900,7 @@ const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; ch
 async function serveStatic(req, res, pathname) {
   if (pathname === "/nba_history.json") {          // the browser gets the same live career boards as Ask Hooptrax
     const d = await chatData().catch(() => null);
-    if (d?.history) { res.writeHead(200, { "content-type": "application/json", "cache-control": "public, max-age=300" }); return res.end(JSON.stringify(d.history)); }
+    if (d?.history) { res.writeHead(200, { "content-type": "application/json", "cache-control": "public, max-age=300" }); return res.end(JSON.stringify(withNbaIds(d.history, await loadAllPlayers()))); }
   }
   const rel = pathname === "/" ? "/index.html" : pathname;
   const file = normPath(join(ROOT, decodeURIComponent(rel)));
@@ -882,7 +937,7 @@ export const server = createServer(async (req, res) => {
 // (league rosters and standings every 30 min), so requests are answered from memory instead of
 // waiting on ESPN. This matters most right after a Render cold start.
 export function startPolling() {
-  const stops = ["scoreboard", "injuries", "standings", "transactions", "teams", "players", "ratings", "teamstats", "sos"].map((r) => store.watch(r, {}, () => {}));
+  const stops = ["scoreboard", "injuries", "standings", "transactions", "teams", "players", "ratings", "teamstats", "sos", "lineups"].map((r) => store.watch(r, {}, () => {}));
   stops.push(store.watch("league", {}, (data) => {
     if (!data?.rosters) return;
     for (const [teamId, roster] of Object.entries(data.rosters)) store.prime("roster", { team: teamId }, roster);

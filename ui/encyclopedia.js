@@ -126,7 +126,7 @@ export function mountEncyclopedia({ sheet, openCompare = () => {}, toast = () =>
       const draftTxt = draftLine(d);
       const hero = `<button class="link-back press" type="button" data-eback>‹ Search</button>
         <div class="enc-hero">
-          <div class="enc-face">${avatar({ name: p.name, headshot: p.headshot }, { size: "5.5rem", color: p.team?.color || "#475569", full: true })}${p.ovr ? `<span class="enc-ovr" title="Official NBA 2K27 OVR">${p.ovr.value}</span>` : ""}</div>
+          <div class="enc-face">${avatar({ name: p.name, headshot: p.headshot, headshotAlt: p.headshotAlt }, { size: "5.5rem", color: p.team?.color || "#475569", full: true })}${p.ovr ? `<span class="enc-ovr" title="Official NBA 2K27 OVR">${p.ovr.value}</span>` : ""}</div>
           <div class="enc-id"><h3>${esc(p.name)}</h3>
             <div class="enc-sub">${badge}${p.jersey ? `<span>#${esc(p.jersey)}</span>` : ""}${p.position ? `<span>${esc(p.position)}</span>` : ""}${p.height ? `<span>${esc(p.height)}</span>` : ""}${p.weight ? `<span>${esc(p.weight)}</span>` : ""}</div></div>
         </div>

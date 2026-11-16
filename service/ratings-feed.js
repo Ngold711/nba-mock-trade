@@ -19,7 +19,7 @@ export function parseRatingsFeed(json, { minPlayers = 1 } = {}) {
     const delta = num(r?.delta ?? r?.change);
     const badges = num(r?.badges);
     players.push({ name, ovr: Math.round(ovr), delta: Number.isFinite(delta) ? Math.round(delta) : 0, team: r?.team ? String(r.team) : "", attributes: r?.attributes && typeof r.attributes === "object" ? r.attributes : null,
-      badges: Number.isFinite(badges) ? Math.round(badges) : null });
+      badges: Number.isFinite(badges) ? Math.round(badges) : null, position: /^(PG|SG|SF|PF|C)\b/i.test(String(r?.position ?? r?.pos ?? "")) ? String(r.position ?? r.pos).toUpperCase().slice(0, 2).replace(/^C.?$/, "C") : null });
   }
   if (players.length < minPlayers) throw new Error(`ratings feed: ${players.length} valid players (need ${minPlayers})`);
   // official team ratings (optional): [{ team: "OKC" | "Oklahoma City Thunder", ovr, offense?, defense? }]

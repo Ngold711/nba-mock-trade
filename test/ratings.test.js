@@ -55,24 +55,34 @@ test("official ratings sync: cross-check merge, last verified copy on failure, s
   assert.equal(kept.syncedAt, "2026-11-16T03:00:00.000Z");
 });
 
-test("starting lineups: one player per team per slot, depth chart first, minutes fallback", async () => {
-  const { startersFrom, fitCost } = await import("../service/starters.js");
+test("lineups: box-score starters, five-slot positions, injured starter swaps back the night he starts", async () => {
+  const { resolveLineups, primaryPosition, depthSlots, boxStarters, lastCompleted } = await import("../service/lineups.js");
   const ath = (id, n) => ({ id, displayName: n });
   const depth = (rows) => ({ depthchart: [{ positions: Object.fromEntries(rows.map(([k, list]) => [k, { athletes: list }])) }] });
-  const league = { players: [
-    ...["G", "G", "F", "F", "C", "G"].map((pos, i) => ({ id: `b${i}`, name: `Bos ${i}`, teamAbbr: "BOS", position: pos })),
-  ] };
-  const players = { players: league.players.map((p, i) => ({ id: p.id, stats: { min: 36 - i } })) };
-  const r = startersFrom([
-    { team: { abbr: "OKC" }, depth: depth([["pg", [ath("1", "SGA")]], ["sg", [ath("1", "SGA"), ath("2", "McCain")]], ["sf", [ath("3", "Mitchell")]], ["pf", [ath("4", "Mara")]], ["c", [ath("5", "Hartenstein")]]]) },
-    { team: { abbr: "BOS" }, depth: null },
-  ], league, players);
-  assert.deepEqual(Object.values(r.teams.OKC).map((p) => p.name), ["SGA", "McCain", "Mitchell", "Mara", "Hartenstein"], "a player listed twice fills one slot only");
-  assert.deepEqual(Object.values(r.teams.BOS).map((p) => p.position), ["G", "G", "F", "F", "C"]);
-  for (const s of ["PG", "SG", "SF", "PF", "C"]) assert.equal(r.positions[s].length, 2);
-  const all = Object.values(r.positions).flat().map((p) => p.id);
+  const D = depth([["pg", [ath("1", "Pg One")]], ["sg", [ath("2", "Sg Two"), ath("6", "Bench Six")]], ["sf", [ath("3", "Sf Three")]], ["pf", [ath("4", "Caleb Wilson"), ath("7", "Fill In")]], ["c", [ath("5", "Big Five")]]]);
+  const league = { players: [["1", "G"], ["2", "G"], ["3", "F"], ["4", "F"], ["5", "C"], ["6", "G"], ["7", "F"]].map(([id, pos]) => ({ id, name: `P${id}`, teamAbbr: "CHA", position: pos })) };
+  const box = (ids) => ({ boxscore: { players: [{ team: { abbreviation: "CHA" }, statistics: [{ athletes: ids.map(([id, g]) => ({ starter: true, athlete: { id, displayName: `P${id}`, position: { abbreviation: g } } })) }] }] } });
+  // Caleb Wilson (4) out: the fill-in (7) starts and holds the PF spot
+  const out = resolveLineups({ league, teams: [{ team: { abbr: "CHA" }, depth: D, lastGame: { id: "g1" }, starters: boxStarters(box([["1", "G"], ["2", "G"], ["3", "F"], ["7", "F"], ["5", "C"]]), "CHA") }] });
+  assert.deepEqual(["PG", "SG", "SF", "PF", "C"].map((s) => out.teams.CHA[s].id), ["1", "2", "3", "7", "5"]);
+  // the night he starts again, he's back
+  const back = resolveLineups({ league, teams: [{ team: { abbr: "CHA" }, depth: D, lastGame: { id: "g2" }, starters: boxStarters(box([["4", "F"], ["1", "G"], ["5", "C"], ["3", "F"], ["2", "G"]]), "CHA") }] });
+  assert.equal(back.teams.CHA.PF.id, "4"); assert.equal(back.positions.PF[0].name, "P4");
+  // no box score yet → depth chart #1s
+  const pre = resolveLineups({ league, teams: [{ team: { abbr: "CHA" }, depth: D, lastGame: null, starters: null }] });
+  assert.equal(pre.teams.CHA.from, "depth"); assert.equal(pre.teams.CHA.PF.id, "4");
+  // positions: official 2K position > depth chart > group + stats
+  assert.equal(primaryPosition({ group: "G", official: "SF", depth: { slot: "SG" } }).pos, "SF");
+  assert.equal(primaryPosition({ group: "G", depth: { slot: "SG" } }).pos, "SG");
+  assert.equal(primaryPosition({ group: "F", depth: { slot: "SG" } }).pos, "SF", "a roster forward listed at SG (Michael Porter Jr.) is a SF");
+  assert.equal(primaryPosition({ group: "G", depth: { slot: "SF" } }).pos, "SF", "a G-listed wing keeps his depth-chart slot");
+  assert.equal(primaryPosition({ group: "F", depth: { slot: "C" } }).pos, "C");
+  assert.equal(primaryPosition({ group: "G", stats: { ast: 8, pts: 18 } }).pos, "PG");
+  assert.equal(primaryPosition({ group: "F", stats: { reb: 9 } }).pos, "PF");
+  assert.deepEqual(depthSlots(D)["6"], { slot: "SG", rank: 1 });
+  assert.equal(lastCompleted({ events: [{ id: "a", date: "2026-11-10T00:00Z", competitions: [{ status: { type: { completed: true } } }] }, { id: "b", date: "2026-11-12T00:00Z", competitions: [{ status: { type: { completed: true } } }] }, { id: "c", date: "2026-11-14T00:00Z", competitions: [{ status: { type: { completed: false } } }] }] }).id, "b");
+  const all = Object.values(back.positions).flat().map((p) => p.id);
   assert.equal(all.length, new Set(all).size);
-  assert.ok(fitCost("C", "C") < fitCost("G", "C"));
 });
 
 test("team schedule and game summary extras normalize", () => {

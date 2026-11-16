@@ -108,12 +108,12 @@ export function buildRatings({ players = null, league = null, feed = null } = {}
     const attrs = seed.attributes ? feedAttrs(null, seed.attributes) : null;
     const role = attrs || attributes(st, { position, age }) || {};
     const g = String(position).toUpperCase();
-    const pos = g.startsWith("C") ? "C" : g.startsWith("G") ? ((role.playmaking ?? 0) >= 72 ? "PG" : "SG") : g.startsWith("F") ? ((role.rebounding ?? 0) >= 72 || (role.finishing ?? 0) >= 85 && (role.threePt ?? 99) < 60 ? "PF" : "SF") : "SF";
+    const pos = seed.position ? seed.position : g.startsWith("C") ? "C" : g.startsWith("G") ? ((role.playmaking ?? 0) >= 72 ? "PG" : "SG") : g.startsWith("F") ? ((role.rebounding ?? 0) >= 72 || (role.finishing ?? 0) >= 85 && (role.threePt ?? 99) < 60 ? "PF" : "SF") : "SF";
     const ovr = clamp(seed.ovr, 40, 99);
     out.push({
       id, name: r.name, pos, teamAbbr: r.teamAbbr || stats.get(id)?.teamAbbr || "", position, age,
       headshot: r.headshot || null, headshotSmall: r.headshotSmall || r.headshot || null, initials: r.initials || "",
-      ovr, delta: seed.delta || 0, tier: tierOf(ovr), official: true, seeded: true, estimated: false, attrs, badges: seed.badges ?? null, gp: st?.gp || 0,
+      ovr, delta: seed.delta || 0, tier: tierOf(ovr), officialPos: seed.position || null, official: true, seeded: true, estimated: false, attrs, badges: seed.badges ?? null, gp: st?.gp || 0,
     });
   }
   out.sort((a, b) => b.ovr - a.ovr || a.name.localeCompare(b.name));

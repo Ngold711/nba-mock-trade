@@ -756,3 +756,27 @@ Built by an offline generator that cross-checks editorial data against ESPN:
 - Higher or Lower: 97 vs ? rating cards.
 - Who He Play For?: a silhouette inside a shot-clock ring.
 - Tier List Maker: an S/A/B grid.
+
+## Round 26: Archive sections, five-position resolver, live starting fives, all-time tier lists
+
+**Archive**
+- All four sections are links on the Archive screen (2×2 on phones, one row on wider screens). The history sheet has the same four tabs, and each link opens its own tab:
+  - All-Time Leaders
+  - Champions & Awards
+  - Retired Jerseys (new tab: every franchise's numbers, names, years and Hall of Fame marks, plus upcoming retirements)
+  - Draft History
+- **Leaderboards:** each stat pill reads only its own list (`careerLeaders[key]` / `singleSeason[key]`). Each list is labelled with its stat ("Career Points · PTS", "3PM"), and the All-Time Leaders link always opens on Career Points. Live boards: LeBron 43,606 PTS, and 3rd in assists (12,092) ahead of Kidd (12,091).
+- **Legend headshots:** official NBA.com headshots load first (`nbaId` from `all_players.json`, e.g. Reggie Miller → 397), then ESPN, then initials. `avatar()` takes `headshotAlt` for the second try.
+
+**Five-position and starting-lineup resolver** (`service/lineups.js`, served at `/api/lineups`, `/api/positions` and `/api/starters`)
+- **Primary position** for every active player, in order: the official 2K27 position (when the ratings feed has a `position` field), then ESPN's depth chart slot. A player ESPN rosters as a forward is never placed at a guard slot (Michael Porter Jr.: SG → SF).
+- **Starting five:** the players who started each team's latest completed game (box score `starter: true`), placed by the lowest-cost slot assignment.
+  - An injured starter's replacement holds the spot. The starter returns the night he starts again: lineups refresh every 30 minutes and right after games go final.
+  - Teams with no game yet use their depth chart.
+- **Everywhere it's used:** Tier List starters, McConnell clues (PG/SG/SF/PF/C; a neighbouring position turns yellow), Who He Play For?, Archive G/F/C filters for active players, and the 2K27 ratings list.
+
+**Tier List Maker**
+- The five "30 Starting …" lists come from those starting fives: one player per team, never duplicated.
+- New All-Time Point Guards / Shooting Guards / Small Forwards / Power Forwards / Centers lists: 25–28 curated legends and active greats each (`service/alltime.js`).
+  - Names are resolved against the full archive, with official headshots.
+  - Namesakes go to the Hall of Famer.

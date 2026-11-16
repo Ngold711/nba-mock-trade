@@ -139,6 +139,17 @@ import { pickInventory } from "../service/draft.js";
 
 const gp = (o) => ({ id: "x", name: "X", team: "BOS", conf: "East", div: "Atlantic", pos: "G", ht: 78, age: 26, num: 9, ...o });
 
+test("McConnell five-slot positions: exact green, neighbouring slot yellow, hybrid fallback", () => {
+  const P = (pos) => ({ team: "BOS", conf: "East", div: "Atlantic", pos, ht: 78, age: 25, num: 1 });
+  assert.equal(compare(P("SF"), P("SF")).pos.state, "green");
+  assert.equal(compare(P("SG"), P("SF")).pos.state, "yellow");
+  assert.equal(compare(P("PF"), P("C")).pos.state, "yellow");
+  assert.equal(compare(P("PG"), P("SF")).pos.state, "gray");
+  const mpj = toGamePlayer({ id: "4278104", name: "Michael Porter Jr.", position: "F", height: "6' 10\"", teamAbbr: "BKN" }, null, "SF");
+  assert.equal(mpj.pos, "SF");
+  assert.equal(toGamePlayer({ id: "9", name: "X", position: "G", height: "6' 7\"" }, null, null).pos, "G-F");
+});
+
 test("McConnell compare: exact, close (±2 with arrow), far, partial position", () => {
   const m = gp({ id: "m", team: "BOS", pos: "G-F", ht: 80, age: 27, num: 11 });
   const r = compare(gp({ id: "g", team: "NY", conf: "East", div: "Atlantic", pos: "G", ht: 78, age: 31, num: 11 }), m);

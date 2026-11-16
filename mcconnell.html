@@ -140,10 +140,10 @@ details.help p { margin: 0.4rem 0; line-height: 1.5; }
     <div class="status"><span id="statusL">Guess 1 of 8</span><span id="statusR"></span></div>
     <div class="grid" id="grid" role="table" aria-label="Your guesses"></div>
     <div class="after" id="after"></div>
-    <div class="legend"><span><i style="background:#10B981"></i>Match</span><span><i style="background:#EAB308"></i>Close (within 2) or shares a position</span><span><i style="background:var(--fill-strong)"></i>No match</span><span>↑ ↓ the mystery value is higher / lower</span></div>
+    <div class="legend"><span><i style="background:#10B981"></i>Match</span><span><i style="background:#EAB308"></i>Close (within 2) or a neighbouring position</span><span><i style="background:var(--fill-strong)"></i>No match</span><span>↑ ↓ the mystery value is higher / lower</span></div>
     <details class="help"><summary>How to play</summary>
       <p>Search any active NBA player to make a guess. Each guess shows how it compares with the mystery player: team, conference, division, position, height, age and jersey number.</p>
-      <p>Height, age and number turn yellow when they’re within 2 of the answer, with an arrow pointing toward it. Positions come from ESPN (G, F, C); hybrids like G-F and F-C are derived from our roster data and height, and share a yellow match with either side.</p>
+      <p>Height, age and number turn yellow when they’re within 2 of the answer, with an arrow pointing toward it. Positions are PG, SG, SF, PF and C, the same ones used across Hooptrax (latest starting lineups, ESPN depth charts and official 2K27 positions). A neighbouring position (SG next to PG or SF, PF next to SF or C) turns yellow.</p>
       <p>Daily mode has one mystery player per calendar day, the same for everyone. Unlimited lets you keep going.</p>
     </details>
   </section>
@@ -336,14 +336,15 @@ function showResults() {
 (async () => {
   const client = await createClient();
   try {
-    const [lg, pl] = await Promise.allSettled([client.get("league", {}), client.get("players", {})]);
+    const [lg, pl, ps] = await Promise.allSettled([client.get("league", {}), client.get("players", {}), fetch("/api/positions").then((r) => (r.ok ? r.json() : null)).catch(() => null)]);
+    const five = (ps.status === "fulfilled" && ps.value?.data?.positions) || {};
     if (lg.status !== "fulfilled") throw lg.reason;
     const league = lg.value.data;
     teams = league.teams;
     // roster snapshot positions (G/F, F/C) by name, for hybrid positions
     const snap = {};
     for (const t of Object.values(window.NBA_DATA.teams)) for (const [name, pos] of t.players) snap[slugName(name)] = pos;
-    players = league.players.filter((a) => a.id && a.status !== "inactive").map((a) => toGamePlayer(a, snap[slugName(a.name)]));
+    players = league.players.filter((a) => a.id && a.status !== "inactive").map((a) => toGamePlayer(a, snap[slugName(a.name)], five[String(a.id)]));
     byId = Object.fromEntries(players.map((p) => [p.id, p]));
     if (pl.status === "fulfilled") for (const p of pl.value.data.players) stats[p.id] = p.stats;
     // Mystery pool: recognizable rotation players when season stats are available.

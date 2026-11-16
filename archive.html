@@ -56,7 +56,7 @@
   </div>
   <div class="arch-quick" id="archQuick"></div>
   <nav class="arch-links" aria-label="Browse the archive">
-    <button type="button" data-browse="leaders">All-Time Leaders</button><span aria-hidden="true">•</span><button type="button" data-browse="awards">Champions &amp; Awards</button><span aria-hidden="true">•</span><button type="button" data-browse="retired">Retired Jerseys</button>
+    <button type="button" data-browse="leaders">All-Time Leaders</button><button type="button" data-browse="awards">Champions &amp; Awards</button><button type="button" data-browse="retired">Retired Jerseys</button><button type="button" data-browse="draft">Draft History</button>
   </nav>
   </div>
   <ul class="list enc-results ref-results" id="refResults" hidden></ul>
@@ -264,19 +264,12 @@ document.addEventListener("click", (e) => {
 });
 let historyP = null;
 const historyData = () => (historyP ||= fetch("nba_history.json").then((r) => r.json()));
+/** All four sections open the same sheet (same four tabs inside), on the tab that was tapped. */
 async function browseOpen(kind) {
-  if (kind === "leaders" || kind === "awards") {
-    sheet.open({ title: kind === "leaders" ? "All-Time Leaders" : "Champions & Awards", render(body) { body.classList.add("ref-sheet"); renderHistory(body, { history: null }); } });
-    const h = await historyData(); if (sheet.isOpen) renderHistory(sheet.body, { history: h, tab: kind });
-    return;
-  }
-  if (kind === "retired") {
-    const h = await historyData();
-    const names = window.NBA_DATA?.teams || {};
-    sheet.open({ title: "Retired Jerseys", render(body) {
-      body.innerHTML = `<p class="enc-note" style="margin-top:0">League-wide: #6 Bill Russell (2022). Audited against team announcements, Nov 2026.</p><ul class="pp-list">${Object.entries(h.franchises).sort((a, b) => a[0].localeCompare(b[0])).map(([code, f]) => `<li class="pp-row rj"><img src="${logo(code)}" alt="" width="28" height="28" loading="lazy" referrerpolicy="no-referrer"><span class="pp-who"><b>${esc(names[code] ? `${names[code].city} ${names[code].name}` : code)}</b><small>${f.retired.map((r) => `#${esc(r.num)} ${esc(r.name)}`).join(" · ") || "No retired numbers"}${(f.upcomingRetirements || []).length ? ` <span class="up">· Coming: ${f.upcomingRetirements.map((u) => `#${esc(u.num)} ${esc(u.name)} (${esc(u.date)})`).join(", ")}</span>` : ""}</small></span><button class="link" type="button" data-team-hub="${code}">Vault ›</button></li>`).join("")}</ul>`;
-    } });
-  }
+  const TITLE = { leaders: "All-Time Leaders", awards: "Champions & Awards", retired: "Retired Jerseys", draft: "Draft History" };
+  if (!TITLE[kind]) return;
+  sheet.open({ title: "NBA History", render(body) { body.classList.add("ref-sheet"); renderHistory(body, { history: null }); } });
+  const h = await historyData(); if (sheet.isOpen) renderHistory(sheet.body, { history: h, tab: kind, cat: kind === "leaders" ? "pts" : null });
 }
 
 /* ---------- start ---------- */

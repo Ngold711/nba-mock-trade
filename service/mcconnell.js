@@ -26,14 +26,16 @@ export function hybridPosition(espnPos, heightIn, snapshotPos) {
   return p || "—";
 }
 
-/** Normalize a league roster player into the fields the game compares. */
-export function toGamePlayer(a, snapshotPos) {
+export const FIVE = ["PG", "SG", "SF", "PF", "C"];
+/** Normalize a league roster player into the fields the game compares. resolvedPos: the site-wide PG/SG/SF/PF/C
+ *  from service/lineups.js (/api/positions); the G / G-F / F / F-C / C hybrid is only a fallback. */
+export function toGamePlayer(a, snapshotPos, resolvedPos = null) {
   const h = inches(a.height);
   const num = /^\d+$/.test(String(a.jersey || "")) ? +a.jersey : null;
   return {
     id: String(a.id), name: a.name, initials: a.initials, headshot: a.headshot, headshotSmall: a.headshotSmall,
     team: a.teamAbbr, teamId: a.teamId, conf: a.conference, div: a.division,
-    pos: hybridPosition(a.position, h, snapshotPos), ht: h, age: a.age ?? null, num,
+    pos: FIVE.includes(resolvedPos) ? resolvedPos : hybridPosition(a.position, h, snapshotPos), ht: h, age: a.age ?? null, num,
   };
 }
 
@@ -49,6 +51,7 @@ export function compare(guess, mystery) {
   const eq = (k) => ({ state: guess[k] && guess[k] === mystery[k] ? "green" : "gray", arrow: "" });
   let pos;
   if (guess.pos === mystery.pos) pos = { state: "green", arrow: "" };
+  else if (FIVE.includes(guess.pos) && FIVE.includes(mystery.pos)) pos = { state: Math.abs(FIVE.indexOf(guess.pos) - FIVE.indexOf(mystery.pos)) === 1 ? "yellow" : "gray", arrow: "" };   // neighbouring slot
   else { const a = letters(guess.pos), b = letters(mystery.pos); pos = { state: [...a].some((x) => b.has(x)) ? "yellow" : "gray", arrow: "" }; }
   return {
     team: eq("team"), conf: eq("conf"), div: eq("div"), pos,

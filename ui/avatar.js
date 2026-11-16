@@ -13,7 +13,11 @@ function initials(name) {
 
 /** onError / onLoad for every avatar image — capture phase, because image events don't bubble.
  *  Installed once at import, before any avatar is rendered, so no early failure is missed. */
-function onAvatarError(img) { img.remove(); }
+function onAvatarError(img) {
+  const alt = img.dataset.alt;                       // NBA.com headshot first, ESPN second, then initials
+  if (alt) { delete img.dataset.alt; img.src = alt; return; }
+  img.remove();
+}
 function onAvatarLoad(img) { img.classList.add("loaded"); img.parentElement?.classList.add("has-photo"); }  // headshots are transparent cutouts: hide initials behind them
 if (typeof document !== "undefined" && !window.__avatarFallback) {
   window.__avatarFallback = true;
@@ -22,7 +26,7 @@ if (typeof document !== "undefined" && !window.__avatarFallback) {
 }
 
 /**
- * @param {{name?:string, initials?:string, headshot?:string|null, headshotSmall?:string|null}} p
+ * @param {{name?:string, initials?:string, headshot?:string|null, headshotSmall?:string|null, headshotAlt?:string|null}} p  (headshotAlt: tried if the first image fails)
  * @param {{size?:string, color?:string, full?:boolean, label?:boolean}} opts
  */
 export function avatar(p, { size = "2.5rem", color = "#8e8e93", full = false, label = false } = {}) {
@@ -31,7 +35,7 @@ export function avatar(p, { size = "2.5rem", color = "#8e8e93", full = false, la
   const alt = label ? `${esc(p?.name)}` : "";
   return `<span class="avatar" style="--s:${size};--c:${esc(color)}"${label ? ` role="img" aria-label="${alt}"` : ' aria-hidden="true"'}>`
     + `<span class="avatar-initials">${esc(ini)}</span>`
-    + (src ? `<img class="avatar-img" src="${esc(src)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : "")
+    + (src ? `<img class="avatar-img" src="${esc(src)}"${p?.headshotAlt && p.headshotAlt !== src ? ` data-alt="${esc(p.headshotAlt)}"` : ""} alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : "")
     + `</span>`;
 }
 

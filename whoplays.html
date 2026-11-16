@@ -143,7 +143,9 @@ document.addEventListener("click", (e) => {
   const d = e.target.closest("[data-diff]");
   if (d && d.dataset.diff !== diff && all.length) { setDiff(d.dataset.diff); start(); }
 });
-const [l, r, tx, st] = await Promise.all(["/api/league", "/api/2k27-ratings", "/api/transactions", "/api/players"].map((u) => fetch(u).then((x) => x.json()).then((j) => j.data).catch(() => null)));
+const [l, r, tx, st, ps] = await Promise.all(["/api/league", "/api/2k27-ratings", "/api/transactions", "/api/players", "/api/positions"].map((u) => fetch(u).then((x) => x.json()).then((j) => j.data).catch(() => null)));
+const five = ps?.positions || {};
+if (l?.players) for (const p of l.players) if (five[String(p.id)]) p.position = five[String(p.id)];      // PG/SG/SF/PF/C used site-wide
 teams = Object.fromEntries(Object.entries(l?.teams || {}).filter(([, t]) => t.displayName));
 moves = (tx || []).filter((m) => m.category !== "rumor");
 const ovr = new Map((r?.players || []).map((p) => [String(p.id), p.ovr]));            // official 2K27 OVR (where synced)

@@ -29,7 +29,7 @@ export const TTL = {
   coaches: 6 * 60 * MIN,
   honors: 24 * 60 * MIN,
   league: 30 * MIN,        // all 30 rosters, warmed at startup
-  depth: 60 * MIN,         // ESPN depth charts (30 starting lineups)
+  lineups: 30 * MIN,       // starting fives from the latest box scores + depth charts (also refreshed after finals)
   ratings: (Number(typeof process !== "undefined" && process.env?.RATINGS_TTL_MIN) || 30) * MIN,   // official 2K27 ratings sync (service/ratings2k.js), every 30 min
   schedule: 30 * MIN,
   teamstats: 60 * MIN,
@@ -83,7 +83,7 @@ export const POLICIES = {
   coaches: () => TTL.coaches,
   honors: () => TTL.honors,
   league: () => TTL.league,
-  depth: () => TTL.depth,
+  lineups: () => TTL.lineups,
   ratings: () => TTL.ratings,
   schedule: () => TTL.schedule,
   teamstats: () => TTL.teamstats,
