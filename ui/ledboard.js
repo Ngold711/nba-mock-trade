@@ -36,7 +36,7 @@ const CSS = `
   color: #DDE6F0; text-shadow: 0 0 6px rgba(221,230,240,.25); }
 .led-q:focus-visible { outline: 1px solid #F59E0B; outline-offset: -3px; }
 .led-q + .led-q { border-left: 1px solid #10151D; }
-.led-q .sym { color: #F59E0B; text-shadow: 0 0 8px rgba(245,158,11,.55); font-weight: 800; }
+.led-q .sym { margin-right: 0.375rem; color: #F59E0B; text-shadow: 0 0 8px rgba(245,158,11,.55); font-weight: 800; }
 .led-q .up { color: #00E676; text-shadow: 0 0 8px rgba(0,230,118,.55); }
 .led-q .dn { color: #FF3B30; text-shadow: 0 0 8px rgba(255,59,48,.55); }
 .led-q .dim { color: #7C8798; text-shadow: none; }
@@ -152,7 +152,7 @@ export function mountLedBoard(el, { client, onGame = () => {} }) {
     }
     for (const m of (S.moves || []).slice(0, 10)) {
       const txt = String(m.description || "").replace(/\.$/, "").toUpperCase();
-      out.push(`<span class="led-q"><span class="dim">MOVE:</span><span class="sym">${esc(tk(m.team?.abbr))}</span>${esc(txt.length > 64 ? txt.slice(0, 62) + "…" : txt)}<span class="up">▲</span></span>`);
+      out.push(`<span class="led-q"><span class="dim">MOVE:</span><span class="sym">${esc(tk(m.team?.abbr))}</span> ${esc(txt.length > 64 ? txt.slice(0, 62) + "…" : txt)}<span class="up">▲</span></span>`);
     }
     // interleave injuries and moves so neither dominates the tape
     const a = out.filter((h) => h.includes("INJ:")), b = out.filter((h) => !h.includes("INJ:"));

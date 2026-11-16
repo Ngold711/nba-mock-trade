@@ -118,7 +118,8 @@ tr.cut td { border-top: 1.5px dashed var(--fill-strong); }
 .inj { align-items: flex-start; }
 .inj .pill { margin-top: 0.15rem; }
 .moves .row { align-items: flex-start; }
-.moves .when { font-size: 0.6875rem; color: var(--label-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.moves .when, .moves .desc { display: block; }
+.moves .when { margin-bottom: 0.15rem; font-size: 0.6875rem; color: var(--label-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
 .moves .desc { font-size: 0.9375rem; line-height: 1.4; }
 
 /* Box score sheet */
@@ -218,6 +219,7 @@ tr.cut td { border-top: 1.5px dashed var(--fill-strong); }
 .sync-line .dot { width: 0.45rem; height: 0.45rem; border-radius: 99px; background: var(--good, #22C55E); flex: none; }
 .sync-line .dot.warn { background: var(--warn, #F59E0B); }
 .sync-line .lag { color: var(--warn, #F59E0B); }
+.sync-line .src { color: var(--label-3); }
 </style>
 </head>
 <body>
@@ -645,16 +647,22 @@ async function paintMovesSync(meta) {
   const el = $("#movesSync"); if (!el) return;
   const st = await fetch("/api/transactions/status").then((r) => r.json()).then((j) => j.data).catch(() => null);
   const synced = st?.syncedAt || meta?.fetchedAt;
-  const nb = st?.newest ? fmtDay(st.newest) : "";
-  const lag = st?.newest && Date.now() - Date.parse(st.newest) > 36 * 3600e3;
-  el.innerHTML = synced ? `<span class="dot${lag ? " warn" : ""}" aria-hidden="true"></span>Last synced <b>${esc(agoTxt(synced))}</b>${nb ? ` · newest move ${esc(nb)}` : ""}${lag ? ` · <span class="lag">${st?.sources?.nba?.ok ? "ESPN and NBA.com haven't" : "ESPN hasn't"} posted newer moves yet</span>` : ""}` : "";
+  if (!synced) { el.innerHTML = ""; return; }
+  const NAMES = { espn: "ESPN", realgm: "RealGM", nba: "NBA.com" };
+  const live = Object.entries(st?.sources || {}).filter(([, v]) => v.ok);
+  // amber only when every source that answered is 36+ hours behind (the overall newest move is that old)
+  const lag = !!st?.newest && Date.now() - Date.parse(st.newest) > 36 * 3600e3;
+  const per = live.map(([k, v]) => `${NAMES[k] || k} ${v.newest ? esc(fmtDay(v.newest)) : "—"}`).join(" · ");
+  el.innerHTML = `<span class="dot${lag ? " warn" : ""}" aria-hidden="true"></span>Last synced <b>${esc(agoTxt(synced))}</b>${st?.newest ? ` · newest move ${esc(fmtDay(st.newest))}` : ""}`
+    + (per ? ` <span class="src">(${per})</span>` : "")
+    + (lag ? ` · <span class="lag">no source has posted a newer move yet</span>` : "");
 }
 function startMoves() {
   const el = $("#moves"); el.dataset.loaded = "";
   return client.watch("transactions", {}, (list, meta) => {
     noteMeta(meta); el.dataset.loaded = "1"; paintMovesSync(meta);
     el.innerHTML = list.length ? list.map((t) => `<li class="row">${teamLogo(t.team, { size: "2.25rem" })}
-      <span class="meta"><span class="when">${esc(fmtDay(t.date))} · ${esc(t.team.abbr)}</span><span class="desc">${esc(t.description)}</span></span>
+      <span class="meta"><span class="when">${esc(fmtDay(t.date))} · ${esc(t.team.abbr)}</span> <span class="desc">${esc(t.description)}</span></span>
       <span class="pill${t.kind === "trade" ? " live" : ""}">${KIND[t.kind] || "Move"}</span></li>`).join("") : `<li class="empty">No recent transactions.</li>`;
   }, (err) => noteError(err, el));
 }

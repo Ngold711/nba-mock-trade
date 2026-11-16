@@ -24,3 +24,19 @@ test("transaction kinds", () => {
   assert.equal(transactionKind("Assigned G X to the G League."), "assignment");
   assert.equal(transactionKind("Suspended F Y two games."), "suspension");
 });
+
+import { parseRss, realgmTransactions } from "../service/transactions.js";
+test("RealGM Wiretap RSS: NBA move headlines only, team + kind detected, deduped against ESPN", () => {
+  const xml = `<rss><channel>
+    <item><title><![CDATA[Cavaliers Guarantee Mario Hezonja&#039;s Contract]]></title><link>https://basketball.realgm.com/wiretap/1</link><pubDate>Sun, 15 Nov 2026 19:02:00 -0500</pubDate></item>
+    <item><title>Real Madrid Beats Barcelona In Clasico</title><pubDate>Sun, 15 Nov 2026 18:00:00 -0500</pubDate></item>
+    <item><title>Timberwolves Sign Johni Broome To Two-Way Deal</title><pubDate>Fri, 13 Nov 2026 10:00:00 -0500</pubDate></item>
+    <item><title>Trail Blazers Waive Lawson Lovering</title><pubDate>Tue, 10 Nov 2026 12:00:00 -0500</pubDate></item>
+  </channel></rss>`;
+  const r = realgmTransactions(parseRss(xml));
+  assert.deepEqual(r.map((t) => [t.team.abbr, t.kind]), [["CLE", "contract"], ["MIN", "signing"], ["POR", "release"]]);
+  assert.equal(r[0].description, "Cavaliers Guarantee Mario Hezonja's Contract.");
+  const merged = mergeTransactions(espn, [], r);
+  assert.equal(merged[0].source, "realgm");
+  assert.equal(merged.filter((t) => /Broome/.test(t.description)).length, 1);
+});

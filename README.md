@@ -654,3 +654,13 @@ Built by an offline generator that cross-checks editorial data against ESPN:
 - **McConnell:** the daily puzzle date is now US Eastern (it used the device's local date), so everyone gets the same mystery player and it rotates at midnight ET. An open page rolls over to the new puzzle at midnight ET, or prompts if a game is in progress.
 - **Bug sweep:** one capture-phase image-error handler in `ui/shell.js` covers every page. A failed headshot or logo tries its `data-alt` URL, then hides, so the initials badge shows. The draft page's ⓘ "Explain pick" buttons got a 44×44 touch target. A browser crawl of 20 views (every tab, sub-view and Archive role) found no NaN/undefined cells, broken images, dead API calls, overflow or console errors.
 - **Still static by necessity:** 2026–27 contracts (`salaries_2026_27.json`, as of Nov 14) and future pick ownership (`draft_picks_2027_2029.json`) have no free live source, so they're dated files. The awards Player of the Week list is a record that also picks up new winners from ESPN news.
+
+## Round 21: RealGM transactions source, spacing fix
+
+- **Transactions sources:** ESPN, NBA.com player movement, and now **RealGM's Wiretap RSS** (`service/transactions.js` `parseRss` / `realgmTransactions`).
+  - Only headlines with both a move verb (sign, waive, guarantee, trade, acquire, assign, recall, convert, suspend, exercise, decline, extend, claim) and an NBA team name count as moves.
+  - Duplicates across sources are matched by team, ±36 h and shared stemmed words.
+  - `TRANSACTIONS_REALGM=0` disables RealGM; `TRANSACTIONS_REALGM_URL` overrides the feed.
+  - Spotrac is not scraped: its terms prohibit automated scraping and it publishes no feed.
+- `/api/transactions/status` reports `espn`, `nba` and `realgm` separately. The Live sync line lists each responding source's newest move, and turns amber only when every one of them is 36+ hours old.
+- **Spacing:** the Live list shows the date/team line above the description (no more "MINSigned"), and the LED Wire has space after the team symbol.
