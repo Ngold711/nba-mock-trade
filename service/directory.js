@@ -45,38 +45,76 @@ export function posGroups(pos) {
 }
 const CODE = { GS: "GSW", NO: "NOP", NY: "NYK", SA: "SAS", UTAH: "UTA", WSH: "WAS" };
 
-/** Build the directory from live league rosters and the legends archive. */
-export function buildDirectory({ league = null, legends = [] } = {}) {
-  const byId = new Map();
+/** Name key that survives suffixes and punctuation: "Jimmy Butler III" = "Jimmy Butler", "AJ Green" = "A.J. Green". */
+export function matchKey(name) {
+  const parts = fold(name).toLowerCase().replace(/[.'’]/g, "").split(/[\s-]+/).filter(Boolean);
+  while (parts.length > 1 && SUFFIX.test(parts[parts.length - 1])) parts.pop();
+  const k = parts.join("");
+  return ALIAS[k] || k;
+}
+const ALIAS = { ronaldholland: "ronholland" };      // roster name → historical index name
+/** Rows of all_players.json → objects. */
+export function indexRows(all) {
+  const f = all?.fields || ["id", "name", "pos", "g", "from", "to", "lg", "hof", "top75", "nba", "espn"];
+  return (all?.players || []).map((r) => Object.fromEntries(f.map((k, i) => [k, r[i]])));
+}
+const nbaHead = (id) => `https://cdn.nba.com/headshots/nba/latest/260x190/${id}.png`;
+const espnHead = (id) => `https://a.espncdn.com/i/headshots/nba/players/full/${id}.png`;
+
+/**
+ * The full directory: every NBA/ABA/BAA player from all_players.json, with live ESPN rosters merged in (active
+ * status, team, ESPN id) and the legends archive's ESPN ids for profiles. Falls back to legends only when the
+ * index isn't available.
+ */
+export function buildDirectory({ league = null, legends = [], all = null } = {}) {
+  const rows = indexRows(all);
+  const out = [];
+  const byName = new Map();             // matchKey → [entries]
+  const add = (e) => { out.push(e); const k = matchKey(e.name); byName.set(k, [...(byName.get(k) || []), e]); return e; };
+  for (const r of rows) {
+    add({ id: r.espn ? String(r.espn) : `h:${r.id}`, bref: r.id, name: r.name, active: false, team: "", pos: r.pos || r.g.split("").join("-"), g: r.g.split(""),
+      from: r.from, to: r.to, years: r.from && r.to ? `${r.from}–${r.to}` : "", lg: r.lg || "NBA", hof: !!r.hof, hofRole: r.hof || "", top75: !!r.top75,
+      headshot: r.nba ? nbaHead(r.nba) : r.espn ? espnHead(r.espn) : null, alt: r.espn && r.nba ? espnHead(r.espn) : null });
+  }
+  const pickRecent = (list) => [...list].sort((a, b) => (b.to || 0) - (a.to || 0))[0];
+  // legends archive: attach ESPN / archive ids so their profiles open (by name; the most recent namesake wins)
+  for (const l of legends) {
+    const hit = byName.get(matchKey(l.name));
+    if (hit) { const e = hit.length === 1 ? hit[0] : hit.find((x) => l.from && Math.abs((x.from || 0) - l.from) <= 1) || null; if (e && e.id.startsWith("h:")) { e.id = String(l.id); e.headshot ||= l.headshot || null; } }
+    else if (!rows.length) add({ id: String(l.id), name: l.name, active: !!l.active, team: "", pos: l.position || "", g: posGroups(l.position), from: l.from, to: l.to,
+      years: l.from && l.to ? `${l.from}–${l.to}` : "", lg: "NBA", hof: HOF.has(l.name), hofRole: HOF.has(l.name) ? "player" : "", top75: TOP75.has(l.name), headshot: l.headshot || null });
+  }
+  // live rosters: active status, team, ESPN id and headshot
   for (const p of league?.players || []) {
     if (!p?.id || !p.name) continue;
-    byId.set(String(p.id), { id: String(p.id), name: p.name, active: true, team: CODE[p.teamAbbr] || p.teamAbbr || "", pos: p.position || "",
-      years: "", headshot: p.headshot || `https://a.espncdn.com/i/headshots/nba/players/full/${p.id}.png` });
+    const hit = byName.get(matchKey(p.name));
+    const e = hit ? (hit.length === 1 ? hit[0] : pickRecent(hit)) : add({ id: String(p.id), name: p.name, pos: p.position || "", g: posGroups(p.position), from: 2026, to: 2027,
+      years: "", lg: "NBA", hof: false, hofRole: "", top75: false, headshot: null });
+    Object.assign(e, { id: String(p.id), name: p.name, active: true, team: CODE[p.teamAbbr] || p.teamAbbr || "", alt: e.headshot && !/espncdn/.test(e.headshot) ? espnHead(p.id) : null });
+    e.headshot = e.headshot || p.headshot || espnHead(p.id);
+    if (!e.g.length) e.g = posGroups(p.position);
+    if (!e.pos) e.pos = p.position || "";
   }
-  const seenNames = new Set([...byId.values()].map((p) => fold(p.name).toLowerCase()));
-  for (const l of legends) {
-    const id = String(l.id);
-    const k = fold(l.name).toLowerCase();
-    if (byId.has(id)) { const a = byId.get(id); a.pos ||= l.position || ""; continue; }       // active: roster entry wins
-    if (seenNames.has(k)) continue;                                                            // same person twice in the archive
-    seenNames.add(k);
-    byId.set(id, { id, name: l.name, active: !!l.active, team: "", pos: l.position || "",
-      years: l.from && l.to ? `${l.from}–${l.active ? "now" : l.to}` : "", headshot: l.headshot || null });
-  }
-  return [...byId.values()].map((p) => {
-    if (/^(NA|N\/A|-)$/i.test(p.pos)) p.pos = "";                 // ESPN's "no position" placeholder
+  return out.map((p) => {
+    if (/^(NA|N\/A|-)$/i.test(p.pos)) p.pos = p.g.join("-");
+    if (!p.g.length) p.g = posGroups(p.pos);
+    if (!p.years && p.active) p.years = "";
     const key = sortKey(p.name);
-    return { ...p, key, letter: /^[a-z]/.test(key) ? key[0].toUpperCase() : "#", g: posGroups(p.pos), hof: HOF.has(p.name), top75: TOP75.has(p.name) };
-  }).sort((a, b) => a.key.localeCompare(b.key) || a.name.localeCompare(b.name));
+    return { ...p, key, letter: /^[a-z]/.test(key) ? key[0].toUpperCase() : "#" };
+  }).sort((a, b) => a.key.localeCompare(b.key) || (a.from || 0) - (b.from || 0));
 }
 
-/** Filter by one of all | active | hof | top75 | G | F | C. */
-export function filterDirectory(list, filter = "all") {
+/** Filter by one of all | active | hof | top75 | G | F | C, and an optional name query. */
+export function filterDirectory(list, filter = "all", q = "") {
+  let out;
   switch (filter) {
-    case "active": return list.filter((p) => p.active);
-    case "hof": return list.filter((p) => p.hof);
-    case "top75": return list.filter((p) => p.top75);
-    case "G": case "F": case "C": return list.filter((p) => p.g.includes(filter));
-    default: return list;
+    case "active": out = list.filter((p) => p.active); break;
+    case "hof": out = list.filter((p) => p.hof); break;
+    case "top75": out = list.filter((p) => p.top75); break;
+    case "G": case "F": case "C": out = list.filter((p) => p.g.includes(filter)); break;
+    default: out = list;
   }
+  const k = fold(q).toLowerCase().trim();
+  if (k.length >= 2) out = out.filter((p) => fold(p.name).toLowerCase().includes(k));
+  return out;
 }

@@ -94,6 +94,12 @@ function updateMode() {
 async function search() {
   const term = q.value.trim();
   updateMode();
+  if (role === "player") {                 // Players: the search box filters the directory (first 25, then Show More)
+    clear.hidden = !term; res.hidden = true; dir.hidden = false;
+    const next = term.length >= 2 ? term : "";
+    if (next !== PD.q || !$("#pdList")) { PD.q = next; PD.letter = null; if ($("#pdList")) pdLoad({ reset: true }); }
+    return;
+  }
   clear.hidden = !term;
   if (term.length < 2) { res.hidden = true; dir.hidden = false; if (!role) renderDir(); return; }
   res.hidden = false; dir.hidden = true;
@@ -123,6 +129,7 @@ function setRole(r) {
   role = r;
   document.querySelectorAll(".ref-filters [data-role]").forEach((x) => x.setAttribute("aria-selected", String(x.dataset.role === r)));
   const u = new URL(location.href); r ? u.searchParams.set("role", r) : u.searchParams.delete("role"); history.replaceState(null, "", u);
+  if (r === "player") { const t = q.value.trim(); PD.q = t.length >= 2 ? t : ""; PD.letter = null; }
   updateMode(); renderDir(); search();
 }
 document.querySelectorAll(".ref-filters [data-role]").forEach((b) => b.addEventListener("click", () => setRole(b.dataset.role)));
@@ -141,51 +148,72 @@ function remember(item) {
 const offices = () => (officesP ||= fetch("/api/front-offices").then((r) => r.json()).then((j) => j.data).catch(() => { officesP = null; return null; }));
 const face = (src, name) => `<span class="dir-face">${src ? `<img src="${esc(src)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}<span>${esc(String(name).split(" ").map((w) => w[0]).slice(0, 2).join(""))}</span></span>`;
 const sk = (n) => `<ul class="dir-list">${Array.from({ length: n }, () => `<li class="dir-row"><span class="sk" style="width:2.5rem;height:2.5rem;border-radius:99px"></span><span class="sk" style="height:1rem;flex:1"></span></li>`).join("")}</ul>`;
-/* ---------- Players: one unified A–Z directory (active + legends), filter pills, letter bar, infinite scroll ---------- */
+/* ---------- Players: every NBA/ABA/BAA player in one A–Z directory, 25 at a time with "Show More" ---------- */
 const PD_FILTERS = [["all", "All"], ["active", "Active"], ["hof", "Hall of Fame"], ["top75", "Top 75"], ["G", "G"], ["F", "F"], ["C", "C"]];
-const PD = { filter: "all", next: 0, total: 0, letters: {}, loading: false, seq: 0, io: null };
-const pdRow = (p) => `<li><button class="dir-row press" type="button" data-enc="${esc(p.id)}">${face(p.headshot, p.name)}
-  <span class="dir-who"><b>${esc(p.name)}</b><small>${p.active ? `${p.team ? `<img class="dir-badge" src="${esc(logo(p.team))}" alt="" width="16" height="16" loading="lazy" referrerpolicy="no-referrer">${esc(p.team)} · ` : ""}Active` : esc(p.years || "Retired")}${p.pos ? ` · ${esc(p.pos)}` : ""}</small></span>
-  <span class="pd-tags">${p.hof ? '<span class="pd-tag hof" title="Naismith Hall of Fame">HOF</span>' : ""}${p.top75 ? '<span class="pd-tag t75" title="NBA 75th Anniversary Team">75</span>' : ""}</span></button></li>`;
+const PAGE = 25;
+const PD = { filter: "all", q: "", letter: null, base: 0, loaded: 0, total: 0, seq: 0, loading: false };
+const HOF_TAG = { player: ["HOF", "Naismith Hall of Fame"], coach: ["HOF coach", "Hall of Fame (inducted as a coach)"], contributor: ["HOF contrib.", "Hall of Fame (inducted as a contributor)"] };
+// headshot: NBA.com CDN first, then ESPN, then the initials badge underneath
+const pdFace = (p) => `<span class="dir-face">${p.headshot ? `<img src="${esc(p.headshot)}" ${p.alt ? `data-alt="${esc(p.alt)}"` : ""} alt="" loading="lazy" referrerpolicy="no-referrer" onerror="if(this.dataset.alt){this.src=this.dataset.alt;this.removeAttribute('data-alt')}else this.remove()">` : ""}<span>${esc(String(p.name).split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase())}</span></span>`;
+const pdRow = (p) => `<li><button class="dir-row press" type="button" ${p.id.startsWith("h:") ? `data-hist="${esc(p.id.slice(2))}" data-name="${esc(p.name)}" data-years="${esc(p.years)}" data-pos="${esc(p.pos)}" data-lg="${esc(p.lg || "")}" data-hof="${esc(p.hofRole || "")}"` : `data-enc="${esc(p.id)}"`}>${pdFace(p)}
+  <span class="dir-who"><b>${esc(p.name)}</b><small>${p.active ? `${p.team ? `<img class="dir-badge" src="${esc(logo(p.team))}" alt="" width="16" height="16" loading="lazy" referrerpolicy="no-referrer">${esc(p.team)} · ` : ""}Active` : esc(p.years || "")}${p.pos ? ` · ${esc(p.pos)}` : ""}${p.lg && p.lg !== "NBA" && !p.active ? ` · ${esc(p.lg.replace("/", " / "))}` : ""}</small></span>
+  <span class="pd-tags">${p.hofRole ? `<span class="pd-tag hof${p.hofRole !== "player" ? " role" : ""}" title="${HOF_TAG[p.hofRole][1]}">${HOF_TAG[p.hofRole][0]}</span>` : ""}${p.top75 ? '<span class="pd-tag t75" title="NBA 75th Anniversary Team">75</span>' : ""}</span></button></li>`;
 function renderPlayerDir() {
   $("#archQuick").innerHTML = "";
   dir.innerHTML = `<div class="pd-bar">
       <div class="pd-filters" role="tablist" aria-label="Filter players">${PD_FILTERS.map(([k, l]) => `<button type="button" role="tab" data-pdf="${k}" aria-selected="${k === PD.filter}">${l}</button>`).join("")}</div>
-      <nav class="pd-letters" aria-label="Jump to letter">${"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((L) => `<button type="button" data-pdl="${L}">${L}</button>`).join("")}</nav>
+      <nav class="pd-letters" aria-label="Jump to letter">${"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((L) => `<button type="button" data-pdl="${L}" aria-pressed="${L === PD.letter}">${L}</button>`).join("")}</nav>
     </div>
     <p class="pd-count" id="pdCount"></p>
-    <ul class="dir-list pd-list" id="pdList">${Array.from({ length: 8 }, () => `<li class="dir-row"><span class="sk" style="width:2.5rem;height:2.5rem;border-radius:99px"></span><span class="sk" style="height:1rem;flex:1"></span></li>`).join("")}</ul>
-    <div class="pd-more" id="pdMore" aria-hidden="true"></div>`;
+    <ul class="dir-list pd-list" id="pdList">${Array.from({ length: 6 }, () => `<li class="dir-row"><span class="sk" style="width:2.5rem;height:2.5rem;border-radius:99px"></span><span class="sk" style="height:1rem;flex:1"></span></li>`).join("")}</ul>
+    <button class="pd-more press" type="button" id="pdMore" hidden></button>`;
   pdLoad({ reset: true });
-  PD.io?.disconnect();
-  PD.io = new IntersectionObserver((ents) => { if (ents.some((e) => e.isIntersecting)) pdLoad(); }, { rootMargin: "600px 0px" });
-  PD.io.observe($("#pdMore"));
 }
-async function pdLoad({ reset = false, letter = null } = {}) {
+/** reset: first 25 of the current filter / search / letter; otherwise append the next 25. */
+async function pdLoad({ reset = false } = {}) {
   if (role !== "player") return;
-  if (!reset && (PD.loading || PD.next >= PD.total)) return;
+  if (!reset && (PD.loading || PD.base + PD.loaded >= PD.total)) return;
   const my = reset ? ++PD.seq : PD.seq;
   PD.loading = true;
-  const qs = new URLSearchParams({ filter: PD.filter, limit: "60" });
-  if (letter) qs.set("letter", letter); else qs.set("offset", reset ? "0" : String(PD.next));
+  const qs = new URLSearchParams({ filter: PD.filter, limit: String(PAGE) });
+  if (PD.q) qs.set("q", PD.q);
+  if (reset && PD.letter) qs.set("letter", PD.letter); else qs.set("offset", reset ? "0" : String(PD.base + PD.loaded));
+  const more = $("#pdMore"); if (more && !reset) { more.disabled = true; more.classList.add("busy"); }
   try {
-    const j = await fetch(`/api/players/directory?${qs}`).then((r) => r.json());
+    const d = (await fetch(`/api/players/directory?${qs}`).then((r) => r.json())).data;
     if (my !== PD.seq || role !== "player") return;
-    const d = j.data; const list = $("#pdList"); if (!list) return;
-    PD.total = d.total; PD.letters = d.letters; PD.next = d.offset + d.players.length;
-    if (reset || letter) list.innerHTML = "";
-    list.insertAdjacentHTML("beforeend", d.players.map(pdRow).join("") || `<li class="empty">No players match this filter.</li>`);
-    $("#pdCount").textContent = `${d.total.toLocaleString("en-US")} players · A–Z by last name${letter ? ` · from ${letter}` : ""}`;
-    document.querySelectorAll("[data-pdl]").forEach((b) => { b.disabled = d.letters[b.dataset.pdl] == null; });
-    if (letter) $("#pdCount").scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-  } catch { if (my === PD.seq) $("#pdCount").textContent = "The directory is unavailable right now. Search still works."; }
-  finally { if (my === PD.seq) PD.loading = false; }
+    const list = $("#pdList"); if (!list) return;
+    if (reset) { PD.base = d.offset; PD.loaded = 0; PD.total = d.total; list.innerHTML = ""; }
+    PD.loaded += d.players.length;
+    list.insertAdjacentHTML("beforeend", d.players.map(pdRow).join("") || (reset ? `<li class="empty">No players match${PD.q ? ` “${esc(PD.q)}”` : ""}.</li>` : ""));
+    const avail = PD.total - PD.base, n = (x) => x.toLocaleString("en-US");
+    $("#pdCount").textContent = `${n(PD.total)} players${PD.q ? ` matching “${PD.q}”` : ""} · A–Z by last name${PD.letter ? ` · from ${PD.letter}` : ""}`;
+    document.querySelectorAll("[data-pdl]").forEach((b) => { b.disabled = d.letters[b.dataset.pdl] == null; b.setAttribute("aria-pressed", String(b.dataset.pdl === PD.letter)); });
+    if (more) {
+      more.hidden = PD.loaded >= avail;
+      more.innerHTML = `<span>Show More <small>(Showing ${n(PD.loaded)} of ${n(avail)}${PD.letter ? ` from ${PD.letter}` : ""})</small></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    }
+  } catch { if (my === PD.seq) $("#pdCount").textContent = "The directory is unavailable right now."; }
+  finally { if (my === PD.seq) { PD.loading = false; if (more) { more.disabled = false; more.classList.remove("busy"); } } }
 }
-document.addEventListener("click", (e) => {
+document.addEventListener("click", async (e) => {
   const f = e.target.closest("[data-pdf]");
-  if (f) { PD.filter = f.dataset.pdf; document.querySelectorAll("[data-pdf]").forEach((x) => x.setAttribute("aria-selected", String(x === f))); PD.next = 0; pdLoad({ reset: true }); return; }
+  if (f) { PD.filter = f.dataset.pdf; PD.letter = null; document.querySelectorAll("[data-pdf]").forEach((x) => x.setAttribute("aria-selected", String(x === f))); pdLoad({ reset: true }); return; }
   const L = e.target.closest("[data-pdl]");
-  if (L && !L.disabled) { ++PD.seq; PD.loading = false; pdLoad({ letter: L.dataset.pdl }); }
+  if (L && !L.disabled) { PD.letter = PD.letter === L.dataset.pdl ? null : L.dataset.pdl; PD.loading = false; pdLoad({ reset: true }); return; }
+  if (e.target.closest("#pdMore")) { pdLoad(); return; }
+  const h = e.target.closest("[data-hist]");
+  if (h) {      // a player only the historical index knows: find his ESPN profile by name, else show what the index has
+    const { name, years, pos, lg, hof } = h.dataset;
+    const r = await fetch(`/api/players/resolve?name=${encodeURIComponent(name)}`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+    if (r?.data?.id) { remember({ kind: "player", id: r.data.id, name }); shell.encyclopedia.openProfile(r.data.id); return; }
+    sheet.open({ title: "Profile", render(body) {
+      body.innerHTML = `<div class="enc-hero"><div class="enc-face">${pdFace({ name })}</div><div class="enc-id"><h3>${esc(name)}</h3>
+        <div class="enc-sub"><span class="enc-team">${esc(lg || "NBA")}</span>${pos ? `<span>${esc(pos)}</span>` : ""}</div></div></div>
+        <div class="enc-facts">${years ? `<div class="enc-fact"><small>Career</small><b>${esc(years)}</b></div>` : ""}${hof ? `<div class="enc-fact"><small>Hall of Fame</small><b>${hof === "player" ? "Inducted" : `As ${esc(hof)}`}</b></div>` : ""}</div>
+        <p class="enc-note">ESPN has no stats profile for this player. Career years, position and league come from the historical player index.</p>`;
+    } });
+  }
 });
 async function renderDir() {
   const r = role;

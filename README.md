@@ -615,3 +615,17 @@ Built by an offline generator that cross-checks editorial data against ESPN:
   - All-time career leaderboards are live: active players' ESPN career totals, plus games the ESPN season line hasn't counted yet. They're re-sorted every 30 minutes and served to the chat and to `/nba_history.json`.
   - Leader questions get live 2026-27 season leaders.
 - **McConnell card:** "Daily NBA Wordle — guess the mystery NBA player in 8 tries using team, conference, division, position, height, age and jersey-number clues."
+
+## Round 18: every player in NBA/ABA/BAA history, Show More paging
+
+- **`scripts/sync-all-nba-players.ts`** builds **`all_players.json`**: 5,467 players, one row per person, deduplicated by Basketball-Reference id. Run it with `node --experimental-strip-types scripts/sync-all-nba-players.ts`; downloads are cached in `scripts/.cache/`, and `--refresh` re-downloads them.
+  - Each row has its leagues, a position and **G/F/C groups** (every player has one, from the career position, then the season positions, then height), career years (first season start – last season end, e.g. Kareem 1969–1989), Hall of Fame role, Top 75 flag, NBA.com person id (headshots) and ESPN id where known.
+  - Sources: the open, Basketball-Reference-derived [bball-reference-datasets](https://github.com/sumitrodatta/bball-reference-datasets) (career and season files) and [nba_api](https://github.com/swar/nba_api)'s static player index (NBA.com ids).
+  - The build fails if the Top 75 isn't exactly 76 honorees, or if any player lacks a G/F/C group.
+- **Hall of Fame:** all 180 inductees who played. 155 were inducted as players; Riley, Phil Jackson, Larry Brown, Attles, Embry and others went in as coaches or contributors and are badged "HOF coach" / "HOF contrib.".
+- **Directory:** `/api/players/directory?filter=…&q=…&letter=…&offset=…&limit=25` merges the index with live ESPN rosters. Active players keep team badges, ESPN ids and live status, and appear under their roster names. Matching ignores suffixes and punctuation ("Jimmy Butler III" = "Jimmy Butler", "AJ Green" = "A.J. Green"). Rookies not yet in the index are added.
+- **Archive → Players UI:**
+  - Shows 25 rows, then a **Show More (Showing 25 of N) ⌄** button that adds 25 per tap.
+  - The count resets to 25 on any filter pill, A–Z letter or search change. In the Players view the search box filters the directory.
+  - Headshots try NBA.com's CDN, then ESPN, then the initials badge.
+  - Players ESPN knows open their full profile, found via `/api/players/resolve?name=`; the rest open a short index card.

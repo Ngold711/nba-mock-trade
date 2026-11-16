@@ -1063,3 +1063,11 @@ body.has-shell, body.has-orb, body.has-shell.has-orb { padding-bottom: 0; }
 .pd-tag { font: 800 0.5625rem/1 var(--font-mono, ui-monospace); letter-spacing: 0.06em; padding: 0.3rem 0.35rem; border-radius: 0.35rem; }
 .pd-tag.hof { background: rgba(245,158,11,.16); color: #F59E0B; }
 .pd-tag.t75 { background: rgba(99,102,241,.16); color: #818CF8; }
+.pd-more { display: flex; align-items: center; justify-content: center; gap: 0.4rem; width: 100%; min-height: 48px; margin: 0.6rem 0 0.25rem; border: 0; border-radius: 0.9rem;
+  background: var(--fill); color: var(--label); font: inherit; font-size: 0.9375rem; font-weight: 650; cursor: pointer; }
+.pd-more small { color: var(--label-3); font-weight: 500; margin-left: 0.2rem; }
+.pd-more svg { width: 1.1rem; height: 1.1rem; color: var(--label-2); }
+.pd-more[hidden] { display: none; }
+.pd-more.busy { opacity: 0.6; }
+.pd-letters button[aria-pressed="true"] { background: var(--accent); color: #111; }
+.pd-tag.hof.role { background: rgba(148,163,184,.16); color: var(--label-2); }

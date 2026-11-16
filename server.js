@@ -594,7 +594,7 @@ async function feedRoute(req, res, m, q) {
 /* =====================================================================
    Player Encyclopedia: search (active rosters + all-time legends + ESPN) and the full profile.
    ===================================================================== */
-import { searchLocal, mergeSearch, trophies, draftOf } from "./service/player.js";
+import { searchLocal, mergeSearch, trophies, draftOf, norm } from "./service/player.js";
 import { searchPeople, personProfile, frontOffices, byPlayerId, directory } from "./service/people.js";
 import { wikiLookup } from "./service/wiki.js";
 import { buildDirectory, filterDirectory } from "./service/directory.js";
@@ -653,25 +653,39 @@ async function playerSearchRoute(req, res, m, q) {
 }
 /** ESPN's displayDOB is day/month/year ("17/2/1963") → "Feb 17, 1963". */
 const fmtDob = (d) => { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(d || "")); return m ? new Date(Date.UTC(+m[3], +m[2] - 1, +m[1])).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : String(d || ""); };
-/** Unified A–Z player directory (active + legends), paged: ?filter=all|active|hof|top75|G|F|C&letter=K&offset=0&limit=60 */
+/** Unified A–Z player directory: every NBA/ABA/BAA player (all_players.json) merged with live rosters, paged.
+ *  ?filter=all|active|hof|top75|G|F|C&q=name&letter=K&offset=0&limit=25 */
 let dirCache = { at: 0, list: null };
+let allPlayers = null;
+const loadAllPlayers = () => (allPlayers ||= readFile(join(ROOT, "all_players.json"), "utf8").then(JSON.parse).catch(() => null));
 async function playerDirectoryRoute(req, res, m, q) {
   if (!dirCache.list || Date.now() - dirCache.at > 10 * 60e3) {
-    const [league, d] = await Promise.all([store.get("league").then((r) => r.data).catch(() => null), chatData().catch(() => ({}))]);
-    const list = buildDirectory({ league, legends: d.history?.legends || [] });
-    if (list.length) dirCache = { at: Date.now(), list };
+    const [league, d, all] = await Promise.all([store.get("league").then((r) => r.data).catch(() => null), chatData().catch(() => ({})), loadAllPlayers()]);
+    const list = buildDirectory({ league, legends: d.history?.legends || [], all });
+    if (list.length) dirCache = { at: league ? Date.now() : Date.now() - 9 * 60e3, list };   // retry soon if rosters weren't loaded yet
   }
   const filter = ["all", "active", "hof", "top75", "G", "F", "C"].includes(q.get("filter")) ? q.get("filter") : "all";
-  const rows = filterDirectory(dirCache.list || [], filter);
+  const rows = filterDirectory(dirCache.list || [], filter, String(q.get("q") || "").slice(0, 40));
   const letters = {};
   rows.forEach((p, i) => { if (letters[p.letter] == null) letters[p.letter] = i; });
-  const limit = Math.min(200, Math.max(1, +q.get("limit") || 60));
+  const limit = Math.min(100, Math.max(1, +q.get("limit") || 25));
   const L = String(q.get("letter") || "").toUpperCase();
   let offset = Math.max(0, +q.get("offset") || 0);
   if (/^[A-Z]$/.test(L)) offset = letters[L] ?? Object.entries(letters).find(([k]) => k > L)?.[1] ?? rows.length;
   res.setHeader("cache-control", "public, max-age=120");
   return json(res, 200, { data: { filter, total: rows.length, offset, letters,
-    players: rows.slice(offset, offset + limit).map(({ key, g, ...p }) => p) } });
+    players: rows.slice(offset, offset + limit).map(({ key, g, letter, ...p }) => p) } });
+}
+/** ESPN athlete id for a historical player the directory only knows by name (?name=&from=&to=). */
+async function playerResolveRoute(req, res, m, q) {
+  const name = String(q.get("name") || "").trim().slice(0, 60);
+  if (name.length < 3) return json(res, 400, { error: "name required" });
+  const hits = await timeout(store.get("search", { q: name.toLowerCase() }).then((r) => r.data).catch(() => []), 4500, []);
+  const k = norm(name);
+  const same = (hits || []).filter((h) => norm(h.name) === k);
+  res.setHeader("cache-control", "public, max-age=3600");
+  if (same.length === 1) return json(res, 200, { data: { id: String(same[0].id) } });
+  return json(res, 404, { error: same.length ? "ambiguous" : "not found" });
 }
 async function personRoute(req, res, m) {
   const dir = await peopleDirectory();
@@ -740,6 +754,7 @@ const routes = [
   [/^\/api\/feed$/, feedRoute],
   [/^\/api\/players\/search$/, playerSearchRoute],
   [/^\/api\/players\/directory$/, playerDirectoryRoute],
+  [/^\/api\/players\/resolve$/, playerResolveRoute],
   [/^\/api\/players\/(\d{1,12}|x-[a-z0-9-]{2,40})\/full$/, playerFullRoute],
   [/^\/api\/people\/([a-z0-9-]{3,40})$/, personRoute],
   [/^\/api\/front-offices$/, frontOfficesRoute],
