@@ -583,3 +583,15 @@ Built by an offline generator that cross-checks editorial data against ESPN:
   - BAA: `1948 BAA • Rd 1 • Pick #4 (NYK)`
   - Otherwise `Undrafted`, never `Rd null` / `Pick #undefined`.
 - ESPN draft lines get the drafting franchise of that year (`draftTeamAt` in `service/player.js`): Kobe 1996 → CHH, Chris Paul 2005 → NOH, 1993 Washington → WSB.
+
+## Round 16: GM Lab bento grid, centered Archive hero, footer clearance
+
+- **GM Lab** (`gmlab.html`) is a three-card bento grid (no emoji tiles):
+  - A dark obsidian hero card (*NBA Trade Machine*) spans both columns. It shows the most-rumored trade player's ESPN headshot over faint logos of the most-rumored teams, from `/api/trending-trades`.
+  - *3-2-1 Lottery & Mock Draft* shows a #1 lottery ball and the live **#1 seed** (worst record) with its chance at the first pick under the 3-2-1 format. The format flattens the bottom three, so the label is "#1 Seed", not "#1 Odds".
+  - *All-Star, Awards & 2K27* shows a diamond OVR badge and the live 2K27 #1 player from `/api/2k-ratings`.
+  - Each card opens its tool, which shows a `‹ GM Lab` back link at top-left.
+- **Archive:** with an empty search on All or Players, the hero is centered in the space between header and tab bar (at least 66vh).
+  - It holds a 30px "Archive" title, the subtitle "Every player, coach, GM & owner since 1946", the rounded search bar, a single row of role pills, a 2×2 grid of quick tiles (recent searches once you have some) and one line of amber text links.
+  - Typing, or picking Coaches / Front Office / Owners, docks the search to the top with a 380ms transition (none with reduced motion).
+- **Footer:** `.app-footer` keeps `pb-24` (6rem, plus the tab bar and any Ask-pill lift) under its badge and disclaimer, so the floating ✦ Ask Hooptrax pill never covers them. That includes the Trade Machine, where the pill sits higher above the trade tray.

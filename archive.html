@@ -42,19 +42,23 @@
 </head>
 <body>
 <header class="bar" id="bar"></header>
-<main class="hub-page archive">
+<main class="hub-page archive is-hero">
+  <div class="arch-top">
   <h1 class="large-title">Archive</h1>
+  <p class="arch-sub">Every player, coach, GM &amp; owner since 1946</p>
   <div class="ref-search">
     <label class="ref-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M15.5 15.5 20 20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-      <input id="refQ" type="search" enterkeyhint="search" placeholder="Search any player, coach, GM, or owner..." autocomplete="off" autocapitalize="words" spellcheck="false" aria-label="Search the NBA archive" />
+      <input id="refQ" type="search" enterkeyhint="search" placeholder="Search players, coaches, GMs, owners..." autocomplete="off" autocapitalize="words" spellcheck="false" aria-label="Search the NBA archive" />
       <button class="ref-clear" id="refClear" type="button" aria-label="Clear search" hidden>✕</button></label>
     <div class="ref-filters" role="tablist" aria-label="Filter">
       <button type="button" role="tab" data-role="" aria-selected="true">All</button><button type="button" role="tab" data-role="player" aria-selected="false">Players</button><button type="button" role="tab" data-role="coach" aria-selected="false">Coaches</button><button type="button" role="tab" data-role="exec" aria-selected="false">Front Office</button><button type="button" role="tab" data-role="owner" aria-selected="false">Owners</button>
     </div>
   </div>
-  <nav class="ref-links" aria-label="Browse the archive">
-    <button class="press" type="button" data-browse="leaders">All-Time Leaders</button><button class="press" type="button" data-browse="awards">Champions &amp; Awards</button><button class="press" type="button" data-browse="retired">Retired Jerseys</button>
+  <div class="arch-quick" id="archQuick"></div>
+  <nav class="arch-links" aria-label="Browse the archive">
+    <button type="button" data-browse="leaders">All-Time Leaders</button><span aria-hidden="true">•</span><button type="button" data-browse="awards">Champions &amp; Awards</button><span aria-hidden="true">•</span><button type="button" data-browse="retired">Retired Jerseys</button>
   </nav>
+  </div>
   <ul class="list enc-results ref-results" id="refResults" hidden></ul>
   <section id="refDir" aria-live="polite"></section>
 </main>
@@ -79,8 +83,17 @@ let role = ["player", "coach", "exec", "owner"].includes(params.get("role")) ? p
 const q = $("#refQ"), clear = $("#refClear"), res = $("#refResults"), dir = $("#refDir");
 let wikiMod = null;
 const browserWiki = (term, r) => (wikiMod ||= import("./service/wiki.js")).then((m) => m.wikiLookup(term, { role: r })).catch(() => []);
+const main = document.querySelector("main.archive");
+/** Hero (centered Spotlight) while nothing is typed on All/Players; docked to the top otherwise. */
+function updateMode() {
+  const hero = q.value.trim().length < 2 && (!role || role === "player");
+  if (main.classList.contains("is-hero") === hero) return;
+  main.classList.toggle("is-hero", hero);
+  if (!hero) window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+}
 async function search() {
   const term = q.value.trim();
+  updateMode();
   clear.hidden = !term;
   if (term.length < 2) { res.hidden = true; dir.hidden = false; if (!role || role === "player") renderDir(); return; }
   res.hidden = false; dir.hidden = true;
@@ -110,7 +123,7 @@ function setRole(r) {
   role = r;
   document.querySelectorAll(".ref-filters [data-role]").forEach((x) => x.setAttribute("aria-selected", String(x.dataset.role === r)));
   const u = new URL(location.href); r ? u.searchParams.set("role", r) : u.searchParams.delete("role"); history.replaceState(null, "", u);
-  renderDir(); search();
+  updateMode(); renderDir(); search();
 }
 document.querySelectorAll(".ref-filters [data-role]").forEach((b) => b.addEventListener("click", () => setRole(b.dataset.role)));
 
@@ -130,12 +143,12 @@ const face = (src, name) => `<span class="dir-face">${src ? `<img src="${esc(src
 const sk = (n) => `<ul class="dir-list">${Array.from({ length: n }, () => `<li class="dir-row"><span class="sk" style="width:2.5rem;height:2.5rem;border-radius:99px"></span><span class="sk" style="height:1rem;flex:1"></span></li>`).join("")}</ul>`;
 async function renderDir() {
   const r = role;
-  if (!r || r === "player") {          // calm, search-first landing: recent searches (or a few quick tries), then whitespace
-    const rec = recent();
-    dir.innerHTML = rec.length
-      ? `<div class="spot-h"><h2 class="group-h">Recent Searches</h2><button class="link spot-clear" type="button" data-recent-clear>Clear</button></div>
-         <div class="spot-chips">${rec.map((x, i) => `<button class="press" type="button" data-recent="${i}">${esc(x.name)}</button>`).join("")}</div>`
-      : `<h2 class="group-h">Try</h2><div class="spot-chips">${TRY.map((n) => `<button class="press" type="button" data-try="${esc(n)}">${esc(n)}</button>`).join("")}</div>`;
+  if (!r || r === "player") {          // centered Spotlight hero: 2×2 quick tiles (recent searches when there are any)
+    dir.innerHTML = "";
+    const rec = recent().slice(0, 4);
+    $("#archQuick").innerHTML = rec.length
+      ? `<div class="aq-h"><span>Recent</span><button class="link" type="button" data-recent-clear>Clear</button></div>${rec.map((x, i) => `<button class="press" type="button" data-recent="${i}">${esc(x.name)}</button>`).join("")}`
+      : TRY.map((n) => `<button class="press" type="button" data-try="${esc(n)}">${esc(n)}</button>`).join("");
     return;
   }
   const TITLE = { coach: "Head Coaches", exec: "Front Offices", owner: "Owners & Governors" };

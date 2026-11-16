@@ -42,38 +42,67 @@
 </head>
 <body>
 <header class="bar" id="bar"></header>
-<main class="hub-page">
+<main class="hub-page gm">
   <h1 class="large-title">GM Lab</h1>
   <p class="hub-lede">Run a front office: build trades, run the lottery, draft, and vote.</p>
-  <div class="launch-list">
-    <a class="launch press" href="index.html" style="--tint:#F59E0B">
-      <span class="launch-ic" aria-hidden="true">⇄</span>
-      <span class="launch-t"><b>NBA Trade Machine</b><small>Build 2026–27 CBA deals &amp; check cap rules</small><span class="launch-chip" id="chipTrade"></span></span>
-      <span class="chev" aria-hidden="true">›</span></a>
-    <a class="launch press" href="draft.html" style="--tint:#10B981">
-      <span class="launch-ic" aria-hidden="true">🎲</span>
-      <span class="launch-t"><b>3-2-1 Lottery &amp; Mock Draft</b><small>2K envelope reveal &amp; 2027–2029 mock boards</small><span class="launch-chip" id="chipDraft"></span></span>
-      <span class="chev" aria-hidden="true">›</span></a>
-    <a class="launch press" href="awards.html" style="--tint:#6366F1">
-      <span class="launch-ic" aria-hidden="true">🏆</span>
-      <span class="launch-t"><b>All-Star Ballot, Awards &amp; 2K27</b><small>Vote starters, track MVP races &amp; live 2K ratings</small><span class="launch-chip" id="chipAwards"></span></span>
-      <span class="chev" aria-hidden="true">›</span></a>
+  <div class="bento">
+    <a class="bento-card bento-hero press" href="index.html" aria-label="NBA Trade Machine: simulate deals, match salaries and swap picks">
+      <span class="bc-text">
+        <b class="bc-title">NBA Trade Machine</b>
+        <small class="bc-sub">Simulate deals, match salaries &amp; swap picks</small>
+        <span class="bc-live" id="tradeLive"><span class="sk" style="width:9rem;height:.9rem;border-radius:99px"></span></span>
+      </span>
+      <span class="bc-visual" id="tradeVis" aria-hidden="true"></span>
+    </a>
+    <a class="bento-card bento-sq bento-lottery press" href="draft.html" aria-label="3-2-1 Lottery and Mock Draft">
+      <b class="bc-title">3-2-1 Lottery &amp; Mock Draft</b>
+      <span class="lotto-ball" aria-hidden="true"><span>1</span></span>
+      <span class="odds-badge" id="oddsBadge"><span class="sk" style="width:6.5rem;height:.9rem;border-radius:99px"></span></span>
+    </a>
+    <a class="bento-card bento-sq bento-awards press" href="awards.html" aria-label="All-Star, Awards and 2K27 ratings">
+      <b class="bc-title">All-Star, Awards &amp; 2K27</b>
+      <span class="ovr-badge" id="ovrBadge" aria-hidden="true"><b>—</b><small>OVR</small></span>
+      <span class="lead-tag" id="leadTag"><span class="sk" style="width:6rem;height:.9rem;border-radius:99px"></span></span>
+    </a>
   </div>
 </main>
 <script src="data.js"></script>
 <script type="module">
 import { mountShell } from "./ui/shell.js";
+import { projectLottery, lotteryTable, DEFAULT_FORMAT } from "./service/draft.js";
 mountShell({ active: "gmlab" });
-const chip = (id, html) => { const el = document.getElementById(id); if (el && html) { el.innerHTML = html; el.classList.add("on"); } };
+const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-// quiet live previews: one line each, never blocking the hub
-fetch("/api/trending-trades").then((r) => r.json()).then(({ data }) => { const p = data?.players?.[0]; if (p) chip("chipTrade", `🔥 Most rumored: ${esc(p.name)} (${esc(p.team.code)})`); }).catch(() => {});
+const ESPN = { GSW: "gs", NOP: "no", NYK: "ny", SAS: "sa", UTA: "utah", WAS: "wsh" };
+const logo = (code) => `https://a.espncdn.com/i/teamlogos/nba/500/${ESPN[code] || String(code).toLowerCase()}.png`;
+const img = (src, cls, alt = "") => `<img class="${cls}" src="${esc(src)}" alt="${esc(alt)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`;
+const clear = (id) => { const el = $(id); if (el) el.textContent = ""; };
+
+// Trade Machine hero: the most-rumored player right now, over faint logos of the most-rumored teams
+fetch("/api/trending-trades").then((r) => r.json()).then(({ data }) => {
+  const list = data?.players || []; const p = list[0];
+  if (!p) return clear("tradeLive");
+  const teams = [...new Set(list.slice(0, 6).map((x) => x.team?.code).filter(Boolean))].slice(0, 3);
+  $("tradeVis").innerHTML = `${teams.map((t, i) => img(logo(t), `bv-logo l${i}`)).join("")}${img(`https://a.espncdn.com/i/headshots/nba/players/full/${p.id}.png`, "bv-face", p.name)}`;
+  $("tradeLive").innerHTML = `<span class="dot" aria-hidden="true"></span>Most rumored: <b>${esc(p.name)}</b> · ${esc(p.team?.code || "")}`;
+}).catch(() => clear("tradeLive"));
+
+// Lottery: the No. 1 lottery seed (worst record) from live standings and its odds at the first pick under the
+// 3-2-1 format. That format flattens the bottom, so seed 1 is not the favorite for #1: label it as the seed.
 fetch("/api/standings").then((r) => r.json()).then(({ data }) => {
-  const all = (data?.conferences || []).flatMap((c) => c.teams || []);
-  const worst = all.filter((t) => t.wins + t.losses > 0).sort((a, b) => a.wins / (a.wins + a.losses) - b.wins / (b.wins + b.losses))[0];
-  if (worst) chip("chipDraft", `Worst record: ${esc(worst.team.displayName || worst.team.abbr)} ${worst.wins}-${worst.losses}`);
-}).catch(() => {});
-fetch("/api/2k-ratings").then((r) => r.json()).then(({ data }) => { const p = data?.players?.[0]; if (p) chip("chipAwards", `2K27 #1: ${esc(p.name)} · ${p.ovr}`); }).catch(() => {});
+  const proj = projectLottery(data, DEFAULT_FORMAT, () => 0.5);
+  const table = lotteryTable(DEFAULT_FORMAT, { balls: proj.balls, order: proj.order, ties: proj.lottery.map((t) => t.tie) });
+  const o = proj.order[0]; const code = typeof o === "string" ? o : o?.team;
+  if (!code) return clear("oddsBadge");
+  $("oddsBadge").innerHTML = `${img(logo(code), "ob-logo")}<span class="tg"><small title="Chance at the first pick">#1 Seed · ${(table[0].p1 * 100).toFixed(1)}%</small><b>${esc(code)}</b></span>`;
+}).catch(() => clear("oddsBadge"));
+
+// 2K27: the highest-rated player
+fetch("/api/2k-ratings").then((r) => r.json()).then(({ data }) => {
+  const p = data?.players?.[0]; if (!p) return clear("leadTag");
+  $("ovrBadge").innerHTML = `<b>${esc(p.ovr)}</b><small>OVR</small>`;
+  $("leadTag").innerHTML = `<span class="tg"><small>2K27 #1</small><b>${esc(p.name)}</b></span>`;
+}).catch(() => clear("leadTag"));
 </script>
 </body>
 </html>
