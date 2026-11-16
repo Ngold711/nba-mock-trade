@@ -780,3 +780,5 @@ Built by an offline generator that cross-checks editorial data against ESPN:
 - New All-Time Point Guards / Shooting Guards / Small Forwards / Power Forwards / Centers lists: 25–28 curated legends and active greats each (`service/alltime.js`).
   - Names are resolved against the full archive, with official headshots.
   - Namesakes go to the Hall of Famer.
+
+**Round 26 follow-up:** Who He Play For? headshots stay in full color. The tight chin-up crop (`scale(1.42)`) alone hides the collar while the clock runs, then zooms out to `scale(1)` on the answer or at the buzzer.

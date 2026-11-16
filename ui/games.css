@@ -86,9 +86,9 @@
 .hl-actions[hidden] { display: none; }
 .tierlist .tl-board, .tierlist .tl-tray, .tierlist .tl-badge { user-select: none; -webkit-user-select: none; }
 
-/* Who He Play For?: face-only crop + grayscale while the clock runs (no collar, trim or team colors) */
-.wp-face .avatar-img { object-position: center 14%; transform-origin: 50% 24%; transition: opacity 200ms ease, filter 450ms ease, transform 450ms cubic-bezier(.2,.8,.2,1); }
-.wp-face.hidden-team .avatar-img { filter: grayscale(100%) contrast(1.08); transform: scale(1.42); }
+/* Who He Play For?: tight face-only crop while the clock runs (no collar or trim), zoom out to reveal the jersey */
+.wp-face .avatar-img { object-position: center 14%; transform-origin: 50% 24%; transition: opacity 200ms ease, transform 450ms cubic-bezier(.2,.8,.2,1); }
+.wp-face.hidden-team .avatar-img { transform: scale(1.42); }   /* full color; the tight chin-up crop alone hides the collar */
 .wp-face.hidden-team .avatar::before { background: #334155; }
 .wp-mode { margin: 0 0 0.4rem; font-size: 0.8125rem; min-height: 0; }
 .wp-final small { color: var(--label-3); font-size: 0.75rem; }
